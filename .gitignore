@@ -22,3 +22,8 @@
 /resource/RC*
 
 /resource/expected_locale_keys
+
+# Agent tooling caches
+/.serena/
+/.claude/worktrees/
+/.claude/settings.local.json

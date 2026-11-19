@@ -1,0 +1,635 @@
+<title>Card Editing Prototype</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<!--
+  PROTOTYPE — throwaway. Wayfinder ticket "How should a phone-portrait user edit a card?" (Gitea #7, map #1).
+  Plan: three structurally different card-editing models for a phone in portrait, switchable via #a / #b / #c
+  (hash instead of ?variant= so it also works as a published artifact). Open this file directly; no build.
+  The card is an HTML stand-in for the bitmap the C++ core will render (ADR 0004); the latency control fakes
+  that render delay.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600&display=swap">
+<style>
+/* Layout: a phone frame beside a notes panel on desktop; on a real phone the frame fills the viewport and the notes follow below. */
+:root {
+  --bg: #eceff3; --surface: #ffffff; --surface2: #f2f4f7; --fg: #17202b; --muted: #5a6676;
+  --line: #d5dbe3; --accent: #2f5d8a; --accent-fg: #ffffff; --bezel: #1b2129; --scrim: rgba(10,14,20,.55);
+  --sel: #e39a2d;
+  --ui: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --head: 'Space Grotesk', 'Inter', system-ui, sans-serif;
+  --cardfont: 'Crimson Pro', Georgia, 'Times New Roman', serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0e1217; --surface: #171d24; --surface2: #1f262f; --fg: #e5eaf0; --muted: #98a4b3;
+  --line: #2b343f; --accent: #8db4de; --accent-fg: #0c1621; --bezel: #04060a; --scrim: rgba(0,0,0,.65);
+  --sel: #f0b24e; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #0e1217; --surface: #171d24; --surface2: #1f262f; --fg: #e5eaf0; --muted: #98a4b3;
+  --line: #2b343f; --accent: #8db4de; --accent-fg: #0c1621; --bezel: #04060a; --scrim: rgba(0,0,0,.65);
+  --sel: #f0b24e; color-scheme: dark; }
+
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body { background: var(--bg); color: var(--fg); font-family: var(--ui); font-size: 14px; }
+button, input, textarea, select { font-family: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.stage { display: flex; gap: 32px; justify-content: center; align-items: flex-start; flex-wrap: wrap;
+  padding-block: 24px 96px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.phone { width: 390px; height: 800px; max-width: 100%; border: 10px solid var(--bezel); border-radius: 40px; overflow: hidden;
+  background: var(--surface); position: relative; display: flex; flex-direction: column; flex: none; }
+.notes { width: 380px; max-width: 100%; min-width: 0; display: flex; flex-direction: column; gap: 16px; }
+@media (max-width: 520px) {
+  .stage { display: block; padding: 0; }
+  .phone { width: 100%; height: calc(100dvh - 64px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); border: 0; border-radius: 0; }
+  .notes { width: auto; padding-block: 24px 96px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+}
+
+/* Prototype switcher: deliberately not part of the design under test */
+.switcher { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(10px + env(safe-area-inset-bottom, 0px)); z-index: 50;
+  display: flex; align-items: center; gap: 2px; background: var(--fg); color: var(--bg); border-radius: 999px; padding: 4px;
+  box-shadow: 0 6px 20px rgba(0,0,0,.3); font: 600 13px var(--ui); }
+.switcher button { background: none; border: 0; color: inherit; font: inherit; font-size: 18px; width: 38px; height: 38px; border-radius: 50%; cursor: pointer; }
+.switcher button:hover { background: color-mix(in srgb, var(--bg) 18%, transparent); }
+.switcher span { padding: 0 8px; white-space: nowrap; }
+
+/* App chrome */
+.appbar { display: flex; align-items: center; gap: 6px; padding: 8px 10px; border-bottom: 1px solid var(--line); background: var(--surface); min-height: 56px; flex: none; }
+.appbar h1 { font: 600 16px var(--head); margin: 0; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-left: 4px; }
+.appbar small { color: var(--muted); font: 400 13px var(--ui); margin-left: 6px; }
+.appbar select { flex: 1; min-width: 0; height: 40px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface2); color: var(--fg); padding: 0 10px; font-size: 15px; }
+.ib { min-width: 40px; height: 40px; border: 0; background: none; color: var(--fg); border-radius: 10px; font: 600 15px var(--ui); cursor: pointer; padding: 0 10px; flex: none; }
+.ib.big { font-size: 22px; }
+.ib:hover { background: var(--surface2); }
+.ib.on { background: var(--surface2); color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.ib.primary { background: var(--accent); color: var(--accent-fg); }
+.screen { flex: 1; min-height: 0; position: relative; display: flex; flex-direction: column; background: var(--surface2); }
+.scroll { overflow: auto; flex: 1; min-height: 0; }
+.hintline { font-size: 12px; color: var(--muted); line-height: 1.4; margin: 0; }
+.center { text-align: center; }
+.btn { min-height: 42px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); font: 600 14px var(--ui); cursor: pointer; padding: 0 14px; }
+.btn.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+.btn.small { min-height: 34px; font-size: 13px; }
+
+/* Field editors (shared by all variants: the question is where they live, not what they are) */
+.ed { display: flex; flex-direction: column; gap: 8px; }
+.ed input, .ed textarea { width: 100%; font-size: 16px; color: var(--fg); background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+.ed textarea { min-height: 84px; resize: vertical; font-family: var(--cardfont); font-size: 18px; line-height: 1.3; }
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.pair label { font-size: 12px; color: var(--muted); display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { border: 1px solid var(--line); background: var(--surface); color: var(--fg); border-radius: 999px; padding: 0 12px; height: 36px; font: 500 13px var(--ui); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; flex: none; }
+.chip[aria-pressed="true"] { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+.sw { width: 12px; height: 12px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(0,0,0,.3); }
+.symbar { display: flex; gap: 5px; flex-wrap: wrap; }
+.symbar button { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; height: 36px; min-width: 36px; cursor: pointer; display: grid; place-items: center; padding: 0 4px; }
+.artrow { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.artthumb { width: 104px; aspect-ratio: 315 / 230; max-width: 100%; border-radius: 6px; overflow: hidden; position: relative; background: #222; flex: none; }
+.artthumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.artbtns { display: flex; gap: 8px; flex-wrap: wrap; }
+.filebtn { position: relative; overflow: hidden; display: inline-grid; place-items: center; }
+.filebtn input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+
+/* ---- The card: stand-in for the core's rendered bitmap. Card colours are content, identical in both themes. ---- */
+.cardhost { position: relative; }
+.cardhost.busy::after { content: "Rendering…"; position: absolute; top: 8px; right: 8px; background: var(--fg); color: var(--bg); font: 600 11px var(--ui); padding: 3px 8px; border-radius: 999px; z-index: 4; }
+.cardwrap { position: relative; overflow: hidden; margin: 0 auto; }
+.card { position: absolute; left: 0; top: 0; width: 375px; height: 523px; border-radius: 18px; background: var(--bd); transform-origin: 0 0;
+  font-family: var(--cardfont); color: #17130e; user-select: none; -webkit-user-select: none; cursor: pointer; }
+.card .frame { position: absolute; inset: 17px 17px 30px 17px; border-radius: 6px; background: var(--fr); }
+.card .r { position: absolute; }
+.card .namebar, .card .typebar { left: 24px; width: 327px; background: var(--box); border-radius: 14px / 50%; box-shadow: inset 0 0 0 1.5px rgba(0,0,0,.4), 0 1px 2px rgba(0,0,0,.35);
+  display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 0 8px 0 11px; }
+.card .namebar { top: 22px; height: 31px; }
+.card .typebar { top: 289px; height: 29px; }
+.card .name { font-weight: 700; font-size: 18.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; line-height: 31px; }
+.card .type { font-weight: 700; font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; line-height: 29px; }
+.card .cost { display: flex; gap: 2px; flex: none; min-width: 22px; height: 24px; align-items: center; justify-content: flex-end; }
+.card .ph { color: rgba(0,0,0,.35); font-weight: 400; font-style: italic; }
+.ms { width: 17px; height: 17px; border-radius: 50%; display: inline-grid; place-items: center; font: 700 10px var(--ui); color: #111; background: #cdc7c1; box-shadow: -1px 1px 0 rgba(0,0,0,.65); flex: none; }
+.ms.W { background: #f7f2d4; } .ms.U { background: #a9cce8; } .ms.B { background: #b8ada7; } .ms.R { background: #eb9d7f; } .ms.G { background: #9cc497; }
+.card .textbox .ms { width: 14px; height: 14px; font-size: 8.5px; vertical-align: -2px; box-shadow: none; margin: 0 1px; }
+.symbar .ms { box-shadow: none; }
+.card .art { left: 30px; top: 56px; width: 315px; height: 230px; overflow: hidden; background: #222; box-shadow: 0 0 0 1.5px rgba(0,0,0,.55); }
+.card .art img, .cropframe img { width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; transform-origin: 50% 50%; }
+.card .rarity { width: 22px; height: 22px; display: grid; place-items: center; flex: none; }
+.gem { width: 17px; height: 17px; clip-path: polygon(50% 0, 100% 38%, 82% 100%, 18% 100%, 0 38%); background: #141414; }
+.gem.uncommon { background: linear-gradient(#eef3f6, #74838e); } .gem.rare { background: linear-gradient(#f6e08e, #94721b); }
+.gem.mythic { background: linear-gradient(#ffb862, #bd3417); } .gem.special { background: linear-gradient(#dbbdf3, #673591); }
+.card .textbox { left: 30px; top: 322px; width: 315px; height: 146px; background: var(--box); box-shadow: inset 0 0 0 1.5px rgba(0,0,0,.4);
+  padding: 7px 10px; display: flex; flex-direction: column; gap: 5px; font-size: 15.5px; line-height: 1.18; overflow: hidden; }
+.card .flavor { font-style: italic; min-height: 16px; }
+.card .flavor:not(.empty) { border-top: 1px solid rgba(0,0,0,.18); padding-top: 4px; }
+.card .pt { left: 281px; top: 466px; width: 72px; height: 30px; background: var(--box); border-radius: 7px; box-shadow: inset 0 0 0 1.5px rgba(0,0,0,.45), 0 1px 2px rgba(0,0,0,.4);
+  font-weight: 700; font-size: 20px; display: grid; place-items: center; }
+.card .artist, .card .num { top: 499px; font: 600 9.5px var(--ui); color: var(--foot); white-space: nowrap; }
+.card .artist { left: 28px; } .card .num { right: 28px; }
+.card .sel { outline: 3px solid var(--sel); outline-offset: 1px; z-index: 3; }
+.card.sel { outline: none; box-shadow: inset 0 0 0 5px var(--sel); }
+.hints .card [data-field]:not(.frame) { outline: 1.5px dashed var(--sel); outline-offset: 0; }
+.hints .card .frame { box-shadow: inset 0 0 0 2px var(--sel); }
+
+/* Variant A: tap the card */
+.a-area { padding: 16px; touch-action: pan-y; display: flex; flex-direction: column; gap: 12px; }
+.filmstrip { display: flex; gap: 8px; overflow-x: auto; padding: 8px 12px; border-top: 1px solid var(--line); background: var(--surface); flex: none; }
+.thumb { flex: none; padding: 0; border: 2px solid transparent; border-radius: 6px; background: none; cursor: pointer; opacity: .55; }
+.thumb.cur { opacity: 1; border-color: var(--accent); }
+.thumb .card { cursor: pointer; }
+.sheet { position: absolute; left: 0; right: 0; bottom: 0; background: var(--surface); border-radius: 18px 18px 0 0; box-shadow: 0 -8px 28px rgba(0,0,0,.22);
+  padding: 4px 14px 16px; max-height: 62%; overflow: auto; z-index: 5; display: flex; flex-direction: column; gap: 10px; }
+.grab { width: 38px; height: 4px; border-radius: 2px; background: var(--line); margin: 6px auto 0; flex: none; }
+.sheethead { display: flex; align-items: center; gap: 4px; }
+.sheethead h2 { flex: 1; font: 600 15px var(--head); margin: 0; text-align: center; }
+
+/* Variant B: field list */
+.b-preview { position: sticky; top: 0; z-index: 3; background: var(--surface2); border-bottom: 1px solid var(--line); display: flex; gap: 12px; padding: 10px 14px; align-items: flex-start; }
+.b-preview .meta { display: flex; flex-direction: column; gap: 6px; min-width: 0; flex: 1; }
+.b-preview .meta b { font: 600 15px var(--head); }
+.b-form { padding: 12px 14px 32px; display: flex; flex-direction: column; gap: 18px; }
+.group { display: flex; flex-direction: column; gap: 8px; }
+.group h3 { font: 600 11.5px var(--ui); text-transform: uppercase; letter-spacing: .07em; color: var(--muted); margin: 0; }
+.row { display: flex; flex-direction: column; gap: 8px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+.row > label, .row > .lbl { font: 600 13px var(--ui); }
+.row.focus { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.overlay { position: absolute; inset: 0; background: var(--scrim); z-index: 20; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 12px; padding: 16px; }
+.overlay > p { color: #fff; font-size: 13px; text-align: center; margin: 0; }
+
+/* Variant C: set grid + guided zoom */
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 12px; padding: 14px; }
+.gcell { cursor: pointer; display: flex; flex-direction: column; gap: 6px; font: 500 12px var(--ui); color: var(--muted); background: none; border: 0; padding: 0; text-align: left; }
+.gcell span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.viewer { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 16px; gap: 12px; touch-action: pan-y; }
+.zoomvp { flex: 1; min-height: 150px; position: relative; overflow: hidden; background: #0c0e11; }
+.zoomvp .card { transition: transform .32s cubic-bezier(.2,.7,.2,1); }
+.dock { flex: none; background: var(--surface); border-top: 1px solid var(--line); padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 10px; max-height: 58%; overflow: auto; }
+.fchips { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; flex: none; }
+.steps { display: flex; gap: 8px; } .steps .btn { flex: 1; }
+
+/* Crop */
+.cropbox { background: var(--surface); color: var(--fg); border-radius: 16px; padding: 14px; width: 100%; display: flex; flex-direction: column; gap: 12px; }
+.cropbox h2 { font: 600 16px var(--head); margin: 0; }
+.cropframe { width: 100%; aspect-ratio: 315 / 230; max-width: 100%; overflow: hidden; position: relative; border-radius: 4px; touch-action: none; cursor: grab; background: #222; }
+.cropframe::after { content: ""; position: absolute; inset: 0; pointer-events: none; background:
+  linear-gradient(to right, transparent 33.2%, rgba(255,255,255,.35) 33.3%, transparent 33.5%, transparent 66.5%, rgba(255,255,255,.35) 66.6%, transparent 66.8%),
+  linear-gradient(to bottom, transparent 33.2%, rgba(255,255,255,.35) 33.3%, transparent 33.5%, transparent 66.5%, rgba(255,255,255,.35) 66.6%, transparent 66.8%); }
+.cropbox label { display: flex; gap: 10px; align-items: center; font-size: 13px; color: var(--muted); }
+.cropbox input[type=range] { flex: 1; }
+.row-btns { display: flex; gap: 8px; justify-content: flex-end; }
+
+/* Notes panel */
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+.panel h2 { font: 600 17px var(--head); margin: 0; text-wrap: balance; }
+.panel p, .panel li { line-height: 1.5; margin: 0; max-width: 65ch; }
+.panel ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
+.eyebrow { font: 600 11px var(--ui); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.panel select { height: 36px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface2); color: var(--fg); padding: 0 8px; }
+.panel pre { font: 11px/1.45 var(--mono); max-height: 340px; overflow: auto; background: var(--surface2); padding: 10px; border-radius: 8px; white-space: pre-wrap; word-break: break-word; margin: 0; }
+@media (prefers-reduced-motion: reduce) { .zoomvp .card { transition: none; } }
+</style>
+
+<div class="stage">
+  <div class="phone" id="phone"></div>
+  <aside class="notes">
+    <section class="panel">
+      <span class="eyebrow">Throwaway prototype · map ticket</span>
+      <h2>How should a phone-portrait user edit a card?</h2>
+      <p>Three ways to edit a <i>magic</i> card on a phone held upright. All three share the same field editors, art crop and card render; only where the editing happens changes. Flip with the bar at the bottom or the ← → keys.</p>
+    </section>
+    <section class="panel" id="vnotes"></section>
+    <section class="panel">
+      <span class="eyebrow">Core render latency</span>
+      <p>The C++ core renders the card off-screen and hands the UI a finished bitmap. Raise this to feel how each variant copes when the card lags behind your typing.</p>
+      <label class="hintline">Delay per re-render
+        <select id="lat"><option value="0">0 ms</option><option value="150" selected>150 ms</option><option value="600">600 ms</option><option value="1500">1500 ms</option></select>
+      </label>
+    </section>
+    <section class="panel">
+      <span class="eyebrow">State</span>
+      <pre id="state"></pre>
+    </section>
+  </aside>
+</div>
+<div class="switcher" role="toolbar" aria-label="Prototype variant">
+  <button id="v-prev" aria-label="Previous variant">‹</button><span id="v-label"></span><button id="v-next" aria-label="Next variant">›</button>
+</div>
+
+<script>
+const $ = (s, r = document) => r.querySelector(s);
+const h = html => { const t = document.createElement('template'); t.innerHTML = html.trim(); return t.content.firstElementChild; };
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const phone = $('#phone');
+
+/* ---------- sample set ---------- */
+function makeArt(seed, hue) {
+  const c = document.createElement('canvas'); c.width = 630; c.height = 460; const g = c.getContext('2d');
+  let r = seed; const rnd = () => (r = (r * 16807) % 2147483647) / 2147483647;
+  const sky = g.createLinearGradient(0, 0, 0, 460);
+  sky.addColorStop(0, `hsl(${hue},50%,24%)`); sky.addColorStop(1, `hsl(${hue + 35},65%,72%)`);
+  g.fillStyle = sky; g.fillRect(0, 0, 630, 460);
+  g.fillStyle = `hsla(${hue + 50},90%,88%,.9)`; g.beginPath(); g.arc(120 + rnd() * 390, 80 + rnd() * 70, 38, 0, 7); g.fill();
+  for (let L = 0; L < 4; L++) {
+    g.fillStyle = `hsl(${hue + 12 * L},${28 + 10 * L}%,${46 - 10 * L}%)`; g.beginPath(); g.moveTo(0, 460);
+    let y = 190 + L * 60 + rnd() * 30; g.lineTo(0, y);
+    for (let x = 0; x <= 630; x += 30) { y += (rnd() - .5) * 55; y = Math.max(110 + L * 55, Math.min(445, y)); g.lineTo(x, y); }
+    g.lineTo(630, 460); g.fill();
+  }
+  return c.toDataURL('image/jpeg', .85);
+}
+const art = (seed, hue) => ({ src: makeArt(seed, hue), x: 0, y: 0, z: 1 });
+const S = {
+  variant: 'a', idx: 0, field: null, hints: false, latency: 150, previewOpen: true, cscreen: 'grid',
+  setName: 'Coastline Skirmish',
+  cards: [
+    { name: 'Tidewatch Sentinel', cost: '2U', color: 'auto', super: 'Creature', sub: 'Merfolk Soldier', rarity: 'uncommon',
+      rules: 'Flash\nWhen Tidewatch Sentinel enters the battlefield, tap target creature an opponent controls.', flavor: 'The harbor never sleeps, and neither do its keepers.',
+      power: '2', toughness: '3', artist: 'R. Calder', border: 'black', art: art(11, 200) },
+    { name: 'Emberstep Raider', cost: '1R', color: 'auto', super: 'Creature', sub: 'Goblin Warrior', rarity: 'common',
+      rules: 'Haste\n{R}: Emberstep Raider gets +1/+0 until end of turn.', flavor: '',
+      power: '2', toughness: '1', artist: 'M. Okafor', border: 'black', art: art(29, 10) },
+    { name: 'Verdant Accord', cost: 'GW', color: 'auto', super: 'Sorcery', sub: '', rarity: 'rare',
+      rules: 'Create two 1/1 green and white Citizen creature tokens. You gain 2 life.', flavor: '"Plant together, harvest together."',
+      power: '', toughness: '', artist: 'L. Ferreira', border: 'black', art: art(47, 95) },
+    { name: 'Sunken Reliquary', cost: '3', color: 'auto', super: 'Artifact', sub: '', rarity: 'rare',
+      rules: '{T}: Add one mana of any color.\n{2}, {T}, Sacrifice Sunken Reliquary: Draw two cards.', flavor: '',
+      power: '', toughness: '', artist: 'J. Varga', border: 'black', art: art(83, 180) },
+    { name: 'Ashen Vow', cost: '1BB', color: 'auto', super: 'Sorcery', sub: '', rarity: 'mythic',
+      rules: 'Each opponent sacrifices a creature. You lose 2 life.', flavor: 'Some oaths are kept only by the dead.',
+      power: '', toughness: '', artist: 'R. Calder', border: 'black', art: art(5, 280) },
+  ],
+};
+const cur = () => S.cards[S.idx];
+
+const FIELDS = [
+  { k: 'name', label: 'Name', kind: 'text' },
+  { k: 'cost', label: 'Mana cost', kind: 'cost' },
+  { k: 'art', label: 'Card art', kind: 'art' },
+  { k: 'type', label: 'Type line', kind: 'type' },
+  { k: 'rarity', label: 'Rarity', kind: 'choice', opts: ['common', 'uncommon', 'rare', 'mythic', 'special'] },
+  { k: 'rules', label: 'Rules text', kind: 'rules' },
+  { k: 'flavor', label: 'Flavor text', kind: 'long' },
+  { k: 'pt', label: 'Power / toughness', kind: 'pt' },
+  { k: 'artist', label: 'Illustrator', kind: 'text' },
+  { k: 'color', label: 'Card color', kind: 'choice', opts: ['auto', 'white', 'blue', 'black', 'red', 'green', 'multicolor', 'colorless', 'artifact', 'land'] },
+  { k: 'border', label: 'Border color', kind: 'choice', opts: ['black', 'white', 'silver'] },
+];
+const F = k => FIELDS.find(f => f.k === k);
+const stepField = (k, d) => { const i = FIELDS.findIndex(f => f.k === k); return FIELDS[(i + d + FIELDS.length) % FIELDS.length].k; };
+
+/* ---------- card render (stand-in for the core's bitmap) ---------- */
+const COL = {
+  white: { fr: '#e6dfc8', box: '#f7f3e5' }, blue: { fr: '#2a6ea6', box: '#d9e7f2' }, black: { fr: '#3a3532', box: '#d8d1cc' },
+  red: { fr: '#c4432f', box: '#f2dbcf' }, green: { fr: '#2e7a4a', box: '#d6e8d4' }, multicolor: { fr: '#c6a246', box: '#f3e7c6' },
+  colorless: { fr: '#a8acaf', box: '#e8eaeb' }, artifact: { fr: '#8c99a2', box: '#e2e6e9' }, land: { fr: '#987f63', box: '#ebe1d2' },
+};
+const BORDER = { black: '#111111', white: '#f4f4f0', silver: '#b6bbc0' };
+const manaTokens = cost => { const out = []; const re = /\{([^}]+)\}|(\d+)|([A-Za-z])/g; let m; while ((m = re.exec(cost || ''))) out.push((m[1] || m[2] || m[3]).toUpperCase()); return out; };
+function autoColor(c) {
+  const cols = [...new Set(manaTokens(c.cost).filter(t => 'WUBRG'.includes(t)))];
+  if (cols.length > 1) return 'multicolor';
+  if (cols.length === 1) return { W: 'white', U: 'blue', B: 'black', R: 'red', G: 'green' }[cols[0]];
+  if (/land/i.test(c.super)) return 'land';
+  if (/artifact/i.test(c.super)) return 'artifact';
+  return 'colorless';
+}
+const colorOf = c => c.color === 'auto' ? autoColor(c) : c.color;
+const sym = t => `<span class="ms ${'WUBRG'.includes(t) ? t : ''}">${esc(t === 'T' ? '↷' : t)}</span>`;
+const rulesHTML = t => esc(t).replace(/\{([^}]+)\}/g, (_, x) => sym(x.toUpperCase())).replace(/\n/g, '<br>');
+const artTf = a => `transform:translate(${a.x}%,${a.y}%) scale(${a.z})`;
+const isCreature = c => /creature/i.test(c.super);
+
+function cardHTML(c, i) {
+  const col = COL[colorOf(c)], n = S.cards.length;
+  const foot = c.border === 'black' ? '#e9e9e9' : '#141414';
+  return `<div class="card" data-field="border" style="--bd:${BORDER[c.border]};--fr:${col.fr};--box:${col.box};--foot:${foot}">
+    <div class="frame" data-field="color"></div>
+    <div class="r namebar"><div class="name" data-field="name">${c.name ? esc(c.name) : '<span class="ph">Card name</span>'}</div><div class="cost" data-field="cost">${manaTokens(c.cost).map(sym).join('')}</div></div>
+    <div class="r art" data-field="art"><img alt="" src="${c.art.src}" style="${artTf(c.art)}"></div>
+    <div class="r typebar"><div class="type" data-field="type">${esc(c.super) || '<span class="ph">Type</span>'}${c.sub ? ' — ' + esc(c.sub) : ''}</div><div class="rarity" data-field="rarity"><span class="gem ${c.rarity}"></span></div></div>
+    <div class="r textbox" data-field="rules"><div class="rules">${rulesHTML(c.rules)}</div><div class="flavor ${c.flavor ? '' : 'empty'}" data-field="flavor">${esc(c.flavor)}</div></div>
+    ${isCreature(c) ? `<div class="r pt" data-field="pt">${esc(c.power)}/${esc(c.toughness)}</div>` : ''}
+    <div class="r artist" data-field="artist">Illus. ${esc(c.artist) || '—'}</div>
+    <div class="r num">${String(i + 1).padStart(3, '0')}/${String(n).padStart(3, '0')} ${c.rarity[0].toUpperCase()}</div>
+  </div>`;
+}
+function markSel(card, k) {
+  card.querySelectorAll('.sel').forEach(e => e.classList.remove('sel')); card.classList.remove('sel');
+  if (!k) return;
+  const el = k === 'border' ? card : card.querySelector(`[data-field="${k}"]`);
+  el && el.classList.add('sel');
+}
+/* paint(host, card, index, {w, wrapW, wrapH, sel, hints, now, after}) */
+function paint(host, c, i, o = {}) {
+  const go = () => {
+    const s = o.w / 375, W = o.wrapW || o.w, H = o.wrapH || Math.round(523 * s);
+    host.innerHTML = `<div class="cardwrap ${o.hints ? 'hints' : ''}" style="width:${W}px;height:${H}px;border-radius:${o.wrapW ? 0 : 18 * s}px">${cardHTML(c, i)}</div>`;
+    const card = host.querySelector('.card');
+    card.style.transform = `scale(${s})`;
+    markSel(card, o.sel);
+    host.classList.remove('busy');
+    o.after && o.after(card);
+  };
+  clearTimeout(host._t);
+  if (S.latency && !o.now && host.firstChild) { host.classList.add('busy'); host._t = setTimeout(go, S.latency); } else go();
+}
+const fieldAt = e => e.target.closest('[data-field]')?.dataset.field;
+
+/* ---------- field editors ---------- */
+function symbar(input, syms, braces, commit) {
+  const bar = h('<div class="symbar"></div>');
+  syms.forEach(s => {
+    const b = h(`<button type="button" aria-label="Insert ${s}">${sym(s)}</button>`);
+    b.addEventListener('pointerdown', e => e.preventDefault()); // keep the keyboard up
+    b.onclick = () => {
+      const t = braces ? `{${s}}` : s, a = input.selectionStart ?? input.value.length, z = input.selectionEnd ?? a;
+      input.setRangeText(t, a, z, 'end'); commit(input.value); input.focus();
+    };
+    bar.append(b);
+  });
+  return bar;
+}
+function editor(f, c, onEdit) {
+  const wrap = h('<div class="ed"></div>');
+  const bind = (inp, get, put) => { inp.value = get(); inp.addEventListener('input', () => { put(inp.value); onEdit(); }); };
+  if (f.kind === 'text') {
+    const i = h(`<input id="ed-${f.k}" type="text" autocomplete="off" enterkeyhint="next">`); bind(i, () => c[f.k], v => c[f.k] = v); wrap.append(i);
+  } else if (f.kind === 'cost') {
+    const i = h('<input id="ed-cost" type="text" autocomplete="off" autocapitalize="characters" placeholder="e.g. 2WU">'); bind(i, () => c.cost, v => c.cost = v);
+    wrap.append(i, symbar(i, ['W', 'U', 'B', 'R', 'G', 'C', 'X', '1', '2', '3'], false, v => { c.cost = v; onEdit(); }),
+      h('<p class="hintline">Digits are generic mana, letters are colors. Card color follows the cost while it is set to Auto.</p>'));
+  } else if (f.kind === 'rules' || f.kind === 'long') {
+    const i = h(`<textarea id="ed-${f.k}" rows="4"></textarea>`); bind(i, () => c[f.k], v => c[f.k] = v); wrap.append(i);
+    if (f.kind === 'rules') wrap.append(symbar(i, ['T', 'W', 'U', 'B', 'R', 'G', 'C', 'X', '1', '2'], true, v => { c.rules = v; onEdit(); }));
+  } else if (f.kind === 'type' || f.kind === 'pt') {
+    const [a, b, la, lb] = f.kind === 'type' ? ['super', 'sub', 'Supertype', 'Subtype'] : ['power', 'toughness', 'Power', 'Toughness'];
+    const p = h(`<div class="pair"><label>${la}<input id="ed-${f.k}" type="text" autocomplete="off"></label><label>${lb}<input id="ed-${f.k}-2" type="text" autocomplete="off"></label></div>`);
+    const [i1, i2] = p.querySelectorAll('input'); bind(i1, () => c[a], v => c[a] = v); bind(i2, () => c[b], v => c[b] = v);
+    if (f.kind === 'pt') { i1.inputMode = i2.inputMode = 'numeric'; }
+    wrap.append(p);
+    if (f.kind === 'pt' && !isCreature(c)) wrap.append(h('<p class="hintline">Only creatures show a power/toughness box. Change the type line to Creature to see it.</p>'));
+  } else if (f.kind === 'choice') {
+    const chips = h(`<div class="chips" role="radiogroup" aria-label="${f.label}"></div>`);
+    f.opts.forEach(o => {
+      const sw = f.k === 'color' ? `<span class="sw" style="background:${COL[o === 'auto' ? autoColor(c) : o].fr}"></span>` : f.k === 'border' ? `<span class="sw" style="background:${BORDER[o]}"></span>` : f.k === 'rarity' ? `<span class="gem ${o}" style="width:13px;height:13px"></span>` : '';
+      const txt = o === 'auto' ? `Auto (${autoColor(c)})` : o[0].toUpperCase() + o.slice(1);
+      const b = h(`<button type="button" class="chip" aria-pressed="${c[f.k] === o}">${sw}${txt}</button>`);
+      b.onclick = () => { c[f.k] = o; chips.querySelectorAll('.chip').forEach(x => x.setAttribute('aria-pressed', x === b)); onEdit(); };
+      chips.append(b);
+    });
+    wrap.append(chips);
+  } else if (f.kind === 'art') {
+    const row = h(`<div class="artrow"><div class="artthumb"><img alt="Current card art" src="${c.art.src}" style="${artTf(c.art)}"></div>
+      <div class="artbtns"><span class="btn small filebtn">Choose image…<input id="ed-art" type="file" accept="image/*" aria-label="Choose image"></span><button type="button" class="btn small" id="ed-crop">Crop</button></div></div>`);
+    const thumb = row.querySelector('img');
+    const edit = () => { thumb.src = c.art.src; thumb.style.cssText = artTf(c.art); onEdit(); };
+    row.querySelector('input').onchange = e => {
+      const file = e.target.files[0]; if (!file) return;
+      const rd = new FileReader(); rd.onload = () => { c.art = { src: rd.result, x: 0, y: 0, z: 1 }; edit(); openCrop(c, edit); }; rd.readAsDataURL(file);
+    };
+    row.querySelector('#ed-crop').onclick = () => openCrop(c, edit);
+    wrap.append(row, h('<p class="hintline">On a device this opens the photo picker. Crop is drag to move, slider to zoom.</p>'));
+  }
+  return wrap;
+}
+function openCrop(c, edit) {
+  const ov = h(`<div class="overlay" id="crop"><div class="cropbox" role="dialog" aria-label="Crop art"><h2>Crop art</h2>
+    <div class="cropframe"><img alt="" src="${c.art.src}" style="${artTf(c.art)}"></div>
+    <label>Zoom <input id="crop-z" type="range" min="1" max="4" step="0.01" value="${c.art.z}"></label>
+    <div class="row-btns"><button type="button" class="btn" id="crop-reset">Reset</button><button type="button" class="btn primary" id="crop-done">Done</button></div></div></div>`);
+  phone.append(ov);
+  const fr = ov.querySelector('.cropframe'), img = fr.querySelector('img'), zr = ov.querySelector('#crop-z');
+  const clamp = () => { const m = (c.art.z - 1) * 50; c.art.x = Math.max(-m, Math.min(m, c.art.x)); c.art.y = Math.max(-m, Math.min(m, c.art.y)); };
+  const upd = () => { clamp(); img.style.cssText = artTf(c.art); edit(); };
+  let p0 = null;
+  fr.onpointerdown = e => { p0 = { x: e.clientX, y: e.clientY, ax: c.art.x, ay: c.art.y }; fr.setPointerCapture(e.pointerId); };
+  fr.onpointermove = e => { if (!p0) return; c.art.x = p0.ax + (e.clientX - p0.x) / fr.clientWidth * 100; c.art.y = p0.ay + (e.clientY - p0.y) / fr.clientHeight * 100; upd(); };
+  fr.onpointerup = fr.onpointercancel = () => p0 = null;
+  zr.oninput = () => { c.art.z = +zr.value; upd(); };
+  ov.querySelector('#crop-reset').onclick = () => { c.art.x = c.art.y = 0; c.art.z = 1; zr.value = 1; upd(); };
+  ov.querySelector('#crop-done').onclick = () => ov.remove();
+}
+const focusEd = () => setTimeout(() => phone.querySelector('.sheet input:not([type=file]), .sheet textarea, .dock input:not([type=file]), .dock textarea')?.focus({ preventScroll: true }), 30);
+function onEdit() { V().repaint(); showState(); }
+function goCard(i) { const n = S.cards.length; S.idx = (i + n) % n; V().build(); showState(); }
+function swipe(el, onTap) {
+  let x0 = null, moved = false;
+  el.addEventListener('pointerdown', e => { x0 = e.clientX; moved = false; });
+  el.addEventListener('pointerup', e => { if (x0 != null && Math.abs(e.clientX - x0) > 50) { moved = true; goCard(S.idx + (e.clientX < x0 ? 1 : -1)); } x0 = null; });
+  el.addEventListener('click', e => { if (!moved) onTap(e); });
+}
+
+/* ---------- Variant A: tap the card ---------- */
+function buildA() {
+  const c = cur(), n = S.cards.length;
+  phone.innerHTML = `<div class="appbar"><button class="ib big" id="a-prev" aria-label="Previous card">‹</button>
+      <h1>${esc(S.setName)}<small>${S.idx + 1} of ${n}</small></h1>
+      <button class="ib ${S.hints ? 'on' : ''}" id="a-hints" aria-pressed="${S.hints}">Fields</button>
+      <button class="ib big" id="a-next" aria-label="Next card">›</button></div>
+    <div class="screen"><div class="a-area scroll" id="a-area"><div class="cardhost" id="a-card"></div>
+      <p class="hintline center">Tap any part of the card to edit it. Swipe sideways for the next card. “Fields” outlines what is tappable.</p></div>
+      <div class="filmstrip" id="a-film"></div></div>`;
+  $('#a-prev').onclick = () => goCard(S.idx - 1); $('#a-next').onclick = () => goCard(S.idx + 1);
+  $('#a-hints').onclick = () => { S.hints = !S.hints; buildA(); showState(); };
+  const film = $('#a-film');
+  S.cards.forEach((cc, i) => {
+    const t = h(`<button class="thumb ${i === S.idx ? 'cur' : ''}" aria-label="${esc(cc.name)}"></button>`);
+    film.append(t); paint(t, cc, i, { w: 50, now: true }); t.onclick = () => goCard(i);
+  });
+  const ct = film.querySelector('.cur'); film.scrollLeft = ct.offsetLeft - film.clientWidth / 2 + 27;
+  const area = $('#a-area');
+  if (S.field) {
+    const f = F(S.field);
+    const sheet = h(`<div class="sheet" role="dialog" aria-label="Edit ${f.label}"><div class="grab"></div><div class="sheethead">
+      <button class="ib big" id="s-prev" aria-label="Previous field">‹</button><h2>${f.label}</h2>
+      <button class="ib big" id="s-next" aria-label="Next field">›</button><button class="ib primary" id="s-done">Done</button></div></div>`);
+    sheet.append(editor(f, c, onEdit)); $('.screen', phone).append(sheet);
+    $('#s-prev').onclick = () => { S.field = stepField(S.field, -1); buildA(); focusEd(); showState(); };
+    $('#s-next').onclick = () => { S.field = stepField(S.field, 1); buildA(); focusEd(); showState(); };
+    $('#s-done').onclick = () => { S.field = null; buildA(); showState(); };
+    area.style.paddingBottom = (sheet.offsetHeight + 16) + 'px';
+  }
+  paintA(true);
+  if (S.field) {
+    const card = $('#a-card .card'), el = S.field === 'border' ? card : card.querySelector(`[data-field="${S.field}"]`);
+    if (el) area.scrollTop += el.getBoundingClientRect().top - area.getBoundingClientRect().top - 24;
+  }
+  swipe($('#a-card'), e => { const k = fieldAt(e); if (k) { S.field = k; buildA(); focusEd(); showState(); } });
+}
+function paintA(now) { paint($('#a-card'), cur(), S.idx, { w: Math.min($('#a-area').clientWidth - 32, 420), sel: S.field, hints: S.hints, now }); }
+function repaintA() { paintA(); const t = $('#a-film .cur'); t && paint(t, cur(), S.idx, { w: 50, now: true }); }
+
+/* ---------- Variant B: field list ---------- */
+const GROUPS = [['Identity', ['name', 'cost', 'color']], ['Type', ['type', 'rarity']], ['Text', ['rules', 'flavor']], ['Stats', ['pt']], ['Art', ['art']], ['Frame & credits', ['border', 'artist']]];
+function buildB() {
+  const c = cur(), n = S.cards.length;
+  phone.innerHTML = `<div class="appbar"><button class="ib big" id="b-prev" aria-label="Previous card">‹</button>
+      <select id="b-pick" aria-label="Card">${S.cards.map((cc, i) => `<option value="${i}" ${i === S.idx ? 'selected' : ''}>${i + 1}. ${esc(cc.name || 'Untitled')}</option>`).join('')}</select>
+      <button class="ib big" id="b-next" aria-label="Next card">›</button></div>
+    <div class="screen"><div class="scroll" id="b-scroll"><div class="b-preview" id="b-pv"></div><div class="b-form" id="b-form"></div></div></div>`;
+  $('#b-prev').onclick = () => goCard(S.idx - 1); $('#b-next').onclick = () => goCard(S.idx + 1);
+  $('#b-pick').onchange = e => goCard(+e.target.value);
+  const pv = $('#b-pv');
+  pv.innerHTML = S.previewOpen
+    ? `<div class="cardhost" id="b-card" role="button" tabindex="0" aria-label="Enlarge card"></div>
+       <div class="meta"><b>Card ${S.idx + 1} of ${n}</b><span class="hintline">The preview follows the field you are editing. Tap it to enlarge; tap a part of the enlarged card to jump to that field.</span>
+       <button class="btn small" id="b-toggle">Hide preview</button></div>`
+    : `<div class="meta" style="flex-direction:row;align-items:center;justify-content:space-between"><span class="hintline">Preview hidden</span><button class="btn small" id="b-toggle">Show preview</button></div>`;
+  $('#b-toggle').onclick = () => { S.previewOpen = !S.previewOpen; buildB(); showState(); };
+  const form = $('#b-form');
+  GROUPS.forEach(([g, ks]) => {
+    const grp = h(`<div class="group"><h3>${g}</h3></div>`);
+    ks.forEach(k => {
+      const f = F(k), row = h(`<div class="row ${S.field === k ? 'focus' : ''}" id="row-${k}" data-k="${k}">${f.kind === 'choice' || f.kind === 'art' ? `<span class="lbl">${f.label}</span>` : `<label for="ed-${k}">${f.label}</label>`}</div>`);
+      row.append(editor(f, c, onEdit)); grp.append(row);
+    });
+    form.append(grp);
+  });
+  const pick = e => { const r = e.target.closest('.row'); if (r && r.dataset.k !== S.field) selectB(r.dataset.k); };
+  form.addEventListener('focusin', pick); form.addEventListener('click', pick);
+  if (S.previewOpen) { paint($('#b-card'), c, S.idx, { w: 150, sel: S.field, now: true }); $('#b-card').onclick = enlargeB; }
+}
+function selectB(k) {
+  S.field = k;
+  phone.querySelectorAll('.row').forEach(r => r.classList.toggle('focus', r.dataset.k === k));
+  const card = $('#b-card .card'); card && markSel(card, k);
+  showState();
+}
+function enlargeB() {
+  const ov = h(`<div class="overlay" id="b-ov"><div class="cardhost" id="ov-card"></div><p>Tap a part of the card to edit that field. Tap outside it to close.</p></div>`);
+  phone.append(ov);
+  paint($('#ov-card'), cur(), S.idx, { w: phone.clientWidth - 32, sel: S.field, now: true });
+  ov.onclick = e => {
+    const k = e.target.closest('.card') ? fieldAt(e) : null; ov.remove();
+    if (!k) return;
+    selectB(k);
+    const sc = $('#b-scroll'), row = $('#row-' + k);
+    sc.scrollTop = row.offsetTop - $('#b-pv').offsetHeight - 12;
+    setTimeout(() => row.querySelector('input:not([type=file]), textarea')?.focus({ preventScroll: true }), 30);
+  };
+}
+function repaintB() {
+  if (S.previewOpen) paint($('#b-card'), cur(), S.idx, { w: 150, sel: S.field });
+  const o = $('#b-pick').options[S.idx]; o.text = `${S.idx + 1}. ${cur().name || 'Untitled'}`;
+}
+
+/* ---------- Variant C: set grid, then guided zoom ---------- */
+function buildC() {
+  const c = cur(), n = S.cards.length;
+  if (S.cscreen === 'grid') {
+    phone.innerHTML = `<div class="appbar"><h1>${esc(S.setName)}<small>${n} cards</small></h1></div>
+      <div class="screen"><div class="scroll"><div class="grid" id="c-grid"></div></div></div>`;
+    const grid = $('#c-grid'), w = Math.floor((grid.clientWidth - 28 - 12) / 2);
+    S.cards.forEach((cc, i) => {
+      const cell = h(`<button class="gcell"><div class="cardhost"></div><span>${esc(cc.name || 'Untitled')}</span></button>`);
+      grid.append(cell); paint(cell.firstChild, cc, i, { w, now: true });
+      cell.onclick = () => { S.idx = i; S.cscreen = 'view'; buildC(); showState(); };
+    });
+  } else if (S.cscreen === 'view') {
+    phone.innerHTML = `<div class="appbar"><button class="ib" id="c-back">‹ Set</button><h1>${esc(c.name)}<small>${S.idx + 1} of ${n}</small></h1><button class="ib primary" id="c-edit">Edit</button></div>
+      <div class="screen"><div class="viewer" id="c-view"><div class="cardhost" id="c-card"></div><p class="hintline center">Swipe for the next card. Tap Edit to step through the fields, or tap a part of the card to start there.</p></div></div>`;
+    $('#c-back').onclick = () => { S.cscreen = 'grid'; buildC(); showState(); };
+    $('#c-edit').onclick = () => enterEdit();
+    paintCView(true);
+    swipe($('#c-card'), e => { const k = fieldAt(e); if (k) enterEdit(k); });
+  } else {
+    phone.innerHTML = `<div class="appbar"><button class="ib primary" id="c-done">Done</button><h1>${esc(c.name)}<small id="c-pos"></small></h1></div>
+      <div class="screen"><div class="zoomvp" id="c-vp"></div><div class="dock" id="c-dock"></div></div>`;
+    $('#c-done').onclick = () => { S.cscreen = 'view'; buildC(); showState(); };
+    refreshDock();
+    paintCEdit(true);
+    $('#c-vp').onclick = e => { const k = fieldAt(e); if (k) setFieldC(k); };
+  }
+}
+function paintCView(now) {
+  const v = $('#c-view'), w = Math.min(v.clientWidth - 32, (v.clientHeight - 70) * 375 / 523);
+  paint($('#c-card'), cur(), S.idx, { w, now });
+}
+function enterEdit(k) { S.field = k || S.field || 'name'; S.cscreen = 'edit'; buildC(); focusEd(); showState(); }
+function rectInCard(el, card) { let x = 0, y = 0, e = el; while (e && e !== card) { x += e.offsetLeft; y += e.offsetTop; e = e.offsetParent; } return { x, y, w: el.offsetWidth, h: el.offsetHeight }; }
+function zoomTo(card, vp, k, animate) {
+  const W = vp.clientWidth, H = vp.clientHeight;
+  const el = (k === 'border' || k === 'color') ? card : (card.querySelector(`[data-field="${k}"]`) || card);
+  const r = el === card ? { x: 0, y: 0, w: 375, h: 523 } : rectInCard(el, card);
+  const fit = Math.min(W / 375, H / 523) * .96;
+  const z = Math.max(fit, Math.min(W * .9 / r.w, H * .72 / r.h, 3));
+  const tx = W / 2 - (r.x + r.w / 2) * z, ty = H / 2 - (r.y + r.h / 2) * z;
+  if (!animate) card.style.transition = 'none';
+  card.style.transform = `translate(${tx}px,${ty}px) scale(${z})`;
+  if (!animate) { card.offsetWidth; card.style.transition = ''; }
+}
+function paintCEdit(now) {
+  const vp = $('#c-vp');
+  paint(vp, cur(), S.idx, { w: 375, wrapW: vp.clientWidth, wrapH: vp.clientHeight, sel: S.field, now, after: card => zoomTo(card, vp, S.field, false) });
+}
+function refreshDock() {
+  const dock = $('#c-dock'), c = cur(), i = FIELDS.findIndex(f => f.k === S.field);
+  dock.innerHTML = '';
+  const chips = h('<div class="fchips" role="tablist" aria-label="Fields"></div>');
+  FIELDS.forEach(f => { const b = h(`<button type="button" class="chip" role="tab" aria-pressed="${f.k === S.field}">${f.label}</button>`); b.onclick = () => setFieldC(f.k); chips.append(b); });
+  const steps = h('<div class="steps"><button type="button" class="btn" id="c-p">‹ Previous</button><button type="button" class="btn primary" id="c-n">Next ›</button></div>');
+  dock.append(chips, editor(F(S.field), c, onEdit), steps);
+  steps.querySelector('#c-p').onclick = () => setFieldC(stepField(S.field, -1));
+  steps.querySelector('#c-n').onclick = () => setFieldC(stepField(S.field, 1));
+  const cc = chips.children[i]; chips.scrollLeft = cc.offsetLeft - chips.clientWidth / 2 + cc.offsetWidth / 2;
+  $('#c-pos').textContent = `Field ${i + 1} of ${FIELDS.length}`;
+}
+function setFieldC(k) {
+  S.field = k; refreshDock();
+  const vp = $('#c-vp'), card = vp.querySelector('.card');
+  if (card) {
+    markSel(card, k);
+    const wrap = vp.querySelector('.cardwrap'); wrap.style.width = vp.clientWidth + 'px'; wrap.style.height = vp.clientHeight + 'px';
+    requestAnimationFrame(() => zoomTo(card, vp, k, true));
+  }
+  focusEd(); showState();
+}
+function repaintC() { if (S.cscreen === 'edit') paintCEdit(); else if (S.cscreen === 'view') paintCView(); }
+
+/* ---------- switcher, notes, state ---------- */
+const VARIANTS = [
+  { key: 'a', name: 'Tap the card', build: buildA, repaint: repaintA,
+    notes: ['The card is the editor. Tap a part of it and a sheet opens with that field’s control; ‹ › in the sheet walks to the neighbouring field.',
+      'Watch for fields with no obvious place to tap: card color is the frame, border color is the outer edge, and a sorcery has no P/T box at all.',
+      'Watch for small targets (rarity gem, mana cost) and for the sheet covering the part of the card you are changing.'] },
+  { key: 'b', name: 'Field list', build: buildB, repaint: repaintB,
+    notes: ['A small live preview stays pinned above a scrolling form that lists every field, grouped.',
+      'Every field is reachable without knowing the card layout, including the ones that have no region on the card.',
+      'Watch for whether you look at the preview at all while typing, and how long the form feels on a real card.'] },
+  { key: 'c', name: 'Set grid + guided zoom', build: buildC, repaint: repaintC,
+    notes: ['Start from the whole set as a grid, open a card full screen, then press Edit: the card zooms onto one field at a time with its editor docked below.',
+      'Previous / Next walks the fields in a fixed order; the chip row and tapping the zoomed card jump directly.',
+      'Watch for zoom disorientation, and for how a slow render feels when the zoomed field is all you can see.'] },
+];
+const V = () => VARIANTS.find(v => v.key === S.variant);
+function renderNotes() {
+  const v = V();
+  $('#vnotes').innerHTML = `<span class="eyebrow">Variant ${v.key.toUpperCase()}</span><h2>${v.name}</h2><ul>${v.notes.map(t => `<li>${t}</li>`).join('')}</ul>`;
+  $('#v-label').textContent = `${v.key.toUpperCase()} · ${v.name}`;
+}
+function showState() {
+  const c = cur();
+  const card = { ...c, art: { ...c.art, src: `${c.art.src.slice(0, 22)}… (${Math.round(c.art.src.length / 1024)} KB)` }, derivedColor: colorOf(c) };
+  const ui = { variant: S.variant, cardIndex: S.idx, selectedField: S.field, latencyMs: S.latency };
+  if (S.variant === 'a') ui.showFieldOutlines = S.hints;
+  if (S.variant === 'b') ui.previewOpen = S.previewOpen;
+  if (S.variant === 'c') ui.screen = S.cscreen;
+  $('#state').textContent = JSON.stringify({ ui, card }, null, 2);
+}
+function build() { phone.querySelectorAll('.overlay').forEach(o => o.remove()); V().build(); renderNotes(); showState(); }
+function setVariant(k) { if (location.hash !== '#' + k) location.hash = k; else { S.variant = k; build(); } }
+function cycle(d) { const i = VARIANTS.findIndex(v => v.key === S.variant); setVariant(VARIANTS[(i + d + VARIANTS.length) % VARIANTS.length].key); }
+window.addEventListener('hashchange', () => {
+  const k = location.hash.slice(1); if (!VARIANTS.some(v => v.key === k)) return;
+  S.variant = k; S.field = null; S.cscreen = 'grid'; build();
+});
+$('#v-prev').onclick = () => cycle(-1); $('#v-next').onclick = () => cycle(1);
+document.addEventListener('keydown', e => {
+  if (e.target.closest('input, textarea, select, [contenteditable]')) return;
+  if (e.key === 'ArrowLeft') cycle(-1); if (e.key === 'ArrowRight') cycle(1);
+});
+$('#lat').onchange = e => { S.latency = +e.target.value; showState(); };
+// Rebuild on width changes only: the phone keyboard changes height, and a rebuild would drop focus.
+let rt, lastW = innerWidth; window.addEventListener('resize', () => { if (innerWidth === lastW) return; lastW = innerWidth; clearTimeout(rt); rt = setTimeout(() => V().build(), 150); });
+{ const k = location.hash.slice(1); if (VARIANTS.some(v => v.key === k)) S.variant = k; }
+build();
+</script>
