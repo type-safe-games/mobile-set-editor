@@ -3,7 +3,7 @@
 The Android `Canvas` (ADR 0003) is Skia, built from source CPU-only (no GPU, PDF or SVG), rendering off-screen into a buffer matching MSE's RGB + alpha `Image`; the UI only ever receives finished card bitmaps, so the backend is independent of the UI stack. Skia's `SkCodec` decodes PNG and JPEG. We deliberately bypass most of what makes Skia attractive elsewhere:
 
 - **Text stays MSE's.** The `Canvas` text primitive only rasterises aliased glyphs into a coverage buffer at a requested scale; MSE's own 4x downsample, blur and repeated-blit bold (`gfx/resample_text.cpp`) stay, so stroke weight and bold look match desktop.
-- **Font names never reach the backend.** An MSE-owned font registry resolves family + bold/italic (case-insensitive, with fallback) to font files from installed Templates; the `Canvas` takes resolved faces. The desktop reference uses the same registry, so both sides render the same files.
+- **Font names never reach the backend.** An MSE-owned font registry resolves family + bold/italic (case-insensitive, with fallback) to font files from installed Templates and from the shared font store of loose fonts collected at import (ADR 0005: the core Magic fonts ship in no package); the `Canvas` takes resolved faces. The desktop reference uses the same registry, so both sides render the same files.
 - **Text is unhinted with linear advances**, for measurement and rasterisation alike, as part of the `Canvas` contract. The wx golden-image harness pins hinting off with a checked-in fontconfig file.
 - **Bitwise raster ops** are not a Skia capability; they always use the CPU fallback over read-back, with Windows semantics.
 
