@@ -88,7 +88,7 @@ void WebRequestWindow::onComplete(wxWebRequestEvent& evt) {
     return;
   }
 
-  content_type = response.GetContentType();
+  content_type = response.GetHeader(_("Content-Type")); // GetContentType() is wx >= 3.3
   if (content_type.StartsWith("image/")) {
     image_out = Image(*stream);
     if (!image_out.IsOk()) {

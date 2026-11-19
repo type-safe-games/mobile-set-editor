@@ -1150,6 +1150,9 @@ action:
 
 ############################################################## Error messages
 error:
+	cards bigger than page:			Some cards are bigger than the page and will be cut off.
+	game import script not map:			The game's import script must return a map.
+	unknown data format:			The clipboard or dropped data is in an unknown format.
 	# file related
 	file not found:						沒有找到文件： '%s' 在 '%s' 文件包中
 	file not found package like:
@@ -1231,7 +1234,7 @@ error:
 	json set without game:				Can't create set from JSON without game
 	json set without stylesheet:		Can't create set from JSON without stylesheet
 	json unknown type:					JSON value of unknown type found
-	json unknown script type:			Can't convert script value to JSON
+	json unknown script type:			Can't convert script value to JSON (%s)
 	json cant parse:					Failed to parse JSON file
 	json cant convert:					Input must be a string when importing from JSON
 	json cant concat:					Can't merge map with array
@@ -1384,6 +1387,7 @@ error:
 
 ############################################################## Types used in scripts / shape names
 type:
+	updater:			updater
 	function:							函數
 	collection:							收集
 	collection of:						收集 %ss

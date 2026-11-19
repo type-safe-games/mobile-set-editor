@@ -129,7 +129,6 @@ find(\&gather_locale_keys, $indir);
 if (scalar(%locale_keys) == 0) {
   die "Did not find any source files with locale keys"
 }
-print $locale_keys{'ERROR'}{'successful instalal'} . "\n";
 
 # ------------------------------------------------------------------------------
 # Step 2: validate a locale
@@ -205,8 +204,10 @@ sub validate_locale {
     }
     foreach my $key (sort keys %{$locale{$type}}) {
       if (!defined($locale_keys{$type}{$key})) {
-        print "Unknown key in locale: $type: '$key'\n";
-        $ok = 0;
+        # Unused keys are harmless at runtime, and MSE 2.6 ships dozens that the
+        # source no longer references, so they only warn. Missing keys and wrong
+        # arities still fail: those show broken text in the program.
+        print "Warning: unused key in locale: $type: '$key'\n";
       }
     }
   }

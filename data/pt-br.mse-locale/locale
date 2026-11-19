@@ -1036,6 +1036,9 @@ action:
 
 ############################################################## Error messages
 error:
+	cards bigger than page:			Some cards are bigger than the page and will be cut off.
+	game import script not map:			The game's import script must return a map.
+	unknown data format:			The clipboard or dropped data is in an unknown format.
 	# file related
 	file not found:						O arquivo não foi encontrado: '%s' no pacote '%s'
 	file not found package like:
@@ -1102,7 +1105,7 @@ error:
 	json set without game:				Não é possível criar uma Edição a partir de JSON sem o jogo
 	json set without stylesheet:		Não é possível criar uma Edição a partir de JSON sem o estilo
 	json unknown type:					Valor JSON de tipo desconhecido encontrado
-	json unknown script type:			Não é possível converter o valor do script para JSON
+	json unknown script type:			Não é possível converter o valor do script para JSON (%s)
 	json cant parse:					Falha ao analisar o arquivo JSON
 	json cant convert:					A entrada deve ser uma string ao importar de JSON
 	json cant concat:					Não é possível mesclar um vetor associativo com um vetor
@@ -1233,6 +1236,7 @@ error:
 
 ############################################################## Types used in scripts / shape names
 type:
+	updater:			updater
 	function:							função
 	collection:							coleção
 	collection of:						coleção de %ss

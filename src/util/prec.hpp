@@ -61,6 +61,8 @@ typedef wxOutputStream OutputStream;
 
 // ----------------------------------------------------------------------------- : Compatability fixes
 
+#include "wx_compat.hpp"
+
 #if wxVERSION_NUMBER < 2805
   #define wxBORDER_THEME wxSUNKEN_BORDER
 #endif

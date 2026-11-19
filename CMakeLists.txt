@@ -7,11 +7,18 @@ add_definitions(-DUNOFFICIAL_BUILD)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
-find_package(wxWidgets 3.3.3 CONFIG QUIET COMPONENTS core base net)
+# Upstream 2.6 wants wx >= 3.3.3. This fork's desktop build is only a test host
+# (ADR 0007), so it accepts the system wx 3.2 and bridges the gap in
+# src/util/wx_compat.hpp.
+find_package(wxWidgets 3.2 CONFIG QUIET COMPONENTS core base net)
 if(NOT wxWidgets_FOUND)
-  find_package(wxWidgets 3.3.3 MODULE REQUIRED COMPONENTS core base net)
+  find_package(wxWidgets 3.2 MODULE REQUIRED COMPONENTS core base net)
 endif()
-find_package(Boost REQUIRED COMPONENTS regex)
+# Boost >= 1.70 ships BoostConfig.cmake; CMake 4 deprecates the FindBoost module (CMP0167).
+if(POLICY CMP0167)
+  cmake_policy(SET CMP0167 NEW)
+endif()
+find_package(Boost REQUIRED COMPONENTS regex json)
 
 find_package(PkgConfig)
 
@@ -42,7 +49,7 @@ include_directories(${HUNSPELL_INCLUDE_DIRS})
 # Magic Set Editor executable
 
 add_executable(magicseteditor WIN32)
-target_link_libraries(${PROJECT_NAME} PRIVATE wxWidgets::wxWidgets ${Boost_LIBRARIES} ${HUNSPELL_LIBRARIES})
+target_link_libraries(${PROJECT_NAME} PRIVATE wxWidgets::wxWidgets Boost::regex Boost::json ${HUNSPELL_LIBRARIES})
 
 file(GLOB_RECURSE sources src/*.cpp)
 list(FILTER sources EXCLUDE REGEX win32_cli_wrapper.cpp)
@@ -121,11 +128,15 @@ if(WIN32)
   )
 endif()
 
-# Magic Set Editor Updater executable
+# Magic Set Editor Updater executable: needs wx >= 3.3 (wxWebRequestSync,
+# SetAppearance) and self-updates a desktop install, so it is not built for the
+# wx 3.2 test host.
 
-add_executable(magicseteditor-updater WIN32)
-target_link_libraries(magicseteditor-updater PRIVATE wxWidgets::wxWidgets)
-target_sources(magicseteditor-updater PRIVATE src_updater/main.cpp src_updater/win32_res.rc src_updater/updater.ico)
+if(wxWidgets_VERSION VERSION_GREATER_EQUAL 3.3)
+  add_executable(magicseteditor-updater WIN32)
+  target_link_libraries(magicseteditor-updater PRIVATE wxWidgets::wxWidgets)
+  target_sources(magicseteditor-updater PRIVATE src_updater/main.cpp src_updater/win32_res.rc src_updater/updater.ico)
+endif()
 
 # warnings
 if(CMAKE_COMPILER_IS_GNUCC OR CMAKE_COMPILER_IS_GNUCXX)

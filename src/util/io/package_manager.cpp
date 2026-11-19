@@ -237,27 +237,37 @@ bool PackageManager::install(const InstallablePackage& package, const InstallPro
 
 // ----------------------------------------------------------------------------- : PackageDirectory
 
+/// Walk up from start until a directory containing 'data' is found, return that 'data' path or "" if none
+static String find_data_dir_above(String dir) {
+  while (!wxDirExists(dir + _("/data"))) {
+    String d = dir;
+    dir = wxPathOnly(dir);
+    if (d == dir || dir.empty()) return String();
+  }
+  return dir + _("/data");
+}
+
 void PackageDirectory::init(bool local) {
   is_local = local;
   if (local) {
-    init(wxStandardPaths::Get().GetUserDataDir() + _("/data"));
+    // MSE_TEMPLATES_DIR (ADR 0008) points the test host at a template pack outside the user's data dir
+    String templates_dir;
+    if (wxGetEnv(_("MSE_TEMPLATES_DIR"), &templates_dir) && !templates_dir.empty()) {
+      init(templates_dir);
+    } else {
+      init(wxStandardPaths::Get().GetUserDataDir() + _("/data"));
+    }
   } else {
     // determine data directory
-    String dir = wxStandardPaths::Get().GetDataDir();
     // check if this is the actual data directory, especially during debugging,
     // the data may be higher up:
     //  exe path  = mse/build/debug/mse.exe
     //  data path = mse/data
-    while (!wxDirExists(dir + _("/data"))) {
-      String d = dir;
-      dir = wxPathOnly(dir);
-      if (d == dir) {
-        // we are at the root -> 'data' not found anywhere in the path
-        dir = wxStandardPaths::Get().GetDataDir();
-        break;
-      }
-    }
-    init(dir + _("/data"));
+    String dir = find_data_dir_above(wxStandardPaths::Get().GetDataDir());
+    // On Linux GetDataDir() is the install prefix, so a build tree also looks above the executable
+    if (dir.empty()) dir = find_data_dir_above(wxPathOnly(wxStandardPaths::Get().GetExecutablePath()));
+    if (dir.empty()) dir = wxStandardPaths::Get().GetDataDir() + _("/data");
+    init(dir);
   }
 }
 void PackageDirectory::init(const String& dir) {

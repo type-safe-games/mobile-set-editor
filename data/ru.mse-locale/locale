@@ -32,8 +32,8 @@ menu:
 
 	# edit menu
 	edit:								Редактировать
-	undo:								Назад	Ctrl+Z
-	redo:								Вперед	Ctrl+Y
+	undo:								Назад%s	Ctrl+Z
+	redo:								Вперед%s	Ctrl+Y
 	cut:								Вырезать	Ctrl+X
 	cut card:							Вырезать	Ctrl+X
 	cut keyword:						Вырезать	Ctrl+X
@@ -497,8 +497,8 @@ tooltip:
 	cut:								Вырезать
 	copy:								Копировать
 	paste:								Встевить
-	undo:								Назад
-	redo:								Вперед
+	undo:								Назад%s
+	redo:								Вперед%s
 
 	# cards toolbar
 	add card:							Добавить карту
@@ -1199,6 +1199,9 @@ action:
 
 ############################################################## Error messages
 error:
+	cards bigger than page:			Some cards are bigger than the page and will be cut off.
+	game import script not map:			The game's import script must return a map.
+	unknown data format:			The clipboard or dropped data is in an unknown format.
 	# file related
 	#TODO: Localize Section
 	file not found:						File not found: '%s' in package '%s'
@@ -1281,7 +1284,7 @@ error:
 	json set without game:				Can't create set from JSON without game
 	json set without stylesheet:		Can't create set from JSON without stylesheet
 	json unknown type:					JSON value of unknown type found
-	json unknown script type:			Can't convert script value to JSON
+	json unknown script type:			Can't convert script value to JSON (%s)
 	json cant parse:					Failed to parse JSON file
 	json cant convert:					Input must be a string when importing from JSON
 	json cant concat:					Can't merge map with array
@@ -1448,6 +1451,7 @@ error:
 
 ############################################################## Types used in scripts / shape names
 type:
+	updater:			updater
 	#TODO: Localize Section
 	function:							function
 	collection:							collection
