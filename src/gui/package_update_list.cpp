@@ -1,5 +1,5 @@
 //+----------------------------------------------------------------------------+
-//| Description:  Magic Set Editor - Program to make Magic (tm) cards          |
+//| Description:  Magic Set Editor - Program to make card games                |
 //| Copyright:    (C) Twan van Laarhoven and the other MSE developers          |
 //| License:      GNU General Public License 2 or later (see file COPYING)     |
 //+----------------------------------------------------------------------------+
@@ -11,7 +11,7 @@
 #include <gui/thumbnail_thread.hpp>
 #include <gui/util.hpp>
 #include <gfx/gfx.hpp>
-#include <wx/url.h>
+#include <wx/webrequest.h>
 
 // ----------------------------------------------------------------------------- : PackageUpdateList::TreeItem
 
@@ -24,6 +24,11 @@ void PackageUpdateList::TreeItem::add(const InstallablePackageP& package, const 
     // this is a lower position hint, use it
     position_type = new_type;
     position_hint = new_hint;
+  }
+  // tally the best (lowest) position_hint found anywhere in this node's subtree,
+  // so groups/folders can be ordered by the best hint of any package they contain
+  if (new_hint < group_hint) {
+    group_hint = new_hint;
   }
   // end of the path?
   if (path.empty()) {
@@ -60,6 +65,7 @@ void PackageUpdateList::TreeItem::add(const InstallablePackageP& package, const 
 }
 
 bool compare_pos_hint(const PackageUpdateList::TreeItemP& a, const PackageUpdateList::TreeItemP& b) {
+  if (a->group_hint != b->group_hint) return a->group_hint < b->group_hint;
   if (a->position_type < b->position_type) return true;
   if (a->position_type > b->position_type) return false;
   if (a->position_hint < b->position_hint) return true;
@@ -85,12 +91,14 @@ PackageUpdateList::TreeItem::PackageType PackageUpdateList::TreeItem::package_ty
   if (desc.name == mse_package)                           return TYPE_PROG;
   size_t pos = desc.name.find_last_of(_('.'));
   if (pos == String::npos)                                return TYPE_OTHER;
-  if (is_substr(desc.name,pos,_(".mse-locale")))          return TYPE_LOCALE;
-  if (is_substr(desc.name,pos,_(".mse-game")))            return TYPE_GAME;
   if (is_substr(desc.name,pos,_(".mse-style")))           return TYPE_STYLESHEET;
-  if (is_substr(desc.name,pos,_(".mse-export-template"))) return TYPE_EXPORT_TEMPLATE;
   if (is_substr(desc.name,pos,_(".mse-symbol-font")))     return TYPE_SYMBOL_FONT;
+  if (is_substr(desc.name,pos,_(".mse-game")))            return TYPE_GAME;
+  if (is_substr(desc.name,pos,_(".mse-locale")))          return TYPE_LOCALE;
+  if (is_substr(desc.name,pos,_(".mse-export-template"))) return TYPE_EXPORT_TEMPLATE;
+  if (is_substr(desc.name,pos,_(".mse-import-template"))) return TYPE_IMPORT_TEMPLATE;
   if (is_substr(desc.name,pos,_(".mse-include")))         return TYPE_INCLUDE;
+  if (is_substr(desc.name,pos,_(".mse-updater")))         return TYPE_PROG;
   if (is_substr(desc.name,pos,_(".ttf")))                 return TYPE_FONT;
   return TYPE_OTHER;
 }
@@ -159,18 +167,22 @@ public:
   PackageIconRequest(PackageUpdateList* list, PackageUpdateList::TreeItem* ti)
     : ThumbnailRequest(
       list,
-      _("package_") + ti->package->description->icon_url + _("_") + ti->package->description->version.toString(),
+      _("package_") + (settings.darkMode() && !ti->package->description->dark_icon_url.empty() ? ti->package->description->dark_icon_url : ti->package->description->icon_url) + _("_") + ti->package->description->version.toString(),
       wxDateTime(1,wxDateTime::Jan,2000))
     , list(list), ti(ti)
   {}
   
   Image generate() override {
-    wxURL url(ti->package->description->icon_url);
-    unique_ptr<wxInputStream> isP(url.GetInputStream());
-    if (!isP) return wxImage();
-    SeekAtStartInputStream is2(*isP);
-    Image result(is2);
-    return result;
+    String url(settings.darkMode() && !ti->package->description->dark_icon_url.empty() ? ti->package->description->dark_icon_url : ti->package->description->icon_url);
+    wxWebRequestSync request = wxWebSessionSync::GetDefault().CreateRequest(url);
+    auto const result = request.Execute();
+    if (!result) return Image();
+    wxInputStream* is(request.GetResponse().GetStream());
+    if (!is) return Image();
+    Image img(*is);
+    if (!img.IsOk()) return Image();
+    ti->setIcon(img);
+    return img;
   }
   void store(const Image& image) override {
     if (!image.Ok()) return;
@@ -220,7 +232,8 @@ void PackageUpdateList::initItems() {
       ti.setIcon(p->description->icon);
     } else if (p) {                       // it doesn't have an icon (yet)
       ti.setIcon(load_resource_image(_("installer_package")));
-      if (!p->description->icon_url.empty()) {
+      String icon_url = settings.darkMode() && !p->description->dark_icon_url.empty() ? p->description->dark_icon_url : p->description->icon_url;
+      if (!icon_url.empty()) {
         // download icon
         thumbnail_thread.request(make_intrusive<PackageIconRequest>(this,&ti));
       }
@@ -254,7 +267,7 @@ void PackageUpdateList::drawItem(DC& dc, size_t index, size_t column, int x, int
       dc.SetTextForeground(lerp(color,Color(255,255,0),0.5));
       dc.DrawText(_LABEL_("package modified"), x,y);
     } else if (package.has(PACKAGE_UPDATES)) {
-      dc.SetTextForeground(lerp(color,Color(0,0,255),0.5));
+      dc.SetTextForeground(lerp(color,settings.darkMode() ? Color(80,80,255) : Color(0,0,255),0.5));
       dc.DrawText(_LABEL_("package updates"), x,y);
     } else if (package.has(PACKAGE_INSTALLED)) {
       dc.SetTextForeground(color);
@@ -264,15 +277,20 @@ void PackageUpdateList::drawItem(DC& dc, size_t index, size_t column, int x, int
       dc.SetTextForeground(color);
       dc.DrawText(_LABEL_("package installable"), x,y);
     }
+  } else if (column == 1 && !ti.expanded) {
+    if (CheckChildrenForUpdates(ti)) {
+      dc.SetTextForeground(lerp(color, settings.darkMode() ? Color(80, 80, 255) : Color(0, 0, 255), 0.5));
+      dc.DrawText(_LABEL_("package updates"), x, y);
+    }
   } else if (column == 2 && ti.package) {
     // Action
     InstallablePackage& package = *ti.package;
     if (package.has(PACKAGE_ACT_INSTALL)) {
       if (package.has(PACKAGE_UPDATES)) {
-        dc.SetTextForeground(lerp(color,Color(0,0,255),0.6));
+        dc.SetTextForeground(lerp(color,settings.darkMode() ? Color(80,80,255) : Color(0,0,255),0.6));
         dc.DrawText(_LABEL_("upgrade package"), x,y);
       } else if (package.has(PACKAGE_INSTALLED)) {
-        dc.SetTextForeground(lerp(color,Color(0,0,255),0.2));
+        dc.SetTextForeground(lerp(color,settings.darkMode() ? Color(80,80,255) : Color(0,0,255),0.2));
         dc.DrawText(_LABEL_("reinstall package"), x,y);
       } else {
         dc.SetTextForeground(lerp(color,Color(0,255,0),0.6));
@@ -285,6 +303,14 @@ void PackageUpdateList::drawItem(DC& dc, size_t index, size_t column, int x, int
   }
 }
 
+bool PackageUpdateList::CheckChildrenForUpdates(const TreeItem& ti) const {
+  for (auto& c : ti.children) {
+    if (c->package && c->package->has(PACKAGE_UPDATES)) return true;
+    if (CheckChildrenForUpdates(*c)) return true;
+  }
+  return false;
+}
+
 String PackageUpdateList::columnText(size_t column) const {
   if       (column == 0) return _LABEL_("package name");
   else if  (column == 1) return _LABEL_("package status");
@@ -295,9 +321,9 @@ String PackageUpdateList::columnText(size_t column) const {
 int PackageUpdateList::columnWidth(size_t column) const {
   if (column == 0) {
     wxSize cs = GetClientSize();
-    return cs.x - 240;
+    return cs.x - 280;
   } else {
-    return 120;
+    return 140;
   }
 }
 

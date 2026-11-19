@@ -1,5 +1,5 @@
 //+----------------------------------------------------------------------------+
-//| Description:  Magic Set Editor - Program to make Magic (tm) cards          |
+//| Description:  Magic Set Editor - Program to make card games                |
 //| Copyright:    (C) Twan van Laarhoven and the other MSE developers          |
 //| License:      GNU General Public License 2 or later (see file COPYING)     |
 //+----------------------------------------------------------------------------+
@@ -50,6 +50,21 @@ int MultipleChoiceStyle::update(Context& ctx) {
 
 IMPLEMENT_REFLECTION_NAMELESS(MultipleChoiceValue) {
   REFLECT_BASE(ChoiceValue);
+}
+
+void MultipleChoiceValue::copyDataFrom(const Value& other) {
+  ChoiceValue::copyDataFrom(other);
+  if (const MultipleChoiceValue* o = dynamic_cast<const MultipleChoiceValue*>(&other)) {
+    last_change = o->last_change;
+  }
+}
+
+bool MultipleChoiceValue::isDefault() {
+  return value.isDefault();
+}
+
+void MultipleChoiceValue::makeDefault(bool d) {
+  value.makeDefault(d);
 }
 
 bool MultipleChoiceValue::update(Context& ctx) {

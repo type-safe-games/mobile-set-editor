@@ -1,5 +1,5 @@
 //+----------------------------------------------------------------------------+
-//| Description:  Magic Set Editor - Program to make Magic (tm) cards          |
+//| Description:  Magic Set Editor - Program to make card games                |
 //| Copyright:    (C) Twan van Laarhoven and the other MSE developers          |
 //| License:      GNU General Public License 2 or later (see file COPYING)     |
 //+----------------------------------------------------------------------------+
@@ -28,6 +28,7 @@ public:
 private:
   PackageUpdateList* package_list; ///< List of available packages
   PackageInfoPanel*  package_info; ///< Description of the selected package
+  wxStaticText*      waiting_info; ///< Did we get the list of installers?
   
   /// List of the packages shown in this window
   InstallablePackages installable_packages;
@@ -40,6 +41,7 @@ private:
   
   void onOk(wxCommandEvent&);
   void onActionChange(wxCommandEvent&);
+  bool checkReadOnlyFilesBeforeRemoving();
   void onPackageSelect(wxCommandEvent&);
   void onUpdateUI(wxUpdateUIEvent&);
   void onIdle(wxIdleEvent&);
@@ -50,5 +52,7 @@ private:
   /// Check whether we have downloaded the list of installers
   /** If the download is (partially) complete, update the installable_packages list */
   bool checkInstallerList(bool refresh = true);
+  /// Notify that the package list has changed
+  void sendEvent();
 };
 

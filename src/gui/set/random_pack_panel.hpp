@@ -1,5 +1,5 @@
 //+----------------------------------------------------------------------------+
-//| Description:  Magic Set Editor - Program to make Magic (tm) cards          |
+//| Description:  Magic Set Editor - Program to make card games                |
 //| Copyright:    (C) Twan van Laarhoven and the other MSE developers          |
 //| License:      GNU General Public License 2 or later (see file COPYING)     |
 //+----------------------------------------------------------------------------+
@@ -17,6 +17,7 @@ class CardViewer;
 class RandomCardList;
 class PackTotalsPanel;
 class SelectableLabel;
+class wxScrolledWindow;
 struct CardSelectEvent;
 DECLARE_POINTER_TYPE(PackType);
 
@@ -69,8 +70,10 @@ private:
   CardViewer*       preview;    ///< Card preview
   RandomCardList*   card_list;  ///< The list of cards
   wxTextCtrl*       seed;      ///< Seed value
+  wxScrolledWindow* packsWindow; ///< Scrollable container for the pack pickers
   wxFlexGridSizer*  packsSizer;
   wxFlexGridSizer*  totalsSizer;
+  wxScrolledWindow* totalsWindow; ///< Scrollable container for the totals panel
   wxButton*         generate_button;
   wxRadioButton*    seed_random, *seed_fixed;
   PackTotalsPanel*  totals;

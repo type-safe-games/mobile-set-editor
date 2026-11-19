@@ -1,5 +1,5 @@
 //+----------------------------------------------------------------------------+
-//| Description:  Magic Set Editor - Program to make Magic (tm) cards          |
+//| Description:  Magic Set Editor - Program to make card games                |
 //| Copyright:    (C) Twan van Laarhoven and the other MSE developers          |
 //| License:      GNU General Public License 2 or later (see file COPYING)     |
 //+----------------------------------------------------------------------------+
@@ -35,8 +35,12 @@ SymbolWindow::SymbolWindow(Window* parent, const String& filename)
   : performer(nullptr)
 {
   // open file
-  wxFileInputStream stream(filename);
-  Reader reader(stream, nullptr, filename);
+  unique_ptr<wxFileInputStream> stream;
+  retry_io([&]{
+    stream = make_unique<wxFileInputStream>(filename);
+    return stream->IsOk();
+  });
+  Reader reader(*stream, nullptr, filename);
   SymbolP symbol;
   reader.handle_greedy(symbol);
   init(parent, symbol);
@@ -65,7 +69,7 @@ SymbolWindow::~SymbolWindow() {
 }
 
 void SymbolWindow::init(Window* parent, SymbolP symbol) {
-  Create(parent, wxID_ANY, _TITLE_("symbol editor"), wxDefaultPosition, wxSize(650,600), wxDEFAULT_FRAME_STYLE | wxNO_FULL_REPAINT_ON_RESIZE);
+  Create(parent, wxID_ANY, _TITLE_("symbol editor"), wxDefaultPosition, wxSize(850,700), wxDEFAULT_FRAME_STYLE | wxNO_FULL_REPAINT_ON_RESIZE);
   SetIcon(load_resource_icon(_("app")));
   inSelectionEvent = false;
   
@@ -83,8 +87,8 @@ void SymbolWindow::init(Window* parent, SymbolP symbol) {
   menuBar->Append(menuFile, _MENU_("file"));
   
   auto menuEdit = new wxMenu();
-    add_menu_item(menuEdit, ID_EDIT_UNDO, "undo", _MENU_1_("undo",wxEmptyString), _HELP_("undo"));
-    add_menu_item(menuEdit, ID_EDIT_REDO, "redo", _MENU_1_("redo",wxEmptyString), _HELP_("redo"));
+    add_menu_item(menuEdit, ID_EDIT_UNDO, settings.darkModePrefix() + "undo", _MENU_1_("undo",_("")), _HELP_("undo"));
+    add_menu_item(menuEdit, ID_EDIT_REDO, settings.darkModePrefix() + "redo", _MENU_1_("redo",_("")), _HELP_("redo"));
     menuEdit->AppendSeparator();
     add_menu_item_tr(menuEdit, ID_EDIT_GROUP, "group", "group");
     add_menu_item_tr(menuEdit, ID_EDIT_UNGROUP, "ungroup", "ungroup");
@@ -94,11 +98,11 @@ void SymbolWindow::init(Window* parent, SymbolP symbol) {
   
   auto menuTool = new wxMenu();
     add_menu_item_tr(menuTool, ID_MODE_SELECT, "mode_select", "select", wxITEM_CHECK);
-    add_menu_item_tr(menuTool, ID_MODE_ROTATE, "mode_rotate", "rotate", wxITEM_CHECK);
+    add_menu_item_tr(menuTool, ID_MODE_ROTATE, settings.darkModePrefix() + "mode_rotate", "rotate", wxITEM_CHECK);
     add_menu_item_tr(menuTool, ID_MODE_POINTS, "mode_curve", "points", wxITEM_CHECK);
-    add_menu_item_tr(menuTool, ID_MODE_SHAPES, "circle", "basic_shapes", wxITEM_CHECK);
+    add_menu_item_tr(menuTool, ID_MODE_SHAPES, settings.darkModePrefix() + "circle", "basic_shapes", wxITEM_CHECK);
     add_menu_item_tr(menuTool, ID_MODE_SYMMETRY, "mode_symmetry", "symmetry", wxITEM_CHECK);
-    add_menu_item_tr(menuTool, ID_MODE_PAINT, "mode_paint", "paint", wxITEM_CHECK);
+    //add_menu_item_tr(menuTool, ID_MODE_PAINT,  settings.darkModePrefix() + "mode_paint", "paint", wxITEM_CHECK);
   menuBar->Append(menuTool, _MENU_("tool"));
   
   SetMenuBar(menuBar);
@@ -111,8 +115,8 @@ void SymbolWindow::init(Window* parent, SymbolP symbol) {
   wxToolBar* tb = CreateToolBar(wxTB_FLAT | wxNO_BORDER | wxTB_HORIZONTAL | wxTB_TEXT);
   add_tool_tr(tb, ID_FILE_STORE, "apply", "store_symbol", true);
   tb->AddSeparator();
-  add_tool(tb, ID_EDIT_UNDO, "undo", _TOOL_("undo"), _TOOLTIP_1_("undo",wxEmptyString), _HELP_("undo"));
-  add_tool(tb, ID_EDIT_REDO, "redo", _TOOL_("redo"), _TOOLTIP_1_("redo",wxEmptyString), _HELP_("redo"));
+  add_tool(tb, ID_EDIT_UNDO, settings.darkModePrefix() + "undo", _TOOL_("undo"), _TOOLTIP_1_("undo",_("")), _HELP_("undo"));
+  add_tool(tb, ID_EDIT_REDO, settings.darkModePrefix() + "redo", _TOOL_("redo"), _TOOLTIP_1_("redo",_("")), _HELP_("redo"));
   tb->AddSeparator();
   add_tool_tr(tb, ID_VIEW_GRID, "grid", "grid", true, wxITEM_CHECK);
   add_tool_tr(tb, ID_VIEW_GRID_SNAP, "grid_snap", "snap", true, wxITEM_CHECK);
@@ -123,13 +127,13 @@ void SymbolWindow::init(Window* parent, SymbolP symbol) {
   wxToolBar* em = new wxToolBar(emp, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTB_FLAT | wxTB_VERTICAL | wxTB_HORZ_TEXT);
   em->SetToolBitmapSize(wxSize(17,17));
   add_tool_tr(em, ID_MODE_SELECT, "mode_select", "select", true, wxITEM_CHECK);
-  add_tool_tr(em, ID_MODE_ROTATE, "mode_rotate", "rotate", true, wxITEM_CHECK);
+  add_tool_tr(em, ID_MODE_ROTATE, settings.darkModePrefix() + "mode_rotate", "rotate", true, wxITEM_CHECK);
   em->AddSeparator();
   add_tool_tr(em, ID_MODE_POINTS, "mode_curve", "points", true, wxITEM_CHECK);
   em->AddSeparator();
-  add_tool_tr(em, ID_MODE_SHAPES, "circle", "basic shapes", true, wxITEM_CHECK);
+  add_tool_tr(em, ID_MODE_SHAPES, settings.darkModePrefix() + "circle", "basic shapes", true, wxITEM_CHECK);
   add_tool_tr(em, ID_MODE_SYMMETRY, "mode_symmetry", "symmetry", true, wxITEM_CHECK);
-  //add_tool_tr(em, ID_MODE_PAINT, "mode_paint", "paint", true, wxITEM_CHECK);
+  //add_tool_tr(em, ID_MODE_PAINT, settings.darkModePrefix() + "mode_paint", "paint", true, wxITEM_CHECK);
   em->Realize();
   
   // Lay out
@@ -176,13 +180,13 @@ void SymbolWindow::init(Window* parent, SymbolP symbol) {
     em = new wxToolBar(emp, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTB_FLAT | wxTB_VERTICAL | wxTB_HORZ_TEXT);
     em->SetToolBitmapSize(wxSize(17,17));
     String spaces(max(0,n-1), _(' '));
-    add_tool(em, ID_MODE_SELECT,   "mode_select",  _TOOL_("select")       + spaces, _TOOLTIP_("select"),    _HELP_("select"), wxITEM_CHECK);
-    add_tool(em, ID_MODE_ROTATE,   "mode_rotate",  _TOOL_("rotate")       + spaces, _TOOLTIP_("rotate"),    _HELP_("rotate"), wxITEM_CHECK);
+    add_tool(em, ID_MODE_SELECT,   "mode_select",                             _TOOL_("select")       + spaces, _TOOLTIP_("select"),       _HELP_("select"), wxITEM_CHECK);
+    add_tool(em, ID_MODE_ROTATE,   settings.darkModePrefix() + "mode_rotate", _TOOL_("rotate")       + spaces, _TOOLTIP_("rotate"),       _HELP_("rotate"), wxITEM_CHECK);
     em->AddSeparator();
-    add_tool(em, ID_MODE_POINTS,   "mode_curve",   _TOOL_("points")       + spaces, _TOOLTIP_("points"),    _HELP_("points"), wxITEM_CHECK);
+    add_tool(em, ID_MODE_POINTS,   "mode_curve",                              _TOOL_("points")       + spaces, _TOOLTIP_("points"),       _HELP_("points"), wxITEM_CHECK);
     em->AddSeparator();
-    add_tool(em, ID_MODE_SHAPES,   "circle",        _TOOL_("basic shapes") + spaces, _TOOLTIP_("basic shapes"),_HELP_("basic shapes"), wxITEM_CHECK);
-    add_tool(em, ID_MODE_SYMMETRY, "mode_symmetry", _TOOL_("symmetry")     + spaces, _TOOLTIP_("symmetry"),  _HELP_("symmetry"), wxITEM_CHECK);
+    add_tool(em, ID_MODE_SHAPES,   settings.darkModePrefix() + "circle",      _TOOL_("basic shapes") + spaces, _TOOLTIP_("basic shapes"), _HELP_("basic shapes"), wxITEM_CHECK);
+    add_tool(em, ID_MODE_SYMMETRY, "mode_symmetry",                           _TOOL_("symmetry")     + spaces, _TOOLTIP_("symmetry"),     _HELP_("symmetry"), wxITEM_CHECK);
     em->Realize();
     
     es = new wxBoxSizer(wxVERTICAL);
@@ -209,20 +213,30 @@ void SymbolWindow::onFileNew(wxCommandEvent& ev) {
 }
 
 void SymbolWindow::onFileOpen(wxCommandEvent& ev) {
-  String name = wxFileSelector(_("Open symbol"),settings.default_symbol_dir,_(""),_(""),_("Symbol files|*.mse-symbol;*.bmp|MSE2 symbol files (*.mse-symbol)|*.mse-symbol|Images/MSE1 symbol files|*.bmp;*.png;*.jpg;*.gif"),wxFD_OPEN|wxFD_FILE_MUST_EXIST, this);
-  if (!name.empty()) {
+  wxFileDialog dlg(this, _TITLE_("open symbol file"), settings.default_symbol_dir, _(""),
+    _("All files|*.mse-symbol;*.bmp;*.jpg;*.jpeg;*.png;*.webp;*.gif;*.tif;*.tiff|MSE2 symbol files (*.mse-symbol)|*.mse-symbol|Images/MSE1 symbol files|*.bmp;*.jpg;*.jpeg;*.png;*.webp;*.gif;*.tif;*.tiff"),
+    wxFD_OPEN | wxFD_FILE_MUST_EXIST);
+  if (dlg.ShowModal() == wxID_OK) {
+    String name = dlg.GetPath();
     settings.default_symbol_dir = wxPathOnly(name);
     wxFileName n(name);
     String ext = n.GetExt();
     SymbolP symbol;
     if (ext.Lower() == _("mse-symbol")) {
-      wxFileInputStream stream(name);
-      Reader reader(stream, nullptr, name);
+      unique_ptr<wxFileInputStream> stream;
+      retry_io([&]{
+        stream = make_unique<wxFileInputStream>(name);
+        return stream->IsOk();
+      });
+      Reader reader(*stream, nullptr, name);
       reader.handle_greedy(symbol);
     } else {
       wxBusyCursor busy;
-      Image image(name);
-      if (!image.Ok()) return;
+      Image image;
+      if (!image_load_file(image, name)) {
+        queue_message(MESSAGE_ERROR, _ERROR_("can't load image"));
+        return;
+      }
       symbol = import_symbol(image);
     }
     // show...
@@ -240,9 +254,26 @@ void SymbolWindow::onFileSaveAs(wxCommandEvent& ev) {
   String name = wxFileSelector(_("Save symbol"),settings.default_set_dir,_(""),_(""),_("Symbol files (*.mse-symbol)|*.mse-symbol"),wxFD_SAVE, this);
   if (!name.empty()) {
     settings.default_set_dir = wxPathOnly(name);
-    wxFileOutputStream stream(name);
-    Writer writer(stream, file_version_symbol);
-    writer.handle(control->getSymbol());
+    // build the file locally first, then move it (to a potentially cloud-synced drive)
+    String temp_file = wxFileName::CreateTempFileName(_("mse-symbol"));
+    bool ok;
+    {
+      unique_ptr<wxFileOutputStream> stream;
+      retry_io([&]{
+        stream = make_unique<wxFileOutputStream>(temp_file);
+        return stream->IsOk();
+      });
+      ok = stream->IsOk();
+      if (ok) {
+        Writer writer(*stream, file_version_symbol);
+        writer.handle(control->getSymbol());
+        ok = stream->IsOk();
+      }
+    }
+    if (!ok || !rename_file_or_dir(temp_file, name)) {
+      remove_file(temp_file);
+      queue_message(MESSAGE_ERROR, _ERROR_1_("can't save symbol", name));
+    }
   }
 }
 
@@ -251,9 +282,19 @@ void SymbolWindow::onFileStore(wxCommandEvent& ev) {
     SymbolValueP value = static_pointer_cast<SymbolValue>(performer->value);
     Package& package = performer->getLocalPackage();
     LocalFileName new_filename = package.newFileName(value->field().name,_(".mse-symbol")); // a new unique name in the package
-    auto stream = package.openOut(new_filename);
-    Writer writer(*stream, file_version_symbol);
-    writer.handle(control->getSymbol());
+    unique_ptr<wxOutputStream> stream;
+    retry_io([&]{
+      stream = package.openOut(new_filename);
+      return stream->IsOk();
+    });
+    if (stream->IsOk()) {
+      Writer writer(*stream, file_version_symbol);
+      writer.handle(control->getSymbol());
+    }
+    if (!stream->IsOk()) {
+      queue_message(MESSAGE_ERROR, _ERROR_1_("can't write symbol", new_filename.toStringForWriting()));
+      return;
+    }
     performer->addAction(value_action(value, new_filename));
   }
 }

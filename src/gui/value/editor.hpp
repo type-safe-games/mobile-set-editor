@@ -1,5 +1,5 @@
 //+----------------------------------------------------------------------------+
-//| Description:  Magic Set Editor - Program to make Magic (tm) cards          |
+//| Description:  Magic Set Editor - Program to make card games                |
 //| Copyright:    (C) Twan van Laarhoven and the other MSE developers          |
 //| License:      GNU General Public License 2 or later (see file COPYING)     |
 //+----------------------------------------------------------------------------+
@@ -102,7 +102,12 @@ public:
   
   /// Insert the given text (replacing the current selection)
   virtual void insert(const String& text, const String& action_name) {};
-  
+
+  // --------------------------------------------------- : Resetting
+
+  virtual bool canDefaultReset() const { return false; }
+  virtual void doDefaultReset() {}
+
   // --------------------------------------------------- : Search / replace
   
   /// Do a search or replace action for the given FindInfo

@@ -1,5 +1,5 @@
 //+----------------------------------------------------------------------------+
-//| Description:  Magic Set Editor - Program to make Magic (tm) cards          |
+//| Description:  Magic Set Editor - Program to make card games                |
 //| Copyright:    (C) Twan van Laarhoven and the other MSE developers          |
 //| License:      GNU General Public License 2 or later (see file COPYING)     |
 //+----------------------------------------------------------------------------+
@@ -9,6 +9,7 @@
 #include <util/prec.hpp>
 #include <gui/control/card_editor.hpp>
 #include <gui/value/editor.hpp>
+#include <gui/set/cards_panel.hpp>
 #include <gui/util.hpp>
 #include <data/field.hpp>
 #include <data/stylesheet.hpp>
@@ -213,13 +214,11 @@ bool DataEditor::search(Iterator it, Iterator end, FindInfo& find, bool from_sta
   for (;it != end; ++it) {
     ValueViewer* viewer = *it;
     if (viewer == current_viewer) include = true;
-    if (include && viewer->getField()->editable && viewer->isVisible()) {
+    if (include && is_enabled(viewer)) {
       ValueEditor* editor = viewer->getEditor();
-      if (editor) {
-        if (editor && editor->search(find, from_start || viewer != current_viewer)) {
-          selectViewer(viewer);
-          return true; // done
-        }
+      if (editor && editor->search(find, from_start || viewer != current_viewer)) {
+        selectViewer(viewer);
+        return true; // done
       }
     }
   }
@@ -248,18 +247,20 @@ bool DataEditor::search(FindInfo& find, bool from_start) {
 
 // ----------------------------------------------------------------------------- : Clipboard & Formatting
 
-bool DataEditor::canCut()            const { return current_editor && current_editor->canCut();        }
-bool DataEditor::canCopy()           const { return current_editor && current_editor->canCopy();       }
-bool DataEditor::canPaste()          const { return current_editor && current_editor->canPaste();      }
-bool DataEditor::canFormat(int type) const { return current_editor && current_editor->canFormat(type); }
-bool DataEditor::hasFormat(int type) const { return current_editor && current_editor->hasFormat(type); }
-bool DataEditor::canSelectAll()      const { return current_editor && current_editor->canSelectAll();  }
+bool DataEditor::canCut()            const { return current_editor && current_editor->canCut();          }
+bool DataEditor::canCopy()           const { return current_editor && current_editor->canCopy();         }
+bool DataEditor::canPaste()          const { return current_editor && current_editor->canPaste();        }
+bool DataEditor::canFormat(int type) const { return current_editor && current_editor->canFormat(type);   }
+bool DataEditor::hasFormat(int type) const { return current_editor && current_editor->hasFormat(type);   }
+bool DataEditor::canSelectAll()      const { return current_editor && current_editor->canSelectAll();    }
+bool DataEditor::canDefaultReset()   const { return current_editor && current_editor->canDefaultReset(); }
 
-void DataEditor::doCut()                   { if    (current_editor)   current_editor->doCut();         }
-void DataEditor::doCopy()                  { if    (current_editor)   current_editor->doCopy();        }
-void DataEditor::doPaste()                 { if    (current_editor)   current_editor->doPaste();       }
-void DataEditor::doFormat(int type)        { if    (current_editor)   current_editor->doFormat(type);  }
-void DataEditor::doSelectAll()             { if    (current_editor)   current_editor->doSelectAll();   }
+void DataEditor::doCut()                   { if    (current_editor)   current_editor->doCut();           }
+void DataEditor::doCopy()                  { if    (current_editor)   current_editor->doCopy();          }
+void DataEditor::doPaste()                 { if    (current_editor)   current_editor->doPaste();         }
+void DataEditor::doFormat(int type)        { if    (current_editor)   current_editor->doFormat(type);    }
+void DataEditor::doSelectAll()             { if    (current_editor)   current_editor->doSelectAll();     }
+void DataEditor::doDefaultReset()          { if    (current_editor)   current_editor->doDefaultReset();  }
 
 
 wxMenu* DataEditor::getMenu(int type) const {
@@ -306,6 +307,7 @@ void DataEditor::onLeftDClick(wxMouseEvent& ev) {
 }
 void DataEditor::onRightDown(wxMouseEvent& ev) {
   ev.Skip(); // for context menu
+  SetFocus();
   // change selection?
   selectViewer(ev, &ValueEditor::onRightDown);
 }
@@ -370,7 +372,7 @@ void DataEditor::onMouseLeave(wxMouseEvent& ev) {
   }
   // clear status text
   wxFrame* frame = dynamic_cast<wxFrame*>( wxGetTopLevelParent(this) );
-  if (frame) frame->SetStatusText(wxEmptyString);
+  if (frame) frame->SetStatusText(_(""));
 }
 
 bool DataEditor::selectViewer(ValueViewer* v) {
@@ -416,7 +418,7 @@ RealPoint DataEditor::mousePoint(const wxMouseEvent& ev, const ValueViewer& view
 
 ValueViewer* DataEditor::mousedOverViewer(const wxMouseEvent& ev, bool* over_label_out) const {
   FOR_EACH_EDITOR_REVERSE{ // find high z index fields first
-    if (v->getField()->editable) {
+    if (is_enabled(v)) {
       if (v->containsPoint(mousePoint(ev,*v))) {
         if (over_label_out) *over_label_out = false;
         return v.get();
@@ -439,6 +441,12 @@ void DataEditor::onLoseCapture(wxMouseCaptureLostEvent&) {
 
 // ----------------------------------------------------------------------------- : Keyboard events
 
+static CardsPanel* find_cards_panel(wxWindow* w) {
+  for (; w; w = w->GetParent()) {
+    if (CardsPanel* panel = dynamic_cast<CardsPanel*>(w)) return panel;
+  }
+  return nullptr;
+}
 void DataEditor::onChar(wxKeyEvent& ev) {
   if (ev.GetKeyCode() == WXK_TAB) {
     if (!ev.ShiftDown()) {
@@ -448,7 +456,7 @@ void DataEditor::onChar(wxKeyEvent& ev) {
       wxNavigationKeyEvent evt;
       GetParent()->HandleWindowEvent(evt);
     } else {
-      // try to select the previos editor
+      // try to select the previous editor
       if (selectPrevious()) return;
       // send a navigation event to our parent, to select another control
       wxNavigationKeyEvent evt;
@@ -462,6 +470,14 @@ void DataEditor::onChar(wxKeyEvent& ev) {
   } else {
     ev.Skip();
   }
+
+  // TODO: Figure out how to send an event instead of doing this
+  if (GetId() == ID_CARD_LINK_EDITOR) {
+    CardsPanel* panel = find_cards_panel(GetParent());
+    if (panel) {
+      panel->refreshCard(card);
+    }
+  }
 }
 
 // ----------------------------------------------------------------------------- : Menu events
@@ -469,12 +485,15 @@ void DataEditor::onChar(wxKeyEvent& ev) {
 void DataEditor::onContextMenu(wxContextMenuEvent& ev) {
   if (current_editor) {
     wxMenu m;
-    add_menu_item_tr(&m, ID_EDIT_CUT, "cut", "cut");
+    add_menu_item_tr(&m, ID_EDIT_CUT, settings.darkModePrefix() + "cut", "cut");
     add_menu_item_tr(&m, ID_EDIT_COPY, "copy", "copy");
     add_menu_item_tr(&m, ID_EDIT_PASTE, "paste", "paste");
+    m.AppendSeparator();
+    add_menu_item_tr(&m, ID_EDIT_DEFAULT_RESET, settings.darkModePrefix() + "default_reset", "default_reset");
     m.Enable(ID_EDIT_CUT,   canCut());
     m.Enable(ID_EDIT_COPY,  canCopy());
     m.Enable(ID_EDIT_PASTE, canPaste());
+    m.Enable(ID_EDIT_DEFAULT_RESET, canDefaultReset());
     if (current_editor->onContextMenu(m, ev)) {
       PopupMenu(&m);
     }
@@ -502,6 +521,10 @@ void DataEditor::onFocus(wxFocusEvent& ev) {
     } else {
       selectFirst();
     }
+  }
+  CardsPanel* panel = find_cards_panel(GetParent());
+  if (panel) {
+    panel->setFocusedEditor(this);
   }
 }
 void DataEditor::onLoseFocus(wxFocusEvent& ev) {

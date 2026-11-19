@@ -1,5 +1,5 @@
 //+----------------------------------------------------------------------------+
-//| Description:  Magic Set Editor - Program to make Magic (tm) cards          |
+//| Description:  Magic Set Editor - Program to make card games                |
 //| Copyright:    (C) Twan van Laarhoven and the other MSE developers          |
 //| License:      GNU General Public License 2 or later (see file COPYING)     |
 //+----------------------------------------------------------------------------+
@@ -47,8 +47,23 @@ IMPLEMENT_REFLECTION_NO_SCRIPT(SymbolVariation) {
 
 // ----------------------------------------------------------------------------- : SymbolValue
 
+void SymbolValue::copyDataFrom(const Value& other) {
+  if (const SymbolValue* o = dynamic_cast<const SymbolValue*>(&other)) {
+    filename = o->filename;
+  }
+}
+
 String SymbolValue::toString() const {
-  return filename.empty() ? wxEmptyString : _("<symbol>");
+  return filename.empty() ? _("") : _("<symbol>");
+}
+
+bool SymbolValue::isDefault() {
+  return filename.empty();
+}
+
+void SymbolValue::makeDefault(bool d) {
+  if (!d) return;
+  filename.makeEmpty();
 }
 
 IMPLEMENT_REFLECTION_NO_GET_MEMBER(SymbolValue) {

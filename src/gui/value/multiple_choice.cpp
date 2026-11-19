@@ -1,5 +1,5 @@
 //+----------------------------------------------------------------------------+
-//| Description:  Magic Set Editor - Program to make Magic (tm) cards          |
+//| Description:  Magic Set Editor - Program to make card games                |
 //| Copyright:    (C) Twan van Laarhoven and the other MSE developers          |
 //| License:      GNU General Public License 2 or later (see file COPYING)     |
 //+----------------------------------------------------------------------------+
@@ -101,9 +101,20 @@ DropDownList& MultipleChoiceValueEditor::initDropDown() {
 
 void MultipleChoiceValueEditor::determineSize(bool force_fit) {
   if (!nativeLook()) return;
-  // item height
-  item_height = 18;
-  // height depends on number of items and item height
+  double h = 18;
+  if (style().render_style & RENDER_TEXT) {
+    wxClientDC dc(&editor());
+    dc.SetFont(style().font.toWxFont(1.0));
+    int end = field().choices->lastId();
+    for (int i = 0; i < end; ++i) {
+      String choice = field().choices->choiceName(i);
+      String text = tr(getStylePackage(), choice, capitalize_sentence);
+      wxCoord w, th;
+      dc.GetTextExtent(text, &w, &th);
+      h = max(h, (double)th);
+    }
+  }
+  item_height = h;
   int item_count = field().choices->lastId();
   bounding_box.height = item_count * item_height;
 }
@@ -135,7 +146,7 @@ bool MultipleChoiceValueEditor::onChar(wxKeyEvent& ev) {
   }
 }
 void MultipleChoiceValueEditor::onLoseFocus() {
-  if (drop_down) drop_down->hide(false);
+  //if (drop_down) drop_down->hide(false);
 }
 
 void MultipleChoiceValueEditor::onValueChange() {

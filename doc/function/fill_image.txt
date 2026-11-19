@@ -1,0 +1,14 @@
+Function: fill_image
+
+DOC_MSE_VERSION: since 2.6.0
+
+--Usage--
+> fill_image(input: image, color: color)
+
+Fill an image with a single color, but keep the alpha channel unchanged.
+
+
+--Parameters--
+! Parameter	Type			Description
+| @input@	[[type:image]]		Image to fill.
+| @color@	[[type:color]]		Color to fill with.

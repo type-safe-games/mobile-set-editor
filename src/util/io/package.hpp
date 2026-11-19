@@ -1,5 +1,5 @@
 //+----------------------------------------------------------------------------+
-//| Description:  Magic Set Editor - Program to make Magic (tm) cards          |
+//| Description:  Magic Set Editor - Program to make card games                |
 //| Copyright:    (C) Twan van Laarhoven and the other MSE developers          |
 //| License:      GNU General Public License 2 or later (see file COPYING)     |
 //+----------------------------------------------------------------------------+
@@ -13,6 +13,7 @@
 #include <util/error.hpp>
 #include <util/file_utils.hpp>
 #include <util/vcs.hpp>
+#include <data/format/image_encoding.hpp>
 
 class Package;
 class wxFileInputStream;
@@ -47,6 +48,11 @@ public:
   inline bool empty() const {
     return fn.empty();
   }
+
+  inline void makeEmpty() {
+    fn.clear();
+  }
+
   inline bool operator == (LocalFileName const& that) const {
     return this->fn == that.fn;
   }
@@ -132,6 +138,12 @@ public:
 
   // --------------------------------------------------- : Managing the inside of the package
 
+  /// Check if a file is in the package.
+  bool contains(const String& file);
+  inline bool contains(const LocalFileName& file) {
+    return contains(file.fn);
+  }
+
   /// Open an input stream for a file in the package.
   unique_ptr<wxInputStream> openIn(const String& file);
   inline unique_ptr<wxInputStream> openIn(const LocalFileName& file) {
@@ -161,6 +173,10 @@ public:
   /// Must be called for files not opened using openOut/nameOut
   /// If they are to be kept in the package.
   void referenceFile(const String& file);
+
+  /// Is a file ignored by the package when saving or garbage collecting?
+  /// Used for custom addons written by the user that we only want to read, but never overwrite.
+  virtual bool isIgnoredOnSave(const String& file) const { return false; }
 
   // --------------------------------------------------- : Managing the inside of the package : Reader/writer
 
@@ -260,17 +276,25 @@ public:
   Packaged();
   virtual ~Packaged() {}
 
-  Version version;      ///< Version number of this package
-  Version compatible_version;  ///< Earliest version number this package is compatible with
-  String installer_group;    ///< Group to place this package in in the installer
-  String short_name;      ///< Short name of this package
-  String full_name;      ///< Name of this package, for menus etc.
-  String icon_filename;    ///< Filename of icon to use in package lists
-  vector<PackageDependencyP> dependencies;  ///< Dependencies of this package
-  int    position_hint;    ///< A hint for the package list
+  Version version;                         ///< Version number of this package
+  Version compatible_version;              ///< Earliest version number this package is compatible with
+  String installer_group;                  ///< Group to place this package in in the installer
+  String short_name;                       ///< Short name of this package
+  String full_name;                        ///< Name of this package, for menus etc.
+  String folder_name;                      ///< Name of the folder this package is loaded from.
+  String icon_filename;                    ///< Filename of icon to use in package lists
+  String dark_icon_filename;               ///< Filename of icon to use in package lists, when a variant for dark mode is needed
+  vector<PackageDependencyP> dependencies; ///< Dependencies of this package
+  int    position_hint;                    ///< A hint for the package list
+  vector<String> read_only_files;          ///< Filenames/wildcard patterns (*,?) of files in this
+                                           ///< package that are not managed by the program, and so
+                                           ///< must never be overwritten or garbage collected on save.
 
   /// Get an input stream for the package icon, if there is any
   unique_ptr<wxInputStream> openIconFile();
+
+  /// A file matches if it equals, or matches a wildcard (*,?) pattern in, read_only_files
+  bool isIgnoredOnSave(const String& file) const override;
 
   /// Open a package, and read the data
   /** if just_header is true, then the package is not fully parsed.
@@ -278,7 +302,7 @@ public:
   void open(const String& package, bool just_header = false);
   /// Ensure the package is fully loaded.
   void loadFully();
-  void save();
+  void save(bool remove_unused = true);
   void saveAs(const String& package, bool remove_unused = true, bool as_directory = false);
   void saveCopy(const String& package);
 

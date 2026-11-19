@@ -1,5 +1,5 @@
 //+----------------------------------------------------------------------------+
-//| Description:  Magic Set Editor - Program to make Magic (tm) cards          |
+//| Description:  Magic Set Editor - Program to make card games                |
 //| Copyright:    (C) Twan van Laarhoven and the other MSE developers          |
 //| License:      GNU General Public License 2 or later (see file COPYING)     |
 //+----------------------------------------------------------------------------+
@@ -14,11 +14,14 @@
 #include <data/keyword.hpp>
 #include <data/pack.hpp>
 #include <data/field.hpp>
-#include <data/field/text.hpp>    // for 0.2.7 fix
+#include <data/update_cards_script.hpp>
 #include <data/field/information.hpp>
-#include <util/tagged_string.hpp> // for 0.2.7 fix
+#include <data/field/image.hpp>
+#include <data/field/symbol.hpp>
+#include <data/action/value.hpp>
 #include <util/order_cache.hpp>
 #include <util/delayed_index_maps.hpp>
+#include <util/uid.hpp>
 #include <script/script_manager.hpp>
 #include <script/profiler.hpp>
 #include <wx/sstream.h>
@@ -64,6 +67,73 @@ void Set::updateStyles(const CardP& card, bool only_content_dependent) {
 void Set::updateDelayed() {
   script_manager->updateDelayed();
 }
+void Set::updateLinkScripts(const CardP& card) {
+  script_manager->updateLinkScripts(card);
+}
+void Set::updateCardsScripts() {
+  // first apply all the stylesheet update_cards_scripts that are older than the first game update_cards_scripts
+  // then apply the first game update_cards_scripts
+  // then apply all the stylesheet scripts that are older than the second game script
+  // then apply the second game script, etc...
+  Version previous_cutoff = Version();
+  Version current_cutoff = Version();
+  for (size_t g = 0; g < game->update_cards_scripts.size() + 1; ++g) {
+    bool last_iteration = g == game->update_cards_scripts.size();
+    UpdateCardsScriptP game_script = last_iteration ? nullptr : game->update_cards_scripts[g];
+    previous_cutoff = current_cutoff;
+    current_cutoff = last_iteration ? current_cutoff : game_script->before_version;
+    // Apply stylesheet scripts that are older than the current game script
+    for (size_t i = 0; i < cards.size(); ++i) {
+      CardP& card = cards[i];
+      StyleSheetP stylesheet = stylesheetForP(card);
+      Version stylesheet_version = card->stylesheet_version.isZero() ? this->stylesheet_version : card->stylesheet_version;
+      for (size_t j = 0; j < stylesheet->update_cards_scripts.size(); ++j) {
+        UpdateCardsScriptP& script = stylesheet->update_cards_scripts[j];
+        if (script->before_version >= current_cutoff && !last_iteration) continue;
+        if (script->before_version < previous_cutoff) continue;
+        if (stylesheet_version >= script->before_version) continue;
+        vector<CardP> new_cards;
+        try {
+          new_cards = script->perform(*this, card);
+        }
+        catch (Error& e) {
+          throw Error(_ERROR_3_("error updating card", stylesheet->relativeFilename(), script->before_version.toString(), card->identification()) + _("\n\n") + e.what());
+        }
+        if (!new_cards.empty()) {
+          FOR_EACH(new_card, new_cards) {
+            // Initialize the stylesheet_version if it wasn't defined, to prevent this script from applying again
+            if (stylesheet == stylesheetForP(new_card) && new_card->stylesheet_version < script->before_version) {
+              new_card->stylesheet_version = script->before_version;
+            }
+          }
+          --i;
+          break;
+        }
+      }
+    }
+    // Apply current game script
+    if (last_iteration || game_version >= current_cutoff) continue;
+    size_t size = cards.size();
+    for (int i = 0; i < size; ++i) {
+      CardP& card = cards[i];
+      vector<CardP> new_cards = game_script->perform(*this, card);
+      if (!new_cards.empty()) {
+        --i;
+        --size;
+      }
+    }
+  }
+}
+void Set::buildUIDMap() {
+  card_uids.clear();
+  FOR_EACH(c, cards) {
+    while (card_uids.find(c->uid) != card_uids.end()) {
+      queue_message(MESSAGE_WARNING, _("Multiple cards found with same uid:\n") + c->identification() + _("\n") + card_uids[c->uid]->identification() + _("\nPlease notify someone on the Discord server."));
+      c->uid = generate_uid();
+    }
+    card_uids[c->uid] = c;
+  }
+}
 
 Context& Set::getContextForThumbnails() {
   assert(!wxThread::IsMain());
@@ -104,6 +174,28 @@ IndexMap<FieldP, ValueP>& Set::stylingDataFor(const CardP& card) {
   else                           return stylingDataFor(stylesheetFor(card));
 }
 
+void Set::referenceActionStackFiles() {
+  referenceActionStackFiles(true);
+  referenceActionStackFiles(false);
+}
+void Set::referenceActionStackFiles(bool undo) {
+  for (auto&& action : undo ? actions.undo_actions : actions.redo_actions) {
+    try {
+      SimpleValueAction<ImageValue, false>& v = dynamic_cast<SimpleValueAction<ImageValue, false>&>(*action);
+      if (ImageValue* v2 = dynamic_cast<ImageValue*>(v.valueP.get())) {
+        referenceFile(v.new_value.toStringForWriting());
+        referenceFile(v2->filename.toStringForWriting());
+      }
+    } catch (...) { try {
+      SimpleValueAction<SymbolValue, false>& v = dynamic_cast<SimpleValueAction<SymbolValue, false>&>(*action);
+      if (SymbolValue* v2 = dynamic_cast<SymbolValue*>(v.valueP.get())) {
+        referenceFile(v.new_value.toStringForWriting());
+        referenceFile(v2->filename.toStringForWriting());
+      }
+    } catch (...) {} }
+  }
+}
+
 String Set::identification() const {
   // an identifying field
   FOR_EACH_CONST(v, data) {
@@ -117,26 +209,16 @@ String Set::identification() const {
       return v->toString();
     }
   }
-  return wxEmptyString;
+  return _("");
 }
 
 
 String Set::typeName() const { return _("set"); }
 Version Set::fileVersion() const { return file_version_set; }
 
-// fix values for versions < 0.2.7
-void fix_value_207(const ValueP& value) {
-  if (TextValue* v = dynamic_cast<TextValue*>(value.get())) {
-    // text value -> fix it
-    v->value.assignDontChangeDefault(  // don't change defaultness
-      fix_old_tags(v->value()) // remove tags
-    );
-  }
-}
-
 void Set::validate(Version file_app_version) {
   Packaged::validate(file_app_version);
-  // are the
+  // are the game and stylesheet defined?
   if (!game) {
     throw Error(_ERROR_1_("no game specified",_TYPE_("set")));
   }
@@ -148,22 +230,16 @@ void Set::validate(Version file_app_version) {
     throw Error(_ERROR_("stylesheet and set refer to different game"));
   }
 
-  // This is our chance to fix version incompatabilities
-  if (file_app_version < 207) {
-    // Since 0.2.7 we use </tag> style close tags, in older versions it was </>
-    // Walk over all fields and fix...
-    FOR_EACH(c, cards) {
-      FOR_EACH(v, c->data) fix_value_207(v);
-    }
-    FOR_EACH(v, data) fix_value_207(v);
-/*    FOR_EACH(s, styleData) {
-      FOR_EACH(v, s.second->data) fix_value_207(v);
-    }
-*/  }
+  bool empty = cards.empty();
   // we want at least one card
-  if (cards.empty()) cards.push_back(make_intrusive<Card>(*game));
+  if (empty) cards.push_back(make_intrusive<Card>(*game));
+  // build uid map
+  buildUIDMap();
   // update scripts
   script_manager->updateAll();
+  // don't run update_cards_scripts if the only card in the set was just created
+  if (empty) return;
+  updateCardsScripts();
 }
 
 void reflect_version_check(Reader& handler, const Char* key, intrusive_ptr<Packaged> const& package) {
@@ -187,19 +263,28 @@ IMPLEMENT_REFLECTION(Set) {
     REFLECT_IF_READING {
       data.init(game->set_fields);
     }
-    reflect_version_check(handler, _("game_version"), game);
+    if (Handler::isReading) {
+      REFLECT_NO_SCRIPT(game_version);
+    }
+    else {
+      reflect_version_check(handler, _("game_version"), game);
+    }
     WITH_DYNAMIC_ARG(game_for_reading, game.get());
     REFLECT(stylesheet);
-    REFLECT_COMPAT(<300, "style", stylesheet);
-    reflect_version_check(handler, _("stylesheet_version"), stylesheet);
+    if (Handler::isReading) {
+      REFLECT_NO_SCRIPT(stylesheet_version);
+    }
+    else {
+      reflect_version_check(handler, _("stylesheet_version"), stylesheet);
+    }
     WITH_DYNAMIC_ARG(stylesheet_for_reading, stylesheet.get());
     REFLECT_N("set_info", data);
     if (stylesheet) {
-      REFLECT_COMPAT(<300, "extra_set_info", styling_data);
       REFLECT_N("styling", styling_data);
     }
     // Experimental: save each card to a different file
-    reflect_cards(handler);
+    //reflect_cards(handler); // people seem to not like this, so move back to normal REFLECT
+    REFLECT(cards);
     REFLECT(keywords);
     REFLECT(pack_types);
   }

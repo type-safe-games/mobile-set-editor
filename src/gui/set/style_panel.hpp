@@ -1,5 +1,5 @@
 //+----------------------------------------------------------------------------+
-//| Description:  Magic Set Editor - Program to make Magic (tm) cards          |
+//| Description:  Magic Set Editor - Program to make card games                |
 //| Copyright:    (C) Twan van Laarhoven and the other MSE developers          |
 //| License:      GNU General Public License 2 or later (see file COPYING)     |
 //+----------------------------------------------------------------------------+
@@ -10,6 +10,7 @@
 
 #include <util/prec.hpp>
 #include <gui/set/panel.hpp>
+#include <gui/control/filter_ctrl.hpp>
 
 class CardViewer;
 class PackageList;
@@ -21,15 +22,18 @@ class StylingEditor;
 class StylePanel : public SetWindowPanel {
 public:
   StylePanel(Window* parent, int id);
-  
+
   void onChangeSet() override;
+  void onPackageListChange() override;
+  void onFilterChange();
   void onAction(const Action&, bool undone) override;
   
   // --------------------------------------------------- : UI
   
   void initUI(wxToolBar*, wxMenuBar*) override;
-  
+
   // --------------------------------------------------- : Clipboard
+  
   bool canCut() const override;
   bool canCopy() const override;
   bool canPaste() const override;
@@ -40,6 +44,8 @@ public:
   void doSelectAll() override;
   
   // --------------------------------------------------- : Selection
+  
+  CardP selectedCard() const override;
   void selectCard(const CardP& card) override;
   
 private:
@@ -50,12 +56,17 @@ private:
   StylingEditor* editor;    ///< Editor for styling information
   wxButton*      use_for_all;
   wxCheckBox*    use_custom_options;
+  FilterCtrl* stylesheet_filter;
+  String stylesheet_filter_value;
   CardP          card;    ///< Card we are working on
+  bool list_size_already_initialized = false;
   
   void onStyleSelect(wxCommandEvent&);
   void onUseForAll(wxCommandEvent&);
   void onUseCustom(wxCommandEvent&);
-  
+
+  void onStylesheetFilterUpdate(wxCommandEvent&);
+
   /// Determine the best size for the list of stylesheets based on available space
   void updateListSize();
   bool Layout() override;

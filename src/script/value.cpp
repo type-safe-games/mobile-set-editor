@@ -1,5 +1,5 @@
 //+----------------------------------------------------------------------------+
-//| Description:  Magic Set Editor - Program to make Magic (tm) cards          |
+//| Description:  Magic Set Editor - Program to make card games                |
 //| Copyright:    (C) Twan van Laarhoven and the other MSE developers          |
 //| License:      GNU General Public License 2 or later (see file COPYING)     |
 //+----------------------------------------------------------------------------+
@@ -93,14 +93,19 @@ bool approx_equal(double a, double b) {
   return a == b || fabs(a - b) < 1e-14;
 }
 
-/// compare script values for equallity
+/// compare script values for equality
 bool equal(const ScriptValueP& a, const ScriptValueP& b) {
   if (a == b) return true;
   ScriptType at = a->type(), bt = b->type();
-  if (at == bt && at == SCRIPT_INT) {
-    return a->toInt() == b->toInt();
-  } else if (at == bt && at == SCRIPT_BOOL) {
+  bool same_type = at == bt;
+  if (!same_type && (at == SCRIPT_NIL || bt == SCRIPT_NIL) && at != SCRIPT_ERROR && bt != SCRIPT_ERROR) {
+    return false;
+  } else if (same_type && at == SCRIPT_NIL) {
+    return true;
+  } else if (same_type && at == SCRIPT_BOOL) {
     return a->toBool() == b->toBool();
+  } else if (same_type && at == SCRIPT_INT) {
+    return a->toInt() == b->toInt();
   } else if ((at == SCRIPT_INT || at == SCRIPT_DOUBLE) &&
              (bt == SCRIPT_INT || bt == SCRIPT_DOUBLE)) {
     return approx_equal(a->toDouble(), b->toDouble());

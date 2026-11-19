@@ -1,5 +1,5 @@
 //+----------------------------------------------------------------------------+
-//| Description:  Magic Set Editor - Program to make Magic (tm) cards          |
+//| Description:  Magic Set Editor - Program to make card games                |
 //| Copyright:    (C) Twan van Laarhoven and the other MSE developers          |
 //| License:      GNU General Public License 2 or later (see file COPYING)     |
 //+----------------------------------------------------------------------------+
@@ -10,8 +10,10 @@
 #include <gui/util.hpp>
 #include <util/error.hpp>
 #include <util/rotation.hpp>
+#include <util/file_utils.hpp>
 #include <wx/renderer.h>
 #include <wx/stdpaths.h>
+#include <wx/mstream.h>
 #include <gfx/gfx.hpp>
 
 #if wxUSE_UXTHEME && defined(__WXMSW__)
@@ -73,7 +75,7 @@ struct FakeEvtHandlerClass : public wxEvtHandler {
     ev.Skip();
   }
   void onControlLeave(wxMouseEvent& ev) {
-    set_status_text((wxWindow*)ev.GetEventObject(), wxEmptyString);
+    set_status_text((wxWindow*)ev.GetEventObject(), _(""));
     ev.Skip();
   }
 };
@@ -229,7 +231,7 @@ bool image_load_file(Image& image, wxInputStream &stream) {
 
 bool image_load_file(Image& image, const wxString &name) {
   wxLogNull noLog;
-  return image.LoadFile(name);
+  return retry_io([&]{ return image.LoadFile(name); });
 }
 
 // ----------------------------------------------------------------------------- : Tool/menu bar
@@ -245,13 +247,7 @@ void set_menu_item_image(wxMenuItem* item, const String& resource) {
     if (item->GetKind() == wxITEM_CHECK) return; // check items can't have icons
   #endif
   Image bitmap = load_resource_tool_image(resource);
-  #if defined(__WXMSW__)
-    Image disabled_bitmap = generate_disabled_image(bitmap);
-    item->SetBitmaps(bitmap, bitmap);
-    item->SetDisabledBitmap(disabled_bitmap);
-  #else
-    item->SetBitmap(bitmap);
-  #endif
+  item->SetBitmap(bitmap);
 }
 
 wxMenuItem* make_menu_item(wxMenu* menu, int id, const char* resource, const String& text, const String& help, wxItemKind kind, wxMenu* submenu) {
@@ -358,9 +354,11 @@ wxIcon load_resource_icon(const String& name) {
     return wxIcon(_("icon/") + name);
   #else
     static String path = wxStandardPaths::Get().GetDataDir() + _("/resource/icon/");
-        static String local_path = wxStandardPaths::Get().GetUserDataDir() + _("/resource/icon/");
-        if (wxFileExists(path + name + _(".ico"))) return wxIcon(path + name + _(".ico"), wxBITMAP_TYPE_ICO);
-        else return wxIcon(local_path + name + _(".ico"), wxBITMAP_TYPE_ICO);
+    static String local_path = wxStandardPaths::Get().GetUserDataDir() + _("/resource/icon/");
+    String icon_path = wxFileExists(path + name + _(".ico")) ? (path + name + _(".ico")) : (local_path + name + _(".ico"));
+    wxIcon icon;
+    retry_io([&]{ icon = wxIcon(icon_path, wxBITMAP_TYPE_ICO); return icon.IsOk(); });
+    return icon;
   #endif
 }
 
@@ -433,7 +431,7 @@ void draw_control_box(Window* win, DC& dc, const wxRect& rect, bool focused, boo
   dc.SetBrush(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW));
   dc.DrawRectangle(rect);
   // draw the border
-  #if defined(__WXMSW__)
+  #if wxUSE_UXTHEME && defined(__WXMSW__)
     r.left   = rect.x - 2;
     r.top    = rect.y - 2;
     r.right  = rect.x + rect.width  + 2;

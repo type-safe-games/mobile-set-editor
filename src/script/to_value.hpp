@@ -1,5 +1,5 @@
 //+----------------------------------------------------------------------------+
-//| Description:  Magic Set Editor - Program to make Magic (tm) cards          |
+//| Description:  Magic Set Editor - Program to make card games                |
 //| Copyright:    (C) Twan van Laarhoven and the other MSE developers          |
 //| License:      GNU General Public License 2 or later (see file COPYING)     |
 //+----------------------------------------------------------------------------+
@@ -31,6 +31,10 @@ template <typename T>
 ScriptValueP make_iterator(const T& v) {
   return ScriptValueP();
 }
+
+/// Whether an iterated map entry actually holds a value. Used to skip unset slots when iterating an IndexMap
+template <typename T> inline bool has_map_value(const T&) { return true; }
+template <typename T> inline bool has_map_value(const intrusive_ptr<T>& p) { return (bool)p; }
 
 /// Mark a dependency on a member of value, can be overloaded
 template <typename T>
@@ -165,17 +169,85 @@ ScriptValueP get_member(const IndexMap<K,V>& m, const String& name) {
   }
 }
 
+// Iterator over a map-like collection, yields key/value pairs
+template <typename Collection>
+class ScriptMapIterator : public ScriptIterator {
+public:
+  ScriptMapIterator(const Collection* col) : it(col->begin()), end(col->end()) {}
+  ScriptValueP next(ScriptValueP* key_out, int* index_out) override {
+    while (it != end && !has_map_value(it->second)) ++it;
+    if (it == end) return ScriptValueP();
+    if (key_out) *key_out = to_script(it->first);
+    ScriptValueP v = to_script(it->second);
+    ++it;
+    return v;
+  }
+private:
+  typename Collection::const_iterator it, end;
+};
+
+template <typename Key, typename Value>
+class ScriptIndexMapIterator : public ScriptIterator {
+public:
+  ScriptIndexMapIterator(const IndexMap<Key,Value>* col) : it(col->begin()), end(col->end()) {}
+  ScriptValueP next(ScriptValueP* key_out, int* index_out) override {
+    while (it != end && !has_map_value(*it)) ++it; // skip unset slots
+    if (it == end) return ScriptValueP();
+    if (key_out) *key_out = to_script(get_key_name(*it));
+    ScriptValueP v = to_script(*it);
+    ++it;
+    return v;
+  }
+private:
+  typename IndexMap<Key,Value>::const_iterator it, end;
+};
+
+/// Make an iterator for a map-like collection.
+template <typename Collection>
+inline ScriptValueP make_map_iterator(const Collection* col) {
+  return make_intrusive<ScriptMapIterator<Collection>>(col);
+}
+
+template <typename Key, typename Value>
+inline ScriptValueP make_map_iterator(const IndexMap<Key,Value>* col) {
+  return make_intrusive<ScriptIndexMapIterator<Key,Value>>(col);
+}
+
+/// Count values that are set. the same count next() would yield.
+template <typename Collection>
+inline int map_item_count(const Collection& col) {
+  return (int)col.size();
+}
+
+template <typename Key, typename Value>
+inline int map_item_count(const IndexMap<Key,Value>& col) {
+  // IndexMap can have holes, so it needs a scan.
+  int n = 0;
+  for (typename IndexMap<Key,Value>::const_iterator it = col.begin() ; it != col.end() ; ++it) {
+    if (has_map_value(*it)) ++n;
+  }
+  return n;
+}
+
 /// Script value containing a map-like collection
 template <typename Collection>
 class ScriptMap : public ScriptValue {
 public:
   inline ScriptMap(const Collection* v) : value(v) {}
   ScriptType type() const override { return SCRIPT_COLLECTION; }
-  String typeName() const override { return _TYPE_1_("collection of", type_name(value->begin())); }
+  String typeName() const override {
+    for (typename Collection::const_iterator it = value->begin() ; it != value->end() ; ++it) {
+      if (has_map_value(*it)) return _TYPE_1_("collection of", type_name(*it));
+    }
+    return _TYPE_("collection");
+  }
   ScriptValueP getMember(const String& name) const override {
     return get_member(*value, name);
   }
-  int itemCount() const override { return (int)value->size(); }
+  ScriptValueP makeIterator() const override {
+    return make_map_iterator(value);
+  }
+  int itemCount() const override { return map_item_count(*value); }
   ScriptValueP dependencyMember(const String& name, const Dependency& dep) const override {
     mark_dependency_member(*value, name, dep);
     return getMember(name);
@@ -185,7 +257,6 @@ public:
     compare_ptr = value;
     return COMPARE_AS_POINTER;
   }
-private:
   /// Store a pointer to a collection, collections are only ever used for structures owned outside the script
   const Collection* value;
 };
@@ -224,6 +295,9 @@ public:
   ScriptValueP getMember(const String& name) const override;
   ScriptValueP getIndex(int index) const override;
   ScriptValueP makeIterator() const override;
+  ScriptValueP getA() { return a; }
+  ScriptValueP getB() { return b; }
+
   int itemCount() const override { return a->itemCount() + b->itemCount(); }
   /// Collections can be compared by comparing pointers
   CompareWhat compareAs(String&, void const*& compare_ptr) const override {

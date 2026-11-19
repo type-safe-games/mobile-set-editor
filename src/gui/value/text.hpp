@@ -1,5 +1,5 @@
 //+----------------------------------------------------------------------------+
-//| Description:  Magic Set Editor - Program to make Magic (tm) cards          |
+//| Description:  Magic Set Editor - Program to make card games                |
 //| Copyright:    (C) Twan van Laarhoven and the other MSE developers          |
 //| License:      GNU General Public License 2 or later (see file COPYING)     |
 //+----------------------------------------------------------------------------+
@@ -79,7 +79,12 @@ public:
   size_t selectionEnd()   const override { return selection_end; }
   
   void insert(const String& text, const String& action_name) override;
-  
+
+  // --------------------------------------------------- : Resetting
+
+  bool canDefaultReset() const override { return true; }
+  void doDefaultReset() override;
+
   // --------------------------------------------------- : Search/replace
   
   bool search(FindInfo& find, bool from_start) override;

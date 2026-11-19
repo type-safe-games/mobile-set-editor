@@ -1,5 +1,5 @@
 //+----------------------------------------------------------------------------+
-//| Description:  Magic Set Editor - Program to make Magic (tm) cards          |
+//| Description:  Magic Set Editor - Program to make card games                |
 //| Copyright:    (C) Twan van Laarhoven and the other MSE developers          |
 //| License:      GNU General Public License 2 or later (see file COPYING)     |
 //+----------------------------------------------------------------------------+
@@ -103,7 +103,14 @@ void capitalize_in_place(String& s) {
           (is_substr(it, s.end(), _("is ")) || is_substr(it, s.end(), _("the ")) ||
            is_substr(it, s.end(), _("in ")) || is_substr(it, s.end(), _("of "))  ||
            is_substr(it, s.end(), _("to ")) || is_substr(it, s.end(), _("at "))  ||
-           is_substr(it, s.end(), _("a " )))) {
+           is_substr(it, s.end(), _("a " )) || is_substr(it, s.end(), _("an ")) ||
+           is_substr(it, s.end(), _("for ")) || is_substr(it, s.end(), _("and "))  ||
+           is_substr(it, s.end(), _("nor ")) || is_substr(it, s.end(), _("but "))  ||
+           is_substr(it, s.end(), _("or " )) || is_substr(it, s.end(), _("yet ")) ||
+           is_substr(it, s.end(), _("so ")) || is_substr(it, s.end(), _("if "))  ||
+           is_substr(it, s.end(), _("as ")) || is_substr(it, s.end(), _("by "))  ||
+           is_substr(it, s.end(), _("off " )) || is_substr(it, s.end(), _("on ")) ||
+           is_substr(it, s.end(), _("up ")) || is_substr(it, s.end(), _("via ")))) {
         // Short words are not capitalized, keep lower case
       } else {
         *it = toUpper(*it);
@@ -128,6 +135,15 @@ void uncanonical_name_form_in_place(String& str) {
   for (String::iterator it = str.begin(); it != str.end(); ++it) {
     if (*it == '_') *it = ' ';
   }
+}
+
+String unified_form(String str) {
+  str = trim(str);
+  for (String::iterator it = str.begin(); it != str.end(); ++it) {
+    if (*it == ' ') *it = '_';
+    else *it = toLower(*it);
+  }
+  return str;
 }
 
 String name_to_caption(const String& str) {

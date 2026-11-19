@@ -1,5 +1,5 @@
 //+----------------------------------------------------------------------------+
-//| Description:  Magic Set Editor - Program to make Magic (tm) cards          |
+//| Description:  Magic Set Editor - Program to make card games                |
 //| Copyright:    (C) Twan van Laarhoven and the other MSE developers          |
 //| License:      GNU General Public License 2 or later (see file COPYING)     |
 //+----------------------------------------------------------------------------+
@@ -1172,10 +1172,10 @@ bool GraphControl::hasSelection(size_t axis) const {
   return axis < current_item.size() && current_item[axis] >= 0;
 }
 String GraphControl::getSelection(size_t axis) const {
-  if (!graph || axis >= current_item.size() || axis >= graph->getData()->axes.size()) return wxEmptyString;
+  if (!graph || axis >= current_item.size() || axis >= graph->getData()->axes.size()) return _("");
   GraphAxis& a = *graph->getData()->axes[axis];
   int i = current_item[axis];
-  if (i == -1 || (size_t)i >= a.groups.size()) return wxEmptyString;
+  if (i == -1 || (size_t)i >= a.groups.size()) return _("");
   return a.groups[current_item[axis]].name;
 }
 vector<int> GraphControl::getSelectionIndices() const {
@@ -1198,6 +1198,10 @@ void GraphControl::onMotion(wxMouseEvent& ev) {
     }
     UInt count = data.count(hovered_item);
     tip += String::Format(_("\n%d "), count) + (count == 1 ? _TYPE_("card") : _TYPE_("cards"));
+    if (!data.axes.empty() && data.axes[0]->total > 0) {
+      double percent = 100.0 * count / data.axes[0]->total;
+      tip += String::Format(_("   (%.1f%%)"), percent);
+    }
     tip.Replace(_(" "),_("\xA0"));
     // set tooltip
     SetToolTip(tip);

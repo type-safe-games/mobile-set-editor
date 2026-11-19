@@ -1,5 +1,5 @@
 //+----------------------------------------------------------------------------+
-//| Description:  Magic Set Editor - Program to make Magic (tm) cards          |
+//| Description:  Magic Set Editor - Program to make card games                |
 //| Copyright:    (C) Twan van Laarhoven and the other MSE developers          |
 //| License:      GNU General Public License 2 or later (see file COPYING)     |
 //+----------------------------------------------------------------------------+
@@ -12,9 +12,14 @@
 #include <gui/set/panel.hpp>
 
 class wxSplitterWindow;
+class wxScrolledWindow;
+class wxGridBagSizer;
 class FilteredImageCardList;
 class DataEditor;
 class TextCtrl;
+class CardViewer;
+class wxSizer;
+class wxButton;
 class HoverButton;
 class FindInfo;
 class FilterCtrl;
@@ -48,11 +53,16 @@ public:
   void doCut() override;
   void doCopy() override;
   void doPaste() override;
-  
+
   // --------------------------------------------------- : Text selection
 
   bool canSelectAll() const override;
   void doSelectAll() override;
+
+  // --------------------------------------------------- : Resetting
+
+  bool canDefaultReset() const override;
+  void doDefaultReset() override;
 
   // --------------------------------------------------- : Searching (find/replace)
 
@@ -74,24 +84,55 @@ public:
   CardP selectedCard() const override;
   void selectCard(const CardP& card) override;
   void selectFirstCard() override;
+  void setCard(const CardP& card, bool event = false);
+  void refreshCard(const CardP& card);
 
   void getCardLists(vector<CardListBase*>& out) override;
 
+  void setFocusedEditor(DataEditor* editor);
+
+  bool isUpdating() const override { return updating_card; }
+
 private:
   // --------------------------------------------------- : Controls
-  wxSizer*          s_left;
-  wxSplitterWindow* splitter;
-  DataEditor*       editor;
+  wxSizer*               s_left, *card_and_link;
+  wxSplitterWindow*      splitter;
+  DataEditor*            editor, *link_editor, *focused_editor;
   FilteredImageCardList* card_list;
-  wxPanel*          nodes_panel;
-  TextCtrl*         notes;
-  HoverButton*      collapse_notes;
-  FilterCtrl*       filter;
-  String            filter_value; // value of filter, need separate variable because the control is destroyed
-  bool              notes_below_editor;
-  
+  wxPanel*               nodes_panel;
+  TextCtrl*              notes;
+  wxScrolledWindow*      editor_scroller;  ///< Contains the main editor, scrolls when the editor is taller than the panel
+  wxSizer*               editor_sizer;     ///< sizer inside editor_scroller, holds only `editor`
+  wxScrolledWindow*      link_scroller;    ///< The linked cards area
+  wxGridBagSizer*        link_boxes_sizer; ///< 2-column grid inside link_scroller
+  vector<wxSizer*>       link_boxes;       ///< one box (wxStaticBoxSizer) per link slot
+  vector<CardViewer*>    link_viewers;     ///< one card thumbnail per link slot
+  vector<wxStaticText*>  link_relations;   ///< one relation label per link slot
+  vector<wxButton*>      link_unlinks;     ///< one unlink button per link slot
+  wxButton*              link_select;      ///< "select this card" button, only used for slot 0
+  HoverButton*           collapse_notes;
+  FilterCtrl*            filter;
+  String                 filter_value;     ///< value of filter, need separate variable because the control is destroyed
+  wxStaticText*          counts;
+  bool                   notes_below_editor;
+  bool                   updating_card = false;
+
+  /// Update card counts
+  void updateCardCounts();
+  int selected_cards_count = 0;
+  int filtered_cards_count = 0;
+  int filtered_back_cards_count = 0;
+  int total_cards_count = 0;
   /// Move the notes panel below the editor or below the card list
   void updateNotesPosition();
+  /// Number of link boxes shown per row in link_boxes_sizer
+  static const int LINK_BOX_COLUMNS = 2;
+  /// Cap link_scroller's visible size so it uses a scroll bar if it gets bigger
+  void updateLinkScrollerCap();
+  /// Size editor_scroller to fit the editor, but no taller than this panel; adds room for a scroll bar when needed
+  void updateEditorScrollerSize();
+  /// Unlink the card shown in link slot `index` from the currently selected card
+  void onUnlink(int index);
   // before Layout, call updateNotesPosition.
   // NOTE: docs say this function returns void, but the code says bool
   bool Layout() override;

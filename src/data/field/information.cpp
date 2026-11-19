@@ -1,5 +1,5 @@
 //+----------------------------------------------------------------------------+
-//| Description:  Magic Set Editor - Program to make Magic (tm) cards          |
+//| Description:  Magic Set Editor - Program to make card games                |
 //| Copyright:    (C) Twan van Laarhoven and the other MSE developers          |
 //| License:      GNU General Public License 2 or later (see file COPYING)     |
 //+----------------------------------------------------------------------------+
@@ -63,6 +63,13 @@ IMPLEMENT_REFLECTION(InfoStyle) {
 String InfoValue::toString() const {
   return value;
 }
+
+bool InfoValue::isDefault() {
+  return true;
+}
+
+void InfoValue::makeDefault(bool d) {}
+
 bool InfoValue::update(Context& ctx) {
   if (value.empty()) value = field().caption.get();
   bool change = field().script.invokeOn(ctx, value);

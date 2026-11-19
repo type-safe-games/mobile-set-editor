@@ -1,0 +1,10 @@
+Function: new_uid
+
+--Usage--
+> new_uid()
+
+Returns a new card uid, a string of 32 random digits, which is guaranteed to not exist in the set.
+
+--Parameters--
+! Parameter	Type				Description
+| @set@		[[type:set]]		The set in which to look for uid conflicts. This can be omitted since 'set' is a predefined variable.

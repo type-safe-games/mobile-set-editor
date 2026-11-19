@@ -1,5 +1,5 @@
 //+----------------------------------------------------------------------------+
-//| Description:  Magic Set Editor - Program to make Magic (tm) cards          |
+//| Description:  Magic Set Editor - Program to make card games                |
 //| Copyright:    (C) Twan van Laarhoven and the other MSE developers          |
 //| License:      GNU General Public License 2 or later (see file COPYING)     |
 //+----------------------------------------------------------------------------+
@@ -17,6 +17,7 @@
 DECLARE_POINTER_TYPE(GeneratedImage);
 DECLARE_POINTER_TYPE(SymbolVariation);
 class Package;
+class Set;
 
 // ----------------------------------------------------------------------------- : GeneratedImage
 
@@ -44,9 +45,9 @@ public:
   };
   
   /// Generate the image, and conform to the options
-  Image generateConform(const Options&) const;
+  Image generateConform(const Options&);
   /// Generate the image
-  virtual Image generate(const Options&) const = 0;
+  virtual Image generate(const Options&) = 0;
   /// How must the image be combined with the background?
   virtual ImageCombine combine() const { return COMBINE_DEFAULT; }
   /// Equality should mean that every pixel in the generated images is the same if the same options are used
@@ -87,7 +88,7 @@ protected:
 /// An image generator that returns a blank image
 class BlankImage : public GeneratedImage {
 public:
-  Image generate(const Options&) const override;
+  Image generate(const Options&) override;
   bool operator == (const GeneratedImage& that) const override;
   bool isBlank() const override { return true; }
   
@@ -105,7 +106,7 @@ public:
   inline LinearBlendImage(const GeneratedImageP& image1, const GeneratedImageP& image2, double x1, double y1, double x2, double y2)
     : image1(image1), image2(image2), x1(x1), y1(y1), x2(x2), y2(y2)
   {}
-  Image generate(const Options& opt) const override;
+  Image generate(const Options& opt) override;
   ImageCombine combine() const override;
   bool operator == (const GeneratedImage& that) const override;
   bool local() const override { return image1->local() && image2->local(); }
@@ -122,7 +123,7 @@ public:
   inline MaskedBlendImage(const GeneratedImageP& light, const GeneratedImageP& dark, const GeneratedImageP& mask)
     : light(light), dark(dark), mask(mask)
   {}
-  Image generate(const Options& opt) const override;
+  Image generate(const Options& opt) override;
   ImageCombine combine() const override;
   bool operator == (const GeneratedImage& that) const override;
   bool local() const override { return light->local() && dark->local() && mask->local(); }
@@ -138,7 +139,7 @@ public:
   inline CombineBlendImage(const GeneratedImageP& image1, const GeneratedImageP& image2, ImageCombine image_combine)
     : image1(image1), image2(image2), image_combine(image_combine)
   {}
-  Image generate(const Options& opt) const override;
+  Image generate(const Options& opt) override;
   ImageCombine combine() const override;
   bool operator == (const GeneratedImage& that) const override;
   bool local() const override { return image1->local() && image2->local(); }
@@ -155,10 +156,24 @@ public:
   inline SetMaskImage(const GeneratedImageP& image, const GeneratedImageP& mask)
     : SimpleFilterImage(image), mask(mask)
   {}
-  Image generate(const Options& opt) const override;
+  Image generate(const Options& opt) override;
   bool operator == (const GeneratedImage& that) const override;
 private:
   GeneratedImageP mask;
+};
+
+// ----------------------------------------------------------------------------- : VisibilityMaskImage
+
+/// Generate a black/white mask marking pixels that are (or neighbor) a pixel with alpha <= threshold
+class VisibilityMaskImage : public SimpleFilterImage {
+public:
+  inline VisibilityMaskImage(const GeneratedImageP& image, int threshold, int radius)
+    : SimpleFilterImage(image), threshold(threshold), radius(radius)
+  {}
+  Image generate(const Options& opt) override;
+  bool operator == (const GeneratedImage& that) const override;
+private:
+  int threshold, radius;
 };
 
 /// Change the alpha channel of an image
@@ -167,7 +182,7 @@ public:
   inline SetAlphaImage(const GeneratedImageP& image, double alpha)
     : SimpleFilterImage(image), alpha(alpha)
   {}
-  Image generate(const Options& opt) const override;
+  Image generate(const Options& opt) override;
   bool operator == (const GeneratedImage& that) const override;
 private:
   double alpha;
@@ -181,11 +196,25 @@ public:
   inline SetCombineImage(const GeneratedImageP& image, ImageCombine image_combine)
     : SimpleFilterImage(image), image_combine(image_combine)
   {}
-  Image generate(const Options& opt) const override;
+  Image generate(const Options& opt) override;
   ImageCombine combine() const override;
   bool operator == (const GeneratedImage& that) const override;
 private:
   ImageCombine image_combine;
+};
+
+// ----------------------------------------------------------------------------- : FillImage
+
+/// Fill an image with a given color, without touching the alpha channel
+class FillImage : public SimpleFilterImage {
+public:
+  inline FillImage(const GeneratedImageP& image, Color color)
+    : SimpleFilterImage(image), color(color)
+  {}
+  Image generate(const Options& opt) override;
+  bool operator == (const GeneratedImage& that) const override;
+private:
+  Color color;
 };
 
 // ----------------------------------------------------------------------------- : SaturateImage
@@ -196,7 +225,21 @@ public:
   inline SaturateImage(const GeneratedImageP& image, double amount)
     : SimpleFilterImage(image), amount(amount)
   {}
-  Image generate(const Options& opt) const override;
+  Image generate(const Options& opt) override;
+  bool operator == (const GeneratedImage& that) const override;
+private:
+  double amount;
+};
+
+// ----------------------------------------------------------------------------- : BrightenImage
+
+/// Brighten/darken an image
+class BrightenImage : public SimpleFilterImage {
+public:
+  inline BrightenImage(const GeneratedImageP& image, double amount)
+    : SimpleFilterImage(image), amount(amount)
+  {}
+  Image generate(const Options& opt) override;
   bool operator == (const GeneratedImage& that) const override;
 private:
   double amount;
@@ -210,7 +253,7 @@ public:
   inline InvertImage(const GeneratedImageP& image)
     : SimpleFilterImage(image)
   {}
-  Image generate(const Options& opt) const override;
+  Image generate(const Options& opt) override;
   bool operator == (const GeneratedImage& that) const override;
 };
 
@@ -222,7 +265,7 @@ public:
   inline RecolorImage(const GeneratedImageP& image, Color color)
     : SimpleFilterImage(image), color(color)
   {}
-  Image generate(const Options& opt) const override;
+  Image generate(const Options& opt) override;
   bool operator == (const GeneratedImage& that) const override;
 private:
   Color color;
@@ -233,7 +276,7 @@ public:
   inline RecolorImage2(const GeneratedImageP& image, Color red, Color green, Color blue, Color white)
     : SimpleFilterImage(image), red(red), green(green), blue(blue), white(white)
   {}
-  Image generate(const Options& opt) const override;
+  Image generate(const Options& opt) override;
   bool operator == (const GeneratedImage& that) const override;
 private:
   Color red,green,blue,white;
@@ -247,7 +290,7 @@ public:
   inline FlipImageHorizontal(const GeneratedImageP& image)
     : SimpleFilterImage(image)
   {}
-  Image generate(const Options& opt) const override;
+  Image generate(const Options& opt) override;
   bool operator == (const GeneratedImage& that) const override;
 };
 
@@ -257,7 +300,7 @@ public:
   inline FlipImageVertical(const GeneratedImageP& image)
     : SimpleFilterImage(image)
   {}
-  Image generate(const Options& opt) const override;
+  Image generate(const Options& opt) override;
   bool operator == (const GeneratedImage& that) const override;
 };
 
@@ -267,7 +310,7 @@ public:
   inline RotateImage(const GeneratedImageP& image, Radians angle)
     : SimpleFilterImage(image), angle(angle)
   {}
-  Image generate(const Options& opt) const override;
+  Image generate(const Options& opt) override;
   bool operator == (const GeneratedImage& that) const override;
 private:
   Radians angle;
@@ -281,10 +324,40 @@ public:
   inline EnlargeImage(const GeneratedImageP& image, double border_size)
     : SimpleFilterImage(image), border_size(fabs(border_size))
   {}
-  Image generate(const Options& opt) const override;
+  Image generate(const Options& opt) override;
   bool operator == (const GeneratedImage& that) const override;
 private:
   double border_size;
+};
+
+// ----------------------------------------------------------------------------- : ResizeImage
+
+/// Resize an image by resampling it
+class ResizeImage : public SimpleFilterImage {
+public:
+    inline ResizeImage(const GeneratedImageP& image, int width, int height)
+        : SimpleFilterImage(image), width(max(1, width)), height(max(1, height))
+    {}
+    Image generate(const Options& opt) override;
+    bool operator == (const GeneratedImage& that) const override;
+private:
+    int width;
+    int height;
+};
+
+// ----------------------------------------------------------------------------- : NineSliceImage
+
+class NineSliceImage : public SimpleFilterImage {
+public:
+  inline NineSliceImage(const GeneratedImageP& image, int width, int height, int left, int right, int top, int bottom)
+    : SimpleFilterImage(image), width(max(max(0, left) + max(0, right) + 1, width)), height(max(max(0, top) + max(0, bottom) + 1, height))
+    , left(max(0, left)), right(max(0, right)), top(max(0, top)), bottom(max(0, bottom))
+  {}
+  Image generate(const Options& opt) override;
+  bool operator == (const GeneratedImage& that) const override;
+private:
+  int width, height;
+  int left, right, top, bottom;
 };
 
 // ----------------------------------------------------------------------------- : CropImage
@@ -292,14 +365,67 @@ private:
 /// Crop an image at a certain point, to a certain size
 class CropImage : public SimpleFilterImage {
 public:
-  inline CropImage(const GeneratedImageP& image, double width, double height, double offset_x, double offset_y)
-    : SimpleFilterImage(image), width(width), height(height), offset_x(offset_x), offset_y(offset_y)
+  inline CropImage(const GeneratedImageP& image, double width, double height, double offset_x, double offset_y, Color background_color)
+    : SimpleFilterImage(image), width(width), height(height), offset_x(offset_x), offset_y(offset_y), background_color(background_color)
   {}
-  Image generate(const Options& opt) const override;
+  Image generate(const Options& opt) override;
   bool operator == (const GeneratedImage& that) const override;
 private:
   double width, height;
   double offset_x, offset_y;
+  Color background_color;
+};
+
+// ----------------------------------------------------------------------------- : StrokeImage
+
+/// Create a stroke effect that goes around an image
+class StrokeImage : public GeneratedImage {
+public:
+  inline StrokeImage(const GeneratedImageP& base_image, int radius, int blur, Color color, bool include_image)
+    : base_image(base_image), radius(radius), blur(blur), color(color), include_image(include_image)
+  {}
+  Image generate(const Options& opt) override;
+  bool operator == (const GeneratedImage& that) const override;
+private:
+  GeneratedImageP base_image;
+  int radius, blur;
+  Color color;
+  bool include_image;
+};
+
+// ----------------------------------------------------------------------------- : BleedEdgedImage
+
+/// Add a crude bleed edge to an image
+class BleedEdgedImage : public GeneratedImage {
+public:
+  inline BleedEdgedImage(const GeneratedImageP& base_image, double horizontal_size, double vertical_size, Color background_color)
+    : base_image(base_image), horizontal_size(horizontal_size), vertical_size(vertical_size), background_color(background_color)
+  {}
+  Image generate(const Options& opt) override;
+  bool operator == (const GeneratedImage& that) const override;
+private:
+  GeneratedImageP base_image;
+  double horizontal_size, vertical_size;
+  Color background_color;
+};
+
+// ----------------------------------------------------------------------------- : InsertedImage
+
+/// Insert an image at a certain point inside another image
+class InsertedImage : public GeneratedImage {
+public:
+    inline InsertedImage(const GeneratedImageP& base_image, const GeneratedImageP& inserted_image, int offset_x, int offset_y, bool widen, Color background_color)
+        : base_image(base_image), inserted_image(inserted_image), offset_x(offset_x), offset_y(offset_y), widen(widen), background_color(background_color)
+    {}
+    Image generate(const Options& opt) override;
+    ImageCombine combine() const override;
+    bool operator == (const GeneratedImage& that) const override;
+    bool local() const override { return base_image->local() && inserted_image->local(); }
+private:
+    GeneratedImageP base_image, inserted_image;
+    int offset_x, offset_y;
+    bool widen;
+    Color background_color;
 };
 
 // ----------------------------------------------------------------------------- : DropShadowImage
@@ -311,7 +437,7 @@ public:
     : SimpleFilterImage(image), offset_x(offset_x), offset_y(offset_y)
     , shadow_alpha(shadow_alpha), shadow_blur_radius(shadow_blur_radius), shadow_color(shadow_color)
   {}
-  Image generate(const Options& opt) const override;
+  Image generate(const Options& opt) override;
   bool operator == (const GeneratedImage& that) const override;
 private:
   double offset_x, offset_y;
@@ -328,7 +454,7 @@ public:
   inline PackagedImage(const String& filename)
     : filename(filename)
   {}
-  Image generate(const Options& opt) const override;
+  Image generate(const Options& opt) override;
   bool operator == (const GeneratedImage& that) const override;
 private:
   String filename;
@@ -342,10 +468,23 @@ public:
   inline BuiltInImage(const String& name)
     : name(name)
   {}
-  Image generate(const Options& opt) const override;
+  Image generate(const Options& opt) override;
   bool operator == (const GeneratedImage& that) const override;
 private:
   String name;
+};
+
+// ----------------------------------------------------------------------------- : Arbitrary
+
+class ArbitraryImage : public GeneratedImage {
+public:
+    inline ArbitraryImage(const Image image)
+        : image(image)
+    {}
+    Image generate(const Options& opt) override;
+    bool operator == (const GeneratedImage& that) const override;
+private:
+    Image image;
 };
 
 // ----------------------------------------------------------------------------- : SymbolToImage
@@ -355,7 +494,7 @@ class SymbolToImage : public GeneratedImage {
 public:
   SymbolToImage(bool is_local, const LocalFileName& filename, Age age, const SymbolVariationP& variation);
   ~SymbolToImage();
-  Image generate(const Options& opt) const override;
+  Image generate(const Options& opt) override;
   bool operator == (const GeneratedImage& that) const override;
   bool local() const override { return is_local; }
   
@@ -377,7 +516,7 @@ class ImageValueToImage : public GeneratedImage {
 public:
   ImageValueToImage(const LocalFileName& filename, Age age);
   ~ImageValueToImage();
-  Image generate(const Options& opt) const override;
+  Image generate(const Options& opt) override;
   bool operator == (const GeneratedImage& that) const override;
   bool local() const override { return true; }
 private:
@@ -386,3 +525,59 @@ private:
   Age age; ///< Age the image was last updated
 };
 
+// ----------------------------------------------------------------------------- : SetMetadataImage
+
+/// Change the alpha channel of an image
+class SetMetadataImage : public SimpleFilterImage {
+public:
+  inline SetMetadataImage(const GeneratedImageP& image, const String& metadata)
+    : SimpleFilterImage(image), metadata(metadata)
+  {}
+  Image generate(const Options& opt) override;
+  bool operator == (const GeneratedImage& that) const override;
+private:
+  String metadata;
+};
+
+// ----------------------------------------------------------------------------- : ExternalImage
+
+/// Load an image from outside the data folder
+class ExternalImage : public GeneratedImage {
+public:
+  inline String toString() { return savename; }
+  inline String toCode() const override { return _("<image>"); }
+
+protected:
+  String loadpath;
+  String savename;
+};
+
+// ----------------------------------------------------------------------------- : ScriptedImage
+
+/// Load an image from a script
+class ScriptedImage : public ExternalImage {
+public:
+  ScriptedImage(Set* set, const GeneratedImageP& image);
+  Image generate(const Options&) override;
+  bool operator == (const GeneratedImage& that) const override;
+};
+
+// ----------------------------------------------------------------------------- : ImportedImage
+
+/// Load an image from the filesystem
+class ImportedImage : public ExternalImage {
+public:
+  ImportedImage(Set* set, const String& filepath);
+  Image generate(const Options&) override;
+  bool operator == (const GeneratedImage& that) const override;
+};
+
+// ----------------------------------------------------------------------------- : DownloadedImage
+
+/// Load an image from the internet
+class DownloadedImage : public ExternalImage {
+public:
+  DownloadedImage(Set* set, const String& url);
+  Image generate(const Options&) override;
+  bool operator == (const GeneratedImage& that) const override;
+};

@@ -1,5 +1,5 @@
 //+----------------------------------------------------------------------------+
-//| Description:  Magic Set Editor - Program to make Magic (tm) cards          |
+//| Description:  Magic Set Editor - Program to make card games                |
 //| Copyright:    (C) Twan van Laarhoven and the other MSE developers          |
 //| License:      GNU General Public License 2 or later (see file COPYING)     |
 //+----------------------------------------------------------------------------+
@@ -15,11 +15,11 @@
 #include <data/locale.hpp>
 #include <data/installer.hpp>
 #include <data/format/formats.hpp>
+#include <data/font.hpp>
 #include <cli/cli_main.hpp>
 #include <cli/text_io_handler.hpp>
 #include <gui/welcome_window.hpp>
-#include <gui/update_checker.hpp>
-#include <gui/packages_window.hpp>
+#include <gui/downloadable_installers.hpp>
 #include <gui/set/window.hpp>
 #include <gui/symbol/window.hpp>
 #include <gui/thumbnail_thread.hpp>
@@ -80,12 +80,13 @@ void nag_about_ascii_version() {
 
 int MSE::OnRun() {
   try {
-    #ifdef __WXMSW__
+  #ifdef __WXMSW__
       SetAppName(_("Magic Set Editor"));
-    #else
+  #else
       // Platform friendly appname
       SetAppName(_("magicseteditor"));
-    #endif
+  #endif
+    FontRef::PreloadResourceFonts(true);
     wxInitAllImageHandlers();
     wxFileSystem::AddHandler(new wxInternetFSHandler); // needed for update checker
     wxSocketBase::Initialize();
@@ -94,9 +95,11 @@ int MSE::OnRun() {
     cli.init();
     package_manager.init();
     settings.read();
+    SetAppearance((Appearance)settings.dark_mode_type);
     the_locale = Locale::byName(settings.locale);
     nag_about_ascii_version();
-    
+    downloadable_installers.check_updates();
+
     // interpret command line
     {
       // ingnore the --color argument, it is handled by cli.init()
@@ -251,7 +254,7 @@ int MSE::OnRun() {
             out = out.substr(pos + 1);
           }
           // export
-          export_images(set, set->cards, path, out, CONFLICT_NUMBER_OVERWRITE);
+          export_image(set, set->cards, path, out, CONFLICT_NUMBER_OVERWRITE);
           return EXIT_SUCCESS;
         } else if (args[0] == _("--export")) {
           if (args.size() < 2) {
@@ -284,7 +287,6 @@ int MSE::OnRun() {
 }
 
 int MSE::runGUI() {
-  check_updates();
   return wxApp::OnRun();
 }
 

@@ -1,5 +1,5 @@
 //+----------------------------------------------------------------------------+
-//| Description:  Magic Set Editor - Program to make Magic (tm) cards          |
+//| Description:  Magic Set Editor - Program to make card games                |
 //| Copyright:    (C) Twan van Laarhoven and the other MSE developers          |
 //| License:      GNU General Public License 2 or later (see file COPYING)     |
 //+----------------------------------------------------------------------------+
@@ -162,7 +162,7 @@ SCRIPT_FUNCTION_DEPENDENCIES(combined_editor) {
     SCRIPT_PARAM_C(StyleSheetP, stylesheet);
     target_field = stylesheet->extra_card_fields[dep.index];
   }
-  else                                 throw InternalError(_("Finding dependencies of combined error for non card/set field"));
+  else throw InternalError(_("Found dependencies on non card/set field in combined_editor"));
   // Add dependencies, from target_field on field#
   // For card fields
   size_t j = 0;
@@ -187,6 +187,13 @@ SCRIPT_FUNCTION_DEPENDENCIES(combined_editor) {
     }
   }
   return dependency_dummy;
+}
+
+// ----------------------------------------------------------------------------- : Values
+
+SCRIPT_FUNCTION(is_default) {
+  SCRIPT_PARAM_C(ValueP,input);
+  SCRIPT_RETURN(input->isDefault());
 }
 
 // ----------------------------------------------------------------------------- : Choice values
@@ -389,6 +396,7 @@ SCRIPT_FUNCTION(count_chosen) {
 void init_script_editor_functions(Context& ctx) {
   ctx.setVariable(_("forward_editor"),           script_combined_editor); // compatability
   ctx.setVariable(_("combined_editor"),          script_combined_editor);
+  ctx.setVariable(_("is_default"),               script_is_default);
   ctx.setVariable(_("primary_choice"),           script_primary_choice);
   ctx.setVariable(_("chosen"),                   script_chosen);
   ctx.setVariable(_("count_chosen"),             script_count_chosen);

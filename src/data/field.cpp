@@ -1,5 +1,5 @@
 //+----------------------------------------------------------------------------+
-//| Description:  Magic Set Editor - Program to make Magic (tm) cards          |
+//| Description:  Magic Set Editor - Program to make card games                |
 //| Copyright:    (C) Twan van Laarhoven and the other MSE developers          |
 //| License:      GNU General Public License 2 or later (see file COPYING)     |
 //+----------------------------------------------------------------------------+
@@ -12,6 +12,7 @@
 #include <data/field/choice.hpp>
 #include <data/field/multiple_choice.hpp>
 #include <data/field/boolean.hpp>
+#include <data/field/slider.hpp>
 #include <data/field/image.hpp>
 #include <data/field/symbol.hpp>
 #include <data/field/color.hpp>
@@ -47,9 +48,11 @@ IMPLEMENT_REFLECTION(Field) {
     REFLECT(type);
   }
   REFLECT(name);
+  REFLECT(alt_names);
   REFLECT_LOCALIZED(caption);
-  REFLECT_LOCALIZED(description);
+  REFLECT_LOCALIZED(description); // FIXME: This field is both unused and uninitialized.
   REFLECT_N("icon", icon_filename);
+  REFLECT_N("dark_icon", dark_icon_filename);
   REFLECT(editable);
   REFLECT(save_value);
   REFLECT(show_statistics);
@@ -61,29 +64,32 @@ IMPLEMENT_REFLECTION(Field) {
   REFLECT(card_list_allow);
   REFLECT_LOCALIZED(card_list_name);
   REFLECT(sort_script);
+  REFLECT(import_script);
   REFLECT_N("card_list_alignment", card_list_align);
 }
 
 void Field::after_reading(Version ver) {
   name = canonical_name_form(name);
-  if(caption.default_.empty()) caption.default_ = name_to_caption(name);
-  if(card_list_name.default_.empty()) card_list_name.default_ = capitalize(caption.default_);
+  if(caption.default_.empty()) caption.default_ = tr(package_relative_filename, name, name_to_caption);
+  if(card_list_name.default_.empty()) card_list_name.default_ = tr(package_relative_filename, caption.default_, capitalize);
 }
 
 template <>
 intrusive_ptr<Field> read_new<Field>(Reader& reader) {
+  intrusive_ptr<Field> field;
   // there must be a type specified
   String type;
   reader.handle(_("type"), type);
-  if      (type == _("text"))        return make_intrusive<TextField>();
-  else if (type == _("choice"))      return make_intrusive<ChoiceField>();
-  else if (type == _("multiple choice"))  return make_intrusive<MultipleChoiceField>();
-  else if (type == _("boolean"))      return make_intrusive<BooleanField>();
-  else if (type == _("image"))      return make_intrusive<ImageField>();
-  else if (type == _("symbol"))      return make_intrusive<SymbolField>();
-  else if (type == _("color"))      return make_intrusive<ColorField>();
-  else if (type == _("info"))        return make_intrusive<InfoField>();
-  else if (type == _("package choice"))  return make_intrusive<PackageChoiceField>();
+  if (type == _("text"))        field = make_intrusive<TextField>();
+  else if (type == _("choice"))      field = make_intrusive<ChoiceField>();
+  else if (type == _("multiple choice"))  field = make_intrusive<MultipleChoiceField>();
+  else if (type == _("boolean"))      field = make_intrusive<BooleanField>();
+  else if (type == _("slider"))      field = make_intrusive<SliderField>();
+  else if (type == _("image"))      field = make_intrusive<ImageField>();
+  else if (type == _("symbol"))      field = make_intrusive<SymbolField>();
+  else if (type == _("color"))      field = make_intrusive<ColorField>();
+  else if (type == _("info"))        field = make_intrusive<InfoField>();
+  else if (type == _("package choice"))  field = make_intrusive<PackageChoiceField>();
   else if (type.empty()) {
     reader.warning(_ERROR_1_("expected key", _("type")));
     throw ParseError(_ERROR_("aborting parsing"));
@@ -91,6 +97,8 @@ intrusive_ptr<Field> read_new<Field>(Reader& reader) {
     reader.warning(_ERROR_1_("unsupported field type", type));
     throw ParseError(_ERROR_("aborting parsing"));
   }
+  field->package_relative_filename = reader.getPackage()->relativeFilename().Clone();
+  return field;
 }
 
 // ----------------------------------------------------------------------------- : Style
@@ -172,13 +180,13 @@ int Style::update(Context& ctx) {
   else if (automatic_side & AUTO_BOTTOM) bottom = top + height;
   else                                   {int tb = int(top + bottom); top = (tb - height) / 2; bottom = (tb + height) / 2; }
   // adjust rotation point
-  if (angle != 0 && (automatic_side & (AUTO_LEFT | AUTO_TOP))) {
+  if (!almost_equal(angle, 0.0) && (automatic_side & (AUTO_LEFT | AUTO_TOP))) {
     double s = sin(deg_to_rad(angle)), c = cos(deg_to_rad(angle));
     if (automatic_side & AUTO_LEFT) { // attach right corner instead of left
       left = left + width * (1 - c);
       top  = top  + width * s;
     }
-    if (automatic_side & AUTO_TOP) { // attach botom corner instead of top
+    if (automatic_side & AUTO_TOP) { // attach bottom corner instead of top
       left = left - height * s;
       top  = top  + height * (1 - c);
     }
@@ -215,8 +223,38 @@ void Style::checkContentDependencies(Context& ctx, const Dependency& dep) const 
 
 void Style::markDependencyMember(const String& name, const Dependency& dep) const {
   // mark dependencies on content
-  if (dep.type == DEP_DUMMY && dep.index == false && (starts_with(name, _("content")) || name == "layout") ) {
-    // anything that starts with "content_" is a content property
+  if (
+    dep.type == DEP_DUMMY && dep.index == false && (
+      starts_with(name, _("content")) ||
+      name == "layout" ||
+      name == "lines" ||
+      name == "paragraphs" ||
+      name == "blocks" ||
+      name == "separators" ||
+      name == "font" ||
+      name == "symbol_font" ||
+      name == "always_symbol" ||
+      name == "allow_formating" ||
+      name == "alignment" ||
+      name == "padding_left" ||
+      name == "padding_right" ||
+      name == "padding_top" ||
+      name == "padding_bottom" ||
+      name == "padding_left_min" ||
+      name == "padding_right_min" ||
+      name == "padding_top_min" ||
+      name == "padding_bottom_min" ||
+      name == "line_height_soft" ||
+      name == "line_height_hard" ||
+      name == "line_height_line" ||
+      name == "line_height_soft_max" ||
+      name == "line_height_hard_max" ||
+      name == "line_height_line_max" ||
+      name == "paragraph_height" ||
+      name == "block_height_min" ||
+      name == "direction"
+    )
+  ) {
     const_cast<Dependency&>(dep).index = true;
   }
 }
@@ -265,6 +303,14 @@ IMPLEMENT_REFLECTION_NAMELESS(Value) {
 
 bool Value::equals(const Value* that) {
   return this == that;
+}
+
+bool Value::isDefault() {
+  return false;
+}
+
+void Value::makeDefault(bool d) {
+  throw ScriptError(_("Unimplemented makeDefault function"));
 }
 
 bool Value::update(Context& ctx) {

@@ -1,5 +1,5 @@
 //+----------------------------------------------------------------------------+
-//| Description:  Magic Set Editor - Program to make Magic (tm) cards          |
+//| Description:  Magic Set Editor - Program to make card games                |
 //| Copyright:    (C) Twan van Laarhoven and the other MSE developers          |
 //| License:      GNU General Public License 2 or later (see file COPYING)     |
 //+----------------------------------------------------------------------------+
@@ -54,6 +54,7 @@ void KeywordList::onChangeSet() {
 }
 
 void KeywordList::setFilter(const KeywordListFilterP& filter) {
+
   this->filter = filter;
   refreshList();
 }
@@ -108,6 +109,7 @@ bool KeywordList::doCopy() {
   if (!canCopy()) return false;
   if (!wxTheClipboard->Open()) return false;
   bool ok = wxTheClipboard->SetData(new KeywordDataObject(set, getKeyword())); // ignore result
+  wxTheClipboard->Flush();
   wxTheClipboard->Close();
   return ok;
 }
@@ -124,6 +126,7 @@ bool KeywordList::doPaste() {
   if (!wxTheClipboard->Open()) return false;
   KeywordDataObject data;
   bool ok = wxTheClipboard->GetData(data);
+  wxTheClipboard->Flush();
   wxTheClipboard->Close();
   if (!ok) return false;
   // add keyword to set
@@ -191,6 +194,8 @@ int KeywordList::usage(const Keyword& kw) const {
 // ----------------------------------------------------------------------------- : KeywordList : Item text
 
 String KeywordList::OnGetItemText (long pos, long col) const {
+  if (sorted_list.size() == 0) return _("");
+  
   const Keyword& kw = *getKeyword(pos);
   switch(col) {
     case 0:    return kw.keyword;
@@ -215,7 +220,7 @@ String KeywordList::OnGetItemText (long pos, long col) const {
       }
       return formatted;
     }
-    default:  return wxEmptyString;
+    default:  return _("");
   }
 }
 int KeywordList::OnGetItemImage(long pos) const {
@@ -223,6 +228,7 @@ int KeywordList::OnGetItemImage(long pos) const {
 }
 
 wxListItemAttr* KeywordList::OnGetItemAttr(long pos) const {
+  if (sorted_list.size() == 0) return nullptr;
   // black for set keywords, grey for game keywords (uneditable)
   const Keyword& kw = *getKeyword(pos);
   if (!kw.fixed && kw.valid) return nullptr;
@@ -238,7 +244,7 @@ wxListItemAttr* KeywordList::OnGetItemAttr(long pos) const {
 
 void KeywordList::onContextMenu(wxContextMenuEvent&) {
   wxMenu m;
-  add_menu_item_tr(&m, ID_EDIT_CUT, "cut", "cut_keyword");
+  add_menu_item_tr(&m, ID_EDIT_CUT, settings.darkModePrefix() + "cut", "cut_keyword");
   add_menu_item_tr(&m, ID_EDIT_COPY, "copy", "copy_keyword");
   add_menu_item_tr(&m, ID_EDIT_PASTE, "paste", "paste_keyword");
   m.AppendSeparator();

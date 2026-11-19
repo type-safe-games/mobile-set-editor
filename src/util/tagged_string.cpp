@@ -1,5 +1,5 @@
 //+----------------------------------------------------------------------------+
-//| Description:  Magic Set Editor - Program to make Magic (tm) cards          |
+//| Description:  Magic Set Editor - Program to make card games                |
 //| Copyright:    (C) Twan van Laarhoven and the other MSE developers          |
 //| License:      GNU General Public License 2 or later (see file COPYING)     |
 //+----------------------------------------------------------------------------+
@@ -25,8 +25,8 @@ wxUniChar tag_char(wxUniChar c) {
 
 // Is a character the "end" of the tag name?
 // don't mistake <tag> as <t>, only <t>, <t-stuff> and <t:stuff> are considered <t>
-bool is_tag_end_char(Char c) {
-  return c == '>' || c == '-' || c == ':' || c == ' ';
+bool is_tag_end_char(Char c, bool strict) {
+  return strict ? c == '>' : c == '>' || c == '-' || c == ':' || c == ' ';
 }
 
 
@@ -96,13 +96,13 @@ String fix_old_tags(const String& str) {
       ret += c;
       if (c==_('<')) {
         intag = true;
-        tags.push(wxEmptyString);
+        tags.push(_(""));
       } else if (c==_('>') && intag) {
         intag = false;
         if (!starts_with(tags.top(), _("kw")) && !starts_with(tags.top(), _("atom"))) {
           // only keep keyword related stuff
           ret.resize(ret.size() - tags.top().size() - 2); // remove from output
-          tags.top() = wxEmptyString;
+          tags.top() = _("");
         }
       } else if (intag) {
         tags.top() += c;
@@ -129,10 +129,23 @@ String fix_old_tags(const String& str) {
   return it;
 }
 
-[[nodiscard]] String::const_iterator skip_all_tags(String::const_iterator it, String::const_iterator end, bool skip_open, bool skip_close) {
+[[nodiscard]] String::const_iterator skip_all_tags(String::const_iterator it, String::const_iterator end, bool skip_open, bool skip_close, bool skip_nonformat) {
   // move after first possible position corresponding
   while (it != end && *it == '<') {
-    if (it + 1 != end && *(it + 1) == '/') {
+    if (is_tag(it, end, "<soft-line")) {
+      if (!skip_open) return it;
+      // don't ever allow the cursor to be inside <soft-line>
+      it = skip_tag(it, end);
+      if (it != end && *it != '<') ++it;
+      if (it != end && is_tag(it, end, "</soft-line")) {
+        it = skip_tag(it, end);
+      }
+    } else if (is_tag(it, end, "</soft-line")) {
+      // move past </soft-line> unconditionally
+      it = skip_tag(it, end);
+    } else if (skip_nonformat && !is_formatting_tag(it, end)) {
+      it = skip_tag(it, end);
+    } else if (it + 1 != end && *(it + 1) == '/') {
       if (skip_close) {
         it = skip_tag(it, end);
       } else {
@@ -149,7 +162,7 @@ String fix_old_tags(const String& str) {
   return it;
 }
 
-[[nodiscard]] String::const_iterator advance_untagged(String::const_iterator it, String::const_iterator end, size_t n, bool after_open, bool after_close) {
+[[nodiscard]] String::const_iterator advance_untagged(String::const_iterator it, String::const_iterator end, size_t n, bool after_open, bool after_close, bool after_nonformat) {
   while (n > 0) {
     it = skip_all_tags(it, end);
     if (it != end) {
@@ -159,14 +172,14 @@ String fix_old_tags(const String& str) {
       return it;
     }
   }
-  return skip_all_tags(it, end, after_open, after_close);
+  return skip_all_tags(it, end, after_open, after_close, after_nonformat);
 }
 
-[[nodiscard]] bool is_tag(String::const_iterator it, String::const_iterator end, const char* tag) {
+[[nodiscard]] bool is_tag(String::const_iterator it, String::const_iterator end, const char* tag, bool strict) {
   for (; *tag; ++it, ++tag) {
     if (it == end || *it != *tag) return false;
   }
-  if (it == end || !is_tag_end_char(*it)) return false;
+  if (it == end || !is_tag_end_char(*it, strict)) return false;
   return true;
 }
 
@@ -267,11 +280,82 @@ String::const_iterator find_close_tag(String::const_iterator tag, String::const_
   return String::npos;
 }
 
-bool is_tag(const String& str, size_t pos, const String& tag) {
-  return is_substr(str, pos, tag) && pos+tag.size() < str.size() && is_tag_end_char(str[pos+tag.size()]);
+bool is_tag(const String& str, size_t pos, const String& tag, bool strict) {
+  return is_substr(str, pos, tag) && pos+tag.size() < str.size() && is_tag_end_char(str[pos+tag.size()], strict);
 }
 
-[[nodiscard]] size_t in_tag(const String& str, const String& tag, size_t start, size_t end) {
+bool is_formatting_tag(const String& str, size_t pos) {
+  if (str.size() < pos + 2) return false;
+  if (str.GetChar(pos) != '<') return false;
+  pos++;
+  return is_substr(str, pos, _("b"))      || is_substr(str, pos, _("/b")) ||
+         is_substr(str, pos, _("i"))      || is_substr(str, pos, _("/i")) ||
+         is_substr(str, pos, _("sym"))    || is_substr(str, pos, _("/sym")) ||
+         is_substr(str, pos, _("u"))      || is_substr(str, pos, _("/u")) ||
+         is_substr(str, pos, _("strike")) || is_substr(str, pos, _("/strike")) ||
+         is_substr(str, pos, _("font"))   || is_substr(str, pos, _("/font")) ||
+         is_substr(str, pos, _("size"))   || is_substr(str, pos, _("/size")) ||
+         is_substr(str, pos, _("color"))  || is_substr(str, pos, _("/color"));
+}
+
+bool is_formatting_tag(String::const_iterator it, String::const_iterator end) {
+  // so ugly but so fast!
+  if (it == end) return false;
+  if (*it != '<') return false;
+  ++it; if (it == end) return false;
+  if (*it == '/') {++it; if (it == end) return false;}
+  if (*it == 'b' || *it == 'i' || *it == 'u') return true;
+  if (*it == 's') {
+    ++it; if (it == end) return false;
+    if (*it == 'y') {
+      ++it; if (it == end) return false;
+      if (*it != 'm') return false;
+      return true;
+    }
+    if (*it == 't') {
+      ++it; if (it == end) return false;
+      if (*it != 'r') return false;
+      ++it; if (it == end) return false;
+      if (*it != 'i') return false;
+      ++it; if (it == end) return false;
+      if (*it != 'k') return false;
+      ++it; if (it == end) return false;
+      if (*it != 'e') return false;
+      return true;
+    }
+    if (*it == 'i') {
+      ++it; if (it == end) return false;
+      if (*it != 'z') return false;
+      ++it; if (it == end) return false;
+      if (*it != 'e') return false;
+      return true;
+    }
+    return false;
+  }
+  if (*it == 'f') {
+    ++it; if (it == end) return false;
+    if (*it != 'o') return false;
+    ++it; if (it == end) return false;
+    if (*it != 'n') return false;
+    ++it; if (it == end) return false;
+    if (*it != 't') return false;
+    return true;
+  }
+  if (*it == 'c') {
+    ++it; if (it == end) return false;
+    if (*it != 'o') return false;
+    ++it; if (it == end) return false;
+    if (*it != 'l') return false;
+    ++it; if (it == end) return false;
+    if (*it != 'o') return false;
+    ++it; if (it == end) return false;
+    if (*it != 'r') return false;
+    return true;
+  }
+  return false;
+}
+
+[[nodiscard]] size_t in_tag(const String& str, const String& tag, size_t start, size_t end, bool strict) {
   size_t last_start = String::npos;
   size_t size = str.size();
   int taglevel = 0;
@@ -279,10 +363,10 @@ bool is_tag(const String& str, size_t pos, const String& tag) {
   for (size_t pos = 0 ; pos < end ; ) {
     Char c = str.GetChar(pos);
     if (c == _('<')) {
-      if (is_substr(str, pos + 1, static_cast<const Char*>(tag.c_str())+1) && pos+tag.size() < str.size() && is_tag_end_char(str[pos+tag.size()])) {
+      if (is_substr(str, pos + 1, static_cast<const Char*>(tag.c_str())+1) && pos+tag.size() < str.size() && is_tag_end_char(str[pos+tag.size()], strict)) {
         if (pos < start) last_start = pos;
         ++taglevel;
-      } else if (pos + 2 < size && str.GetChar(pos+1) == _('/') && is_substr(str, pos + 2, static_cast<const Char*>(tag.c_str())+1) && pos+1+tag.size() < str.size() && is_tag_end_char(str[pos+1+tag.size()])) {
+      } else if (pos + 2 < size && str.GetChar(pos+1) == _('/') && is_substr(str, pos + 2, static_cast<const Char*>(tag.c_str())+1) && pos+1+tag.size() < str.size() && is_tag_end_char(str[pos+1+tag.size()], strict)) {
         --taglevel; // close tag
       }
       pos = skip_tag(str,pos);
@@ -296,20 +380,24 @@ bool is_tag(const String& str, size_t pos, const String& tag) {
   }
   return taglevel < 1 ? String::npos : last_start;
 }
-bool is_in_tag(const String& str, const String& tag, size_t start, size_t end) {
-  return in_tag(str,tag,start,end) != String::npos;
+bool is_in_tag(const String& str, const String& tag, size_t start, size_t end, bool strict) {
+  return in_tag(str,tag,start,end,strict) != String::npos;
 }
 
 
 String tag_at(const String& str, size_t pos) {
   size_t end = str.find_first_of(_(">"), pos);
-  if (end == String::npos) return wxEmptyString;
+  if (end == String::npos) return _("");
   return str.substr(pos + 1, end - pos - 1);
 }
 
 String tag_type_at(const String& str, size_t pos) {
+  // don't mistake <soft-line> for <soft>
+  if (is_tag(str, pos, _("<soft-line")) || is_tag(str, pos, _("</soft-line"))) {
+    return _("soft-line");
+  }
   size_t end = str.find_first_of(_(">-"), pos);
-  if (end == String::npos) return wxEmptyString;
+  if (end == String::npos) return _("");
   return str.substr(pos + 1, end - pos - 1);
 }
 
@@ -325,6 +413,17 @@ String anti_tag(const String& tag) {
 
 // ----------------------------------------------------------------------------- : Cursor position
 
+size_t to_untagged_pos(const String& str, size_t pos) {
+  return untag(str.substr(0, pos)).size();
+}
+
+size_t to_tagged_pos(const String& str, size_t pos, bool after_open, bool after_close, bool after_nonformat) {
+  String::const_iterator it = str.begin();
+  const String::const_iterator end = str.end();
+  it = advance_untagged(it, end, pos, after_open, after_close, after_nonformat);
+  return std::distance(str.begin(), it);
+}
+
 size_t index_to_cursor(const String& str, size_t index, Movement dir) {
   size_t cursor = 0;
   index = min(index, str.size());
@@ -335,7 +434,11 @@ size_t index_to_cursor(const String& str, size_t index, Movement dir) {
     bool has_width = true;
     if (c == _('<')) {
       // a tag
-      if (is_substr(str, i, _("<atom")) || is_substr(str, i, _("<sep"))) {
+      if (is_substr(str, i, _("<atom"))      ||
+          is_substr(str, i, _("<sep"))       ||
+          is_substr(str, i, _("<bullet"))    ||
+          is_substr(str, i, _("<soft-line")) ||
+          is_substr(str, i, _("<line"))) {
         // skip tag contents, tag counts as a single 'character'
         size_t before = i;
         size_t close = match_close_tag(str, i);
@@ -426,7 +529,11 @@ void cursor_to_index_range(const String& str, size_t cursor, size_t& start, size
     bool has_width = true;
     if (c == _('<')) {
       // a tag
-      if (is_substr(str, i, _("<atom")) || is_substr(str, i, _("<sep"))) {
+      if (is_substr(str, i, _("<atom"))      ||
+          is_substr(str, i, _("<sep"))       ||
+          is_substr(str, i, _("<bullet"))    ||
+          is_substr(str, i, _("<soft-line")) ||
+          is_substr(str, i, _("<line"))) {
         // never move the end over an atom/sep
         if (cur >= cursor) { ++i; break; }
         // skip tag contents, tag counts as a single 'character'
@@ -504,6 +611,15 @@ String untag_for_cursor(const String& str) {
       } else if (is_substr(str, i, _("<sep"))) {
         i = match_close_tag_end(str, i);
         ret += UNTAG_SEP;
+      } else if (is_substr(str, i, _("<bullet"))) {
+        i = match_close_tag_end(str, i);
+        ret += UNTAG_BULLET;
+      } else if (is_substr(str, i, _("<soft-line"))) {
+        i = match_close_tag_end(str, i);
+        ret += UNTAG_ATOM;
+      } else if (is_substr(str, i, _("<line"))) {
+        i = match_close_tag_end(str, i);
+        ret += UNTAG_ATOM;
       } else if (i == 0 && is_substr(str, i, _("<prefix"))) {
         // prefix at start of string, skip contents, index never before
         i = match_close_tag_end(str,i);
@@ -556,6 +672,13 @@ size_t index_to_untagged(const String& str, size_t index) {
 }
 
 // ----------------------------------------------------------------------------- : Global operations
+
+String wrap_tag(const String& str, const String& tag) {
+  return tag + str + close_tag(tag);
+}
+String anti_wrap_tag(const String& str, const String& tag) {
+  return close_tag(tag) + str + tag;
+}
 
 String remove_tag(const String& str, const String& tag) {
   if (tag.size() < 1)  return str;
@@ -641,11 +764,18 @@ String simplify_tagged(const String& str) {
 
 // Add a tag to a stack of tags, try to cancel it out
 // If </tag> is in stack remove it and returns true
-// otherwise appends <tag> and returns fales
+// otherwise appends <tag> and returns false
 // (where </tag> is the negation of tag)
 bool add_or_cancel_tag(const String& tag, String& stack, bool all = false) {
   if (all || starts_with(tag, _("/")) ||
-      starts_with(tag, _("b")) || starts_with(tag, _("i")) || starts_with(tag, _("sym"))) {
+      starts_with(tag, _("b")) ||
+      starts_with(tag, _("i")) ||
+      starts_with(tag, _("sym")) ||
+      starts_with(tag, _("u")) ||
+      starts_with(tag, _("strike")) ||
+      starts_with(tag, _("color")) ||
+      starts_with(tag, _("font")) ||
+      starts_with(tag, _("size"))) {
     // cancel out all close tags, but not all open tags,
     // so <xx></xx> is always removed
     // but </xx><xx> is not
@@ -666,9 +796,9 @@ bool add_or_cancel_tag(const String& tag, String& stack, bool all = false) {
 }
 
 String simplify_tagged_merge(const String& str, bool all) {
-  String ret; ret.reserve(str.size());
-  String waiting_tags; // tags that are waiting to be written to the output
   size_t size = str.size();
+  String ret; ret.reserve(size);
+  String waiting_tags; // tags that are waiting to be written to the output
   for (size_t i = 0 ; i < size ; ++i) {
     Char c = str.GetChar(i);
     if (c == _('<')) {
@@ -685,15 +815,18 @@ String simplify_tagged_merge(const String& str, bool all) {
 }
 
 String simplify_tagged_overlap(const String& str) {
-  String ret;  ret.reserve(str.size());
-  String open_tags; // tags we are in
   size_t size = str.size();
+  String ret; ret.reserve(size);
+  String open_tags; // tags we are in
   for (size_t i = 0 ; i < size ; ++i) {
     Char c = str.GetChar(i);
     if (c == _('<')) {
       String tag = tag_at(str, i);
-      if (starts_with(tag,  _("b")) || starts_with(tag,  _("i")) || starts_with(tag,  _("sym")) ||
-          starts_with(tag, _("/b")) || starts_with(tag, _("/i")) || starts_with(tag, _("/sym"))) {
+      if (starts_with(tag, _("b"))      || starts_with(tag, _("/b")) ||
+          starts_with(tag, _("i"))      || starts_with(tag, _("/i")) ||
+          starts_with(tag, _("sym"))    || starts_with(tag, _("/sym")) ||
+          starts_with(tag, _("u"))      || starts_with(tag, _("/u")) ||
+          starts_with(tag, _("strike")) || starts_with(tag, _("/strike"))) {
         // optimize this tag
         if (open_tags.find(_("<") + tag + _(">")) == String::npos) {
           // we are not already inside this tag
@@ -744,6 +877,12 @@ bool check_tagged(const String& str, bool check_balance) {
             queue_message(MESSAGE_WARNING, _("Invalid tagged string: missing close tag for <") + tag_at(str,i) + _(">"));
             return false;
           }
+          if (is_tag(str, i, _("<soft-line"))) {
+            if (close - end != 1 || str.GetChar(end) != _('\n')) {
+              queue_message(MESSAGE_WARNING, _("Invalid tagged string: <soft-line> doesn't contain exactly one newline character"));
+              return false;
+            }
+          }
         }
       }
       i = end;
@@ -751,6 +890,74 @@ bool check_tagged(const String& str, bool check_balance) {
       ++i;
     }
   }
+  return true;
+}
+
+// Find the next <soft-line or </soft-line tag at or after position from
+static size_t find_soft_line_tag(const String& str, const String& tag, size_t from) {
+  size_t pos = str.find(tag, from);
+  while (pos != String::npos && !is_tag(str, pos, tag)) {
+    pos = str.find(tag, pos + 1); // something like <soft-linefoo
+  }
+  return pos;
+}
+
+bool fix_soft_lines(const String& str, String& fixed) {
+  // fast path, most strings don't contain any soft-lines
+  if (str.find(_("<soft-line")) == String::npos) return false;
+  const String soft_line = _("<soft-line>\n</soft-line>");
+  const size_t size = str.size();
+  String ret; ret.reserve(size + 2 * soft_line.size());
+  bool changed = false;
+  size_t i = 0; // everything before i has been handled and is in ret
+  while (i < size) {
+    size_t open = find_soft_line_tag(str, _("<soft-line"), i);
+    if (open == String::npos) break;
+    size_t open_end = skip_tag(str, open);
+    if (open_end == String::npos) break; // missing '>', not something we can repair here
+    // is there a close tag before the next soft-line starts?
+    size_t close     = find_soft_line_tag(str, _("</soft-line"), open_end);
+    size_t next_open = find_soft_line_tag(str, _("<soft-line"),  open_end);
+    if (close != String::npos && (next_open == String::npos || close < next_open)) {
+      size_t close_end = skip_tag(str, close);
+      if (close_end == String::npos) break;
+      ret += str.substr(i, open - i);
+      String content = str.substr(open_end, close - open_end);
+      if (content == _("\n")) {
+        // correct, keep as it is
+        ret += str.substr(open, close_end - open);
+      } else {
+        // old style soft-line that can contain anything, only keep the newlines inside soft-lines
+        changed = true;
+        for (size_t j = 0 ; j < content.size() ; ) {
+          Char c = content.GetChar(j);
+          if (c == _('\n')) {
+            ret += soft_line;
+            ++j;
+          } else if (c == _('<')) {
+            size_t end = skip_tag(content, j);
+            if (end == String::npos) end = content.size();
+            ret += content.substr(j, end - j);
+            j = end;
+          } else {
+            ret += c;
+            ++j;
+          }
+        }
+      }
+      i = close_end;
+    } else {
+      // no close tag, put it back after the newline that the tag is supposed to contain
+      changed = true;
+      ret += str.substr(i, open - i);
+      ret += soft_line;
+      i = (open_end < size && str.GetChar(open_end) == _('\n')) ? open_end + 1 : open_end;
+    }
+  }
+  if (!changed) return false;
+  ret += str.substr(i);
+  fixed = ret;
+  queue_message(MESSAGE_WARNING, _ERROR_("malformed soft line"));
   return true;
 }
 

@@ -1,5 +1,5 @@
 //+----------------------------------------------------------------------------+
-//| Description:  Magic Set Editor - Program to make Magic (tm) cards          |
+//| Description:  Magic Set Editor - Program to make card games                |
 //| Copyright:    (C) Twan van Laarhoven and the other MSE developers          |
 //| License:      GNU General Public License 2 or later (see file COPYING)     |
 //+----------------------------------------------------------------------------+
@@ -67,8 +67,15 @@ class SymbolValue : public Value {
 public:
   inline SymbolValue(const SymbolFieldP& field) : Value(field) {}
   DECLARE_VALUE_TYPE(Symbol, LocalFileName);
-  
+
+  void copyDataFrom(const Value& other) override;
+
   ValueType filename;    ///< Filename of the symbol (in the current package)
   Age       last_update; ///< When was the symbol last changed?
+
+  bool isDefault() override;
+
+  void makeDefault(bool d = true) override;
+
 };
 

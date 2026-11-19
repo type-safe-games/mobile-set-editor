@@ -1,5 +1,5 @@
 //+----------------------------------------------------------------------------+
-//| Description:  Magic Set Editor - Program to make Magic (tm) cards          |
+//| Description:  Magic Set Editor - Program to make card games                |
 //| Copyright:    (C) Twan van Laarhoven and the other MSE developers          |
 //| License:      GNU General Public License 2 or later (see file COPYING)     |
 //+----------------------------------------------------------------------------+
@@ -14,6 +14,7 @@
 #include <util/window_id.hpp>
 #include <data/stylesheet.hpp>
 #include <data/card.hpp>
+#include <script/functions/json.hpp>
 #include <wx/splitter.h>
 #include <wx/dcbuffer.h>
 #include <wx/clipbrd.h>
@@ -26,6 +27,7 @@ class ConsoleMessage : public IntrusivePtrBase<ConsoleMessage> {
 public:
   MessageType type;
   String text; // string message
+  wxDateTime timestamp;
   Bitmap bitmap; // image message instead of string
   ScriptValueP value; // other valued message (images? cards?)
   // location of error messages
@@ -38,7 +40,7 @@ public:
   int bottom() const { return top+height; }
   
   ConsoleMessage(MessageType type, String const& text = _(""), bool joined_to_previous = false)
-    : type(type), text(text), line_number(-1), joined_to_previous(joined_to_previous), top(-1), height(-1)
+    : type(type), text(text), timestamp(wxDateTime::Now()), line_number(-1), joined_to_previous(joined_to_previous), top(-1), height(-1)
   {}
 };
 
@@ -80,6 +82,14 @@ public:
   void add_message(MessageType type, String const& text, bool joined_to_previous = false) {
     add_message(make_intrusive<ConsoleMessage>(type,text,joined_to_previous));
   }
+
+  void clear_console() {
+    messages.clear();
+    layout_all();
+    selection = messages.size();
+    update_scrollbar();
+    Refresh(false);
+  }
   
   bool have_selection() const {
     return selection < messages.size();
@@ -98,6 +108,7 @@ public:
     } else {
       ok = wxTheClipboard->SetData(new wxTextDataObject(msg.text));
     }
+    wxTheClipboard->Flush();
     wxTheClipboard->Close();
     return ok;
   }
@@ -237,9 +248,11 @@ private:
     PrepareDC(dc);
     draw(dc);
   }
+
   void draw(wxDC& dc) const {
     clearDC(dc, wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW));
     dc.SetFont(*wxNORMAL_FONT);
+
     FOR_EACH_CONST(msg, messages) {
       draw(dc, *msg);
     }
@@ -273,15 +286,30 @@ private:
     dc.SetPen(*wxTRANSPARENT_PEN);
     dc.SetBrush(lerp(bg,color, 0.05));
     dc.DrawRectangle(left,top,width,msg.height);
-    
+
+    // draw foreground
+    dc.SetTextForeground(fg);
+
+    // draw timestamp
+    dc.DrawText(msg.timestamp.FormatISOTime(), left + TIMESTAMP_PADDING, top + TEXT_PADDING_TOP);
+
+    int timestamp_resolved_width;
+    dc.GetTextExtent(_("55:55:55"), &timestamp_resolved_width, nullptr);
+
+    left += timestamp_resolved_width;
+    left += TIMESTAMP_PADDING * 2;
+
+    // draw line right of timestamp
+    dc.SetPen(lerp(bg, fg, 0.3));
+    dc.DrawLine(left, top, left, top + msg.height);
+
     // draw icon
     if (icons[msg.type].Ok()) {
-      dc.DrawBitmap(icons[msg.type], left + ICON_PADDING,top + ICON_PADDING);
+      dc.DrawBitmap(icons[msg.type], left + ICON_PADDING_LEFT,top + ICON_PADDING);
     }
     
     // draw text
-    dc.SetTextForeground(fg);
-    int text_left = TEXT_PADDING_LEFT;
+    int text_left = left + TEXT_PADDING_LEFT;
     int text_top  = top + TEXT_PADDING_TOP;
     // find line breaks in the text
     String::const_iterator begin = msg.text.begin();
@@ -306,10 +334,10 @@ private:
       dc.DrawBitmap(msg.bitmap, text_left, text_top);
       text_top += msg.bitmap.GetHeight();
     }
-    
+
     // draw line below item
     dc.SetPen(lerp(bg,fg, 0.3));
-    dc.DrawLine(left, top+msg.height, left+width, top+msg.height);
+    dc.DrawLine(0, top + msg.height, 0 + width, top + msg.height);
   }
   
   int item_height(wxDC& dc, ConsoleMessage const& msg) const {
@@ -331,6 +359,11 @@ private:
     if (begin != msg.text.end()) {
       text_height += dc.GetCharHeight() + TEXT_LINE_SPACING;
     }
+
+    // account for the height of a timestamp even if there is no other text content.
+    if (text_height == 0) {
+      text_height = dc.GetCharHeight() + TEXT_LINE_SPACING;
+    }
     
     // height of bitmap
     int bitmap_height = msg.bitmap.Ok() ? msg.bitmap.GetHeight() : 0;
@@ -339,10 +372,12 @@ private:
   }
   
   // --------------------------------------------------- : Layout
-  
+
   static constexpr int LIST_SPACING        = 1;
+  static constexpr int TIMESTAMP_PADDING   = 3;
   static constexpr int ICON_PADDING        = 3;
-  static constexpr int TEXT_PADDING_LEFT   = ICON_PADDING + 16 + 4;
+  static constexpr int ICON_PADDING_LEFT   = TIMESTAMP_PADDING + 3;
+  static constexpr int TEXT_PADDING_LEFT   = ICON_PADDING_LEFT + 16 + 4;
   static constexpr int TEXT_PADDING_RIGHT  = 4;
   static constexpr int TEXT_PADDING_TOP    = 4;
   static constexpr int TEXT_PADDING_BOTTOM = 2;
@@ -455,6 +490,7 @@ END_EVENT_TABLE()
 
 ConsolePanel::ConsolePanel(Window* parent, int id)
   : SetWindowPanel(parent, id)
+  , menuConsole(nullptr)
   , messages(nullptr)
   , entry(nullptr)
   , is_active_window(false)
@@ -479,8 +515,16 @@ ConsolePanel::ConsolePanel(Window* parent, int id)
   // init sizer
   wxSizer* s = new wxBoxSizer(wxVERTICAL);
   s->Add(splitter, 1, wxEXPAND);
-  s->SetSizeHints(this);
   SetSizer(s);
+  s->SetSizeHints(this);
+
+  // init menus
+  menuConsole = new wxMenu();
+  add_menu_item_tr(menuConsole, ID_CLEAR_CONSOLE, "clear_console", "clear console");
+}
+
+ConsolePanel::~ConsolePanel() {
+  delete menuConsole;
 }
 
 void ConsolePanel::onChangeSet() {
@@ -501,12 +545,19 @@ void ConsolePanel::initUI(wxToolBar* tb, wxMenuBar* mb) {
   // stop blinker
   is_active_window = true;
   stop_blinker();
+
+  add_tool_tr(tb, ID_CLEAR_CONSOLE, "clear_console", "clear console");
+  tb->Realize();
+
+  mb->Insert(2, menuConsole, _MENU_("console"));
 }
 
 void ConsolePanel::destroyUI(wxToolBar* tb, wxMenuBar* mb) {
   // Toolbar
+  tb->DeleteTool(ID_CLEAR_CONSOLE);
   // Menus
-  
+  mb->Remove(2);
+
   // we are no longer active, allow blinker
   is_active_window = false;
 }
@@ -523,6 +574,9 @@ void ConsolePanel::onEnter(wxCommandEvent& ev) {
 void ConsolePanel::onCommand(int id) {
   if (id == ID_EVALUATE) {
     exec(entry->get_command_and_clear());
+  }
+  else if (id == ID_CLEAR_CONSOLE) {
+    messages->clear_console();
   }
 }
 
@@ -571,7 +625,7 @@ void ConsolePanel::exec(String const& command) {
     // type of result
     ScriptType type = result->type();
     if (type == SCRIPT_IMAGE) {
-      GeneratedImage::Options options(0,0, set->stylesheet.get(), set.get());
+      GeneratedImage::Options options(0,0, card->stylesheet ? card->stylesheet.get() : set->stylesheet.get(), set.get());
       wxImage image = result->toImage()->generate(options);
       message->bitmap = wxBitmap(image);
     } else if (type == SCRIPT_COLOR) {
@@ -582,7 +636,14 @@ void ConsolePanel::exec(String const& command) {
       set_alpha(image, color.Alpha() / 255.0);
       message->bitmap = wxBitmap(image);
     } else {
-      message->text = result->toCode();
+      try {
+        boost::json::value jresult = mse_to_json(result, set.get(), true);
+        if (jresult.is_null()) message->text = result->toCode();
+        else message->text = json_pretty_print(jresult);
+      }
+      catch (...) {
+        message->text = result->toCode();
+      }
     }
     messages->add_message(message);
   } catch (ScriptError const& e) {

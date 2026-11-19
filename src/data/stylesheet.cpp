@@ -1,5 +1,5 @@
 //+----------------------------------------------------------------------------+
-//| Description:  Magic Set Editor - Program to make Magic (tm) cards          |
+//| Description:  Magic Set Editor - Program to make card games                |
 //| Copyright:    (C) Twan van Laarhoven and the other MSE developers          |
 //| License:      GNU General Public License 2 or later (see file COPYING)     |
 //+----------------------------------------------------------------------------+
@@ -10,6 +10,7 @@
 #include <data/stylesheet.hpp>
 #include <data/game.hpp>
 #include <data/field.hpp>
+#include <data/update_cards_script.hpp>
 #include <util/io/package_manager.hpp>
 #include <gui/new_window.hpp> // for selecting stylesheets on load error
 
@@ -26,7 +27,9 @@ StyleSheet::StyleSheet()
 StyleSheetP StyleSheet::byGameAndName(const Game& game, const String& name) {
   /// Alternative stylesheets for game
   static map<String, String> stylesheet_alternatives;
-  String full_name = game.name() + _("-") + name + _(".mse-style");
+  String full_name = name;
+  if (!full_name.EndsWith(_(".mse-style"))) full_name = full_name + _(".mse-style");
+  if (!full_name.StartsWith(game.name() + _("-"))) full_name = game.name() + _("-") + full_name;
   try {
     map<String, String>::const_iterator it = stylesheet_alternatives.find(full_name);
     if (it != stylesheet_alternatives.end()) {
@@ -35,17 +38,16 @@ StyleSheetP StyleSheet::byGameAndName(const Game& game, const String& name) {
       return package_manager.open<StyleSheet>(full_name);
     }
   } catch (PackageNotFoundError& e) {
-    queue_message(MESSAGE_ERROR, _("Missing stylesheet: ") + full_name);
-    if (stylesheet_for_reading()) {
-      // we already have a stylesheet higher up, so just return a null pointer
-      return StyleSheetP();
-    }
+    // Was the stylesheet itself not found, or was it one of its dependencies?
+    String missing = wxFileName(e.package_name).GetFullName();
+    String failed_dep = (!missing.empty() && missing != full_name) ? missing : String();
     // load an alternative stylesheet
-    StyleSheetP ss = select_stylesheet(game, name);
+    StyleSheetP ss = select_stylesheet(game, full_name, failed_dep);
     if (ss) {
       stylesheet_alternatives[full_name] = ss->relativeFilename();
       return ss;
     } else {
+      queue_message(MESSAGE_ERROR, _("Missing stylesheet: ") + full_name);
       throw e;
     }
   }
@@ -68,8 +70,12 @@ void StyleSheet::validate(Version ver) {
   if (!game) {
     throw Error(_ERROR_1_("no game specified",_TYPE_("stylesheet")));
   }
-  // a stylsheet depends on the game it is made for
+  // a stylesheet depends on the game it is made for
   requireDependency(game.get());
+  // sort the update_cards_scripts from oldest to newest
+  std::sort(update_cards_scripts.begin(), update_cards_scripts.end(), [](const auto& a, const auto& b) {
+    return *a < *b;
+  });
 }
 
 
@@ -92,12 +98,13 @@ void mark_dependency_value(const StyleSheet& stylesheet, const Dependency& dep) 
 
 
 IMPLEMENT_REFLECTION(StyleSheet) {
-  REFLECT(game);
   REFLECT_BASE(Packaged);
+  REFLECT(game);
   REFLECT(card_width);
   REFLECT(card_height);
   REFLECT(card_dpi);
   REFLECT(card_background);
+  REFLECT(card_regions);
   REFLECT(init_script);
   // styling
   REFLECT(styling_fields);
@@ -115,14 +122,10 @@ IMPLEMENT_REFLECTION(StyleSheet) {
   // extra card fields
   REFLECT(extra_card_fields);
   REFLECT_IF_READING {
-    if (extra_card_style.init(extra_card_fields)) {
-      // if a value is not editable, don't save it
-      FOR_EACH(f, extra_card_fields) {
-        if (!f->editable) f->save_value = false;
-      }
-    }
+    extra_card_style.init(extra_card_fields);
   }
   REFLECT(extra_card_style);
+  REFLECT_NO_SCRIPT(update_cards_scripts);
 }
 
 

@@ -1,5 +1,5 @@
 //+----------------------------------------------------------------------------+
-//| Description:  Magic Set Editor - Program to make Magic (tm) cards          |
+//| Description:  Magic Set Editor - Program to make card games                |
 //| Copyright:    (C) Twan van Laarhoven and the other MSE developers          |
 //| License:      GNU General Public License 2 or later (see file COPYING)     |
 //+----------------------------------------------------------------------------+
@@ -12,14 +12,15 @@
 #include <util/error.hpp>
 #include <util/io/package_manager.hpp>
 #include <boost/logic/tribool.hpp>
+#include <data/settings.hpp>
 #undef small
 using boost::tribool;
 
 // ----------------------------------------------------------------------------- : Reader
 
-Reader::Reader(wxInputStream& input, Packaged* package, const String& filename, bool ignore_invalid)
+Reader::Reader(wxInputStream& input, Packaged* package, const String& filename, bool ignore_invalid, bool suppress_warnings)
   : indent(0), expected_indent(0), state(OUTSIDE)
-  , ignore_invalid(ignore_invalid)
+  , ignore_invalid(ignore_invalid), suppress_warnings(suppress_warnings)
   , filename(filename), package(package), line_number(0), previous_line_number(0)
   , input(input)
 {
@@ -29,7 +30,7 @@ Reader::Reader(wxInputStream& input, Packaged* package, const String& filename, 
   handleAppVersion();
 }
 
-void Reader::handleIgnore(int end_version, const Char* a) {
+void Reader::handleIgnore(Version end_version, const Char* a) {
   if (file_app_version < end_version) {
     if (enterBlock(a)) exitBlock();
   }
@@ -52,7 +53,7 @@ void Reader::warning(const String& msg, int line_number_delta, bool warn_on_prev
 }
 
 void Reader::showWarnings() {
-  if (!warnings.empty()) {
+  if (!suppress_warnings && !warnings.empty()) {
     queue_message(MESSAGE_WARNING, _("Warnings while reading file:\n") + filename + _("\n") + warnings);
     warnings.clear();
   }
@@ -207,10 +208,10 @@ void Reader::readLine(bool in_string) {
   size_t pos = line.find_first_of(_(':'), indent);
   key = line.substr(indent, pos - indent);
   if (!ignore_invalid && !in_string && starts_with(key, _(" "))) {
-    warning(_("key: '") + key + _("' starts with a space; only use TABs for indentation!"), 0, false);
-    // try to fix up: 8 spaces is a tab
-    while (starts_with(key, _("        "))) {
-      key = key.substr(8);
+    warning(String(_("key: '")) << key << _("' on line number ") << line_number << _(" starts with a space; only use TABs for indentation!"), 0, false);
+    // try to fix up: 4 spaces is a tab
+    while (starts_with(key, _("    "))) {
+      key = key.substr(4);
       indent += 1;
     }
   }
@@ -355,6 +356,14 @@ template <> void Reader::handle(Vector2D& vec) {
 
 template <> void Reader::handle(LocalFileName& f) {
   f = LocalFileName::fromReadString(this->getValue());
+}
+
+String Reader::addLocale(String filename) {
+  return filename + _("_") + settings.locale;
+}
+
+String Reader::addDark(String filename) {
+  return filename + (settings.darkMode() ? _("_dark") : _(""));
 }
 
 // ----------------------------------------------------------------------------- : EnumReader

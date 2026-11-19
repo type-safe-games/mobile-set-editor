@@ -1,5 +1,5 @@
 //+----------------------------------------------------------------------------+
-//| Description:  Magic Set Editor - Program to make Magic (tm) cards          |
+//| Description:  Magic Set Editor - Program to make card games                |
 //| Copyright:    (C) Twan van Laarhoven and the other MSE developers          |
 //| License:      GNU General Public License 2 or later (see file COPYING)     |
 //+----------------------------------------------------------------------------+
@@ -199,8 +199,8 @@ AutoReplaceWindow::AutoReplaceWindow(Window* parent, const Game& game)
       s4->Add(defaults,                           0, wxALL & ~wxRIGHT, 8);
       s4->Add(CreateButtonSizer(wxOK | wxCANCEL), 1, wxALL, 8);
     s->Add(s4, 0, wxEXPAND);
-  s->SetSizeHints(this);
   SetSizer(s);
+  s->SetSizeHints(this);
   // Set default size
   SetSize(350, 450);
   // initialize values
@@ -268,8 +268,8 @@ void AutoReplaceWindow::refreshItem() {
     enabled   ->SetValue(ar->enabled);
     whole_word->SetValue(ar->whole_word);
   } else {
-    match     ->SetValue(wxEmptyString);
-    replace   ->SetValue(wxEmptyString);
+    match     ->SetValue(_(""));
+    replace   ->SetValue(_(""));
     enabled   ->SetValue(false);
     whole_word->SetValue(false);
   }

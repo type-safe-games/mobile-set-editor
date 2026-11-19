@@ -1,5 +1,5 @@
 //+----------------------------------------------------------------------------+
-//| Description:  Magic Set Editor - Program to make Magic (tm) cards          |
+//| Description:  Magic Set Editor - Program to make card games                |
 //| Copyright:    (C) Twan van Laarhoven and the other MSE developers          |
 //| License:      GNU General Public License 2 or later (see file COPYING)     |
 //+----------------------------------------------------------------------------+
@@ -26,8 +26,9 @@ void SymbolValueEditor::draw(RotatedDC& dc) {
   if (symbols.empty()) {
     dc.SetFont(wxFont(10,wxFONTFAMILY_SWISS,wxFONTSTYLE_NORMAL,wxFONTWEIGHT_NORMAL));
     dc.SetTextForeground(*wxBLACK);
-    RealSize text_size = dc.GetTextExtent(_("double click to edit symbol"));
-    dc.DrawText(_("double click to edit symbol"), align_in_rect(ALIGN_MIDDLE_CENTER, text_size, dc.getInternalRect()));
+    String label = _LABEL_("edit symbol");
+    RealSize text_size = dc.GetTextExtent(label);
+    dc.DrawText(label, align_in_rect(ALIGN_MIDDLE_CENTER, text_size, dc.getInternalRect()));
   }
   if (nativeLook()) {
     // draw editor buttons
@@ -45,6 +46,7 @@ void SymbolValueEditor::drawButton(RotatedDC& dc, int button, const String& text
   // draw button
   draw_button(&editor(), dc.getDC(), dc.trRectToBB(RealRect(x,y,width,height)), false, down, true);
   // draw text
+  dc.SetTextForeground(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOWTEXT));
   RealSize text_size = dc.GetTextExtent(text);
   dc.DrawText(text, align_in_rect((Alignment)(ALIGN_BOTTOM | ALIGN_CENTER), text_size, RealRect(x, y, width,height*0.9)));
   // draw image
@@ -119,4 +121,12 @@ void SymbolValueEditor::editSymbol() {
 
 unique_ptr<ValueActionPerformer> SymbolValueEditor::getActionPerformer() {
   return make_unique<ValueActionPerformer>(valueP(), editor().getCard(), editor().getSetForActions());
+}
+
+// ----------------------------------------------------------------------------- : Resetting
+
+void SymbolValueEditor::doDefaultReset() {
+  if (!valueP()) return;
+  unique_ptr<ResetValueAction<SymbolValue, false>> action = make_unique<ResetValueAction<SymbolValue, false>>(valueP());
+  addAction(std::move(action));
 }

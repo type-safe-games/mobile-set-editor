@@ -1,5 +1,5 @@
 //+----------------------------------------------------------------------------+
-//| Description:  Magic Set Editor - Program to make Magic (tm) cards          |
+//| Description:  Magic Set Editor - Program to make card games                |
 //| Copyright:    (C) Twan van Laarhoven and the other MSE developers          |
 //| License:      GNU General Public License 2 or later (see file COPYING)     |
 //+----------------------------------------------------------------------------+
@@ -9,91 +9,27 @@
 #include <util/prec.hpp>
 #include <gui/packages_window.hpp>
 #include <gui/package_update_list.hpp>
+#include <gui/downloadable_installers.hpp>
 #include <gui/util.hpp>
+#include <gui/set/window.hpp>
 #include <util/io/package_manager.hpp>
 #include <util/window_id.hpp>
 #include <data/installer.hpp>
+#include <data/updater.hpp>
 #include <data/settings.hpp>
 #include <gfx/gfx.hpp>
 #include <wx/wfstream.h>
-#include <wx/html/htmlwin.h>
-#include <wx/dialup.h>
-#include <wx/url.h>
 #include <wx/dcbuffer.h>
 #include <wx/progdlg.h>
+#include <wx/stopwatch.h>
+#include <wx/gauge.h>
+#include <wx/utils.h>
 #include <wx/tglbtn.h>
+#include <wx/stdpaths.h>
 
 DECLARE_POINTER_TYPE(Installer);
 
-// ----------------------------------------------------------------------------- : TODO: MOVE
-
-/*
-// A HTML control that opens all pages in an actual browser
-struct HtmlWindowToBrowser : public wxHtmlWindow {
-  HtmlWindowToBrowser(Window* parent, int id, const wxPoint& pos, const wxSize& size, long flags)
-    : wxHtmlWindow(parent, id, pos, size, flags)
-  {}
-    
-  virtual void OnLinkClicked(const wxHtmlLinkInfo& info) {
-    wxLaunchDefaultBrowser( info.GetHref() );
-  }
-};
-*/
-
-// ----------------------------------------------------------------------------- : DownloadableInstallers
-
-/// Handle downloading of installers
-class DownloadableInstallerList {
-public:
-  DownloadableInstallerList() : status(NONE) {}
-  
-  /// start downloading, return true if we are done
-  bool download();
-  
-  vector<DownloadableInstallerP> installers;
-  
-private:
-  enum Status { NONE, DOWNLOADING, DONE } status;
-  wxMutex lock;
-  
-  struct Thread : public wxThread {
-    ExitCode Entry() override;
-  };
-};
-
-/// The global installer downloader
 DownloadableInstallerList downloadable_installers;
-
-bool DownloadableInstallerList::download() {
-  if (status == DONE) return true;
-  if (status == NONE) {
-    status = DOWNLOADING;
-    Thread* thread = new Thread();
-    thread->Create();
-    thread->Run();
-  }
-  return false;
-}
-
-wxThread::ExitCode DownloadableInstallerList::Thread::Entry() {
-  // open url
-  wxURL url(settings.installer_list_url);
-  unique_ptr<wxInputStream> stream(url.GetInputStream());
-  if (!stream) {
-    wxMutexLocker l(downloadable_installers.lock);
-    downloadable_installers.status = DONE;
-    return 0;
-  }
-  // Read installer list
-  Reader reader(*stream, nullptr, _("installers"), true);
-  vector<DownloadableInstallerP> installers;
-  reader.handle(_("installers"),installers);
-  // done
-  wxMutexLocker l(downloadable_installers.lock);
-  swap(installers, downloadable_installers.installers);
-  downloadable_installers.status = DONE;
-  return 0;
-}
 
 // ----------------------------------------------------------------------------- : PackageInfoPanel
 
@@ -153,31 +89,36 @@ void PackageInfoPanel::draw(DC& dc) {
       icon_w = icon.GetWidth();
       icon_h = icon.GetHeight();
     }
-    dc.DrawBitmap(icon, x+(max_size-icon_w)/2, y+(max_size-icon_h)/2);
+    dc.DrawBitmap(icon, x+(max_size-icon_w)/2, y+(max_size-icon_h)/2 + 2);
     x += max_size;
   }
-  // package name
+  // package info
   x += 7;
   dc.SetFont(wxFont(16, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL, false, _("Arial")));
-  dc.DrawText(d.full_name, x, y);
+  dc.DrawText(d.short_name, x, y);
   y += dc.GetCharHeight() + 7;
-  
-  // version
+  dc.SetFont(wxFont(12, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL, false, _("Arial")));
+  if (d.full_name != d.short_name) dc.DrawText(d.full_name, x, y);
+  y += dc.GetCharHeight() + 7;
+
   dc.SetFont(*wxNORMAL_FONT);
   int dy = dc.GetCharHeight() + 3;
-  dc.DrawText(_LABEL_("installed version"),   x, y);
-  dc.DrawText(_LABEL_("installable version"), x, y + 1*dy);
+  dc.DrawText(_LABEL_("folder name"),         x, y);
+  dc.DrawText(_LABEL_("installed version"),   x, y + 1*dy);
+  dc.DrawText(_LABEL_("installable version"), x, y + 2*dy);
   //dc.DrawText(_LABEL_("installer size"),      x, y + 2*dy);
   //dc.DrawText(_LABEL_("installer status"),    x, y + 3*dy);
   // text size?
   int dx = 0, max_dx = 0;
+  dc.GetTextExtent(_LABEL_("folder name"),         &dx, nullptr); max_dx = max(max_dx, dx);
   dc.GetTextExtent(_LABEL_("installed version"),   &dx, nullptr); max_dx = max(max_dx, dx);
   dc.GetTextExtent(_LABEL_("installable version"), &dx, nullptr); max_dx = max(max_dx, dx);
   //dc.GetTextExtent(_LABEL_("installer size"),      &dx, nullptr); max_dx = max(max_dx, dx);
   //dc.GetTextExtent(_LABEL_("installer status"),    &dx, nullptr); max_dx = max(max_dx, dx);
   x += max_dx + 5;
-  dc.DrawText(package->installed ? package->installed->version.toString()   : _LABEL_("no version"), x, y);
-  dc.DrawText(package->installer ? package->description->version.toString() : _LABEL_("no version"), x, y + 1*dy);
+  dc.DrawText(d.name,                                                                                x, y);
+  dc.DrawText(package->installed ? package->installed->version.toString()   : _LABEL_("no version"), x, y + 1*dy);
+  dc.DrawText(package->installer ? package->description->version.toString() : _LABEL_("no version"), x, y + 2*dy);
   //dc.DrawText(_("?"), x, y + 2*dy);
   //dc.DrawText(_("?"), x, y + 3*dy);
 }
@@ -191,11 +132,144 @@ BEGIN_EVENT_TABLE(PackageInfoPanel, wxPanel)
 END_EVENT_TABLE()
 
 
+// ----------------------------------------------------------------------------- : PackagesProgressDialog
+
+/// A progress dialog with two progress bars, one for the overall progress, and one for the current package
+class PackagesProgressDialog : public wxDialog {
+public:
+  PackagesProgressDialog(Window* parent, int to_download, int to_change);
+  ~PackagesProgressDialog();
+  
+  /// Set the overall progress. returns false if the user has cancelled
+  bool setOverall(int step, const String& text, const String& package_name = String());
+
+  /// Set the progress of the current package. returns false if the user has cancelled
+  bool setDetail(long long done, long long total, const String& text);
+  
+  /// Can the user cancel?
+  void setCancelEnabled(bool enabled);
+  bool wasCancelled() const { return cancelled; }
+  
+  void finish();
+  
+private:
+  enum { DETAIL_RANGE = 1000 };
+  
+  wxStaticText* summary_text;
+  wxStaticText* package_text;
+  wxStaticText* detail_text;
+  wxGauge*      overall_gauge;
+  wxGauge*      detail_gauge;
+  wxButton*     cancel_button;
+  int           max_steps;
+  bool          cancelled;
+  unique_ptr<wxWindowDisabler> disabler;
+  
+  /// Redraw and process events
+  void refresh();
+  void requestCancel();
+  
+  DECLARE_EVENT_TABLE();
+  
+  void onCancel(wxCommandEvent&);
+  void onClose(wxCloseEvent&);
+};
+
+PackagesProgressDialog::PackagesProgressDialog(Window* parent, int to_download, int to_change)
+  : wxDialog(parent, wxID_ANY, _TITLE_("installing updates"), wxDefaultPosition, wxDefaultSize, wxDEFAULT_DIALOG_STYLE | wxSTAY_ON_TOP)
+  , max_steps(to_download + to_change + 1)
+  , cancelled(false)
+{
+  const int text_style = wxST_NO_AUTORESIZE | wxST_ELLIPSIZE_MIDDLE | wxALIGN_LEFT;
+  String summary = _LABEL_2_("downloading updates", String("0"), String()<<to_download);
+  summary_text  = new wxStaticText(this, wxID_ANY, summary, wxDefaultPosition, wxDefaultSize, text_style);
+  overall_gauge = new wxGauge(this, wxID_ANY, max_steps,    wxDefaultPosition, wxSize(-1,18), wxGA_HORIZONTAL | wxGA_SMOOTH);
+  package_text  = new wxStaticText(this, wxID_ANY, _(" "),  wxDefaultPosition, wxDefaultSize, text_style);
+  detail_text   = new wxStaticText(this, wxID_ANY, _(" "),  wxDefaultPosition, wxDefaultSize, text_style);
+  detail_gauge  = new wxGauge(this, wxID_ANY, DETAIL_RANGE, wxDefaultPosition, wxSize(-1,18), wxGA_HORIZONTAL | wxGA_SMOOTH);
+  cancel_button = new wxButton(this, wxID_CANCEL);
+  
+  wxBoxSizer* v = new wxBoxSizer(wxVERTICAL);
+    v->Add(summary_text,  0, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, 10);
+    v->Add(overall_gauge, 0, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, 10);
+    v->AddSpacer(30);
+    v->Add(package_text,  0, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, 10);
+    v->Add(detail_text,   0, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, 10);
+    v->Add(detail_gauge,  0, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, 10);
+    v->Add(cancel_button, 0, wxALIGN_RIGHT | wxALL, 12);
+  v->SetMinSize(wxSize(600, -1));
+  SetSizerAndFit(v);
+  CentreOnParent();
+  
+  Show();
+  disabler = make_unique<wxWindowDisabler>(this);
+  refresh();
+}
+
+PackagesProgressDialog::~PackagesProgressDialog() {
+  disabler.reset();
+}
+
+bool PackagesProgressDialog::setOverall(int step, const String& summary, const String& package_name) {
+  summary_text->SetLabelText(summary);
+  overall_gauge->SetValue(min(step, max_steps));
+  // start of a new package
+  package_text->SetLabelText(package_name.empty() ? String(" ") : _LABEL_1_("current package", package_name));
+  detail_text->SetLabelText(_(" "));
+  detail_gauge->SetValue(0);
+  refresh();
+  return !cancelled;
+}
+
+bool PackagesProgressDialog::setDetail(long long done, long long total, const String& text) {
+  detail_text->SetLabelText(text);
+  if (total > 0) {
+    detail_gauge->SetValue((int)min<long long>(DETAIL_RANGE, max<long long>(0, done) * DETAIL_RANGE / total));
+  } else {
+    detail_gauge->Pulse();
+  }
+  refresh();
+  return !cancelled;
+}
+
+void PackagesProgressDialog::setCancelEnabled(bool enabled) {
+  cancel_button->Enable(enabled && !cancelled);
+}
+
+void PackagesProgressDialog::finish() {
+  Hide();
+  disabler.reset();
+}
+
+void PackagesProgressDialog::refresh() {
+  Update();
+  wxYieldIfNeeded(); // for the cancel button
+}
+
+void PackagesProgressDialog::requestCancel() {
+  if (!cancel_button->IsEnabled()) return;
+  cancelled = true;
+  cancel_button->Disable();
+}
+
+void PackagesProgressDialog::onCancel(wxCommandEvent&) {
+  requestCancel();
+}
+void PackagesProgressDialog::onClose(wxCloseEvent& ev) {
+  // closing the window is the same as pressing cancel
+  ev.Veto();
+  requestCancel();
+}
+
+BEGIN_EVENT_TABLE(PackagesProgressDialog, wxDialog)
+  EVT_BUTTON(wxID_CANCEL, PackagesProgressDialog::onCancel)
+  EVT_CLOSE (             PackagesProgressDialog::onClose)
+END_EVENT_TABLE()
+
+
 // ----------------------------------------------------------------------------- : PackagesWindow
 
-enum Action {
-  KEEP, INSTALL, UPGRADE, REMOVE
-};
+DEFINE_EVENT_TYPE(EVENT_PACKAGE_LIST_CHANGED);
 
 PackagesWindow::PackagesWindow(Window* parent, bool download_package_list)
   : waiting_for_list(download_package_list)
@@ -237,7 +311,9 @@ void PackagesWindow::init(Window* parent, bool show_only_installable) {
   SetIcon(wxIcon());
   package_list = new PackageUpdateList(this, installable_packages, show_only_installable, ID_PACKAGE_LIST);
   package_info = new PackageInfoPanel(this);
-  
+
+  waiting_info = new wxStaticText(this, wxID_ANY, waiting_for_list ? _LABEL_("awaiting package list") : _(""));
+
   wxToggleButton* keep_button    = new wxToggleButton(this, ID_KEEP,    _BUTTON_("keep package"));
   wxToggleButton* install_button = new wxToggleButton(this, ID_INSTALL, _BUTTON_("install package"));
   wxToggleButton* remove_button  = new wxToggleButton(this, ID_REMOVE,  _BUTTON_("remove package"));
@@ -260,10 +336,16 @@ void PackagesWindow::init(Window* parent, bool show_only_installable) {
         v2->Add(keep_button,    0, wxEXPAND | wxBOTTOM, 4);
         v2->AddStretchSpacer();
         v2->Add(remove_button,  0, wxEXPAND | wxBOTTOM, 0);
+        v2->SetMinSize(wxSize(170, -1));
       h->Add(v2);
     v->Add(h, 0, wxEXPAND | (wxALL & ~wxTOP), 8);
-    v->Add(CreateButtonSizer(wxOK | wxCANCEL), 0, wxEXPAND | (wxALL & ~wxTOP), 8);
-  SetSizer(v);
+    wxBoxSizer* h2 = new wxBoxSizer(wxHORIZONTAL);
+      h2->Add(waiting_info, 0, wxEXPAND | (wxALL & ~wxTOP), 8);
+      h2->AddStretchSpacer();
+      h2->Add(CreateButtonSizer(wxOK | wxCANCEL), 0, wxEXPAND | (wxALL & ~wxTOP), 8);
+    v->Add(h2, 0, wxEXPAND);
+  v->SetMinSize(820,650);
+  SetSizerAndFit(v);
   
   wxUpdateUIEvent::SetMode(wxUPDATE_UI_PROCESS_SPECIFIED);
   UpdateWindowUI(wxUPDATE_UI_RECURSE);
@@ -272,34 +354,85 @@ void PackagesWindow::init(Window* parent, bool show_only_installable) {
 PackagesWindow::~PackagesWindow() {
 }
 
-
 void PackagesWindow::onPackageSelect(wxCommandEvent& ev) {
-  package_info->setPackage(package = package_list->getSelection());
+  package_info->setPackage(package = package_list->getSelectedPackage());
   UpdateWindowUI(wxUPDATE_UI_RECURSE);
 }
 
 void PackagesWindow::onActionChange(wxCommandEvent& ev) {
-  if (package) {
-    PackageAction act = ev.GetId() == ID_INSTALL ? PACKAGE_ACT_INSTALL
-                      : ev.GetId() == ID_UPGRADE ? PACKAGE_ACT_INSTALL
-                      : ev.GetId() == ID_REMOVE  ? PACKAGE_ACT_REMOVE
-                      : PACKAGE_ACT_NOTHING;
-    act = act | where;
-    // set action
-    set_package_action(installable_packages, package, act);
-    package_list->Refresh(false);
-    UpdateWindowUI(wxUPDATE_UI_RECURSE);
+  PackageAction act = ev.GetId() == ID_INSTALL ? PACKAGE_ACT_INSTALL
+                    : ev.GetId() == ID_UPGRADE ? PACKAGE_ACT_INSTALL
+                    : ev.GetId() == ID_REMOVE  ? PACKAGE_ACT_REMOVE
+                    : PACKAGE_ACT_NOTHING;
+  act = act | where;
+  // set action
+  package_list->forEachSelectedPackage(
+    [&](const InstallablePackageP& p) {
+      if (p->can(act)) {
+        set_package_action(installable_packages, p, act);
+      }
+    }
+  );
+  package_list->Refresh(false);
+  UpdateWindowUI(wxUPDATE_UI_RECURSE);
+}
+
+bool PackagesWindow::checkReadOnlyFilesBeforeRemoving() {
+  FOR_EACH(ip, installable_packages) {
+    if (!ip->has(PACKAGE_ACT_REMOVE)) continue;
+    vector<String> read_only_files;
+    try {
+      PackagedP p = package_manager.openAny(ip->description->name, true);
+      read_only_files = p->read_only_files;
+    } catch (const Error&) {
+      continue; // package can't be opened, nothing to warn about
+    }
+    if (read_only_files.empty()) continue;
+    String patterns;
+    FOR_EACH(pattern, read_only_files) {
+      if (!patterns.empty()) patterns += _("\n");
+      patterns += _("    ") + pattern;
+    }
+    wxMessageDialog dlg(
+      this,
+      _ERROR_2_("uninstall read only", ip->description->name, patterns),
+      _TITLE_("packages window"),
+      wxICON_EXCLAMATION | wxYES_NO
+    );
+    dlg.SetYesNoLabels(_BUTTON_("uninstall anyway"), _BUTTON_("abort"));
+    if (dlg.ShowModal() != wxID_YES) {
+      // Abort: un-schedule all pending removals
+      FOR_EACH(ip2, installable_packages) {
+        if (ip2->has(PACKAGE_ACT_REMOVE)) {
+          set_package_action(installable_packages, ip2, PACKAGE_ACT_NOTHING);
+        }
+      }
+      sendEvent();
+      return false;
+    }
   }
+  return true;
 }
 
 void PackagesWindow::onOk(wxCommandEvent& ev) {
-  // Do we need a new version of MSE first?
+  // check for read-only files in any package about to be uninstalled
+  // if the user chooses to abort, un-schedule all pending removals
+  if (!checkReadOnlyFilesBeforeRemoving()) {
+    package_list->Refresh(false);
+    UpdateWindowUI(wxUPDATE_UI_RECURSE);
+    return;
+  }
   // count number of packages to change
+  bool app_change = false;
   int to_change   = 0;
   int to_download = 0;
   int to_remove   = 0;
   int with_modifications = 0;
   FOR_EACH(ip, installable_packages) {
+    if (ip->description->name == mse_package) {
+      if (ip->has(PACKAGE_ACT_INSTALL)) app_change = true;
+      continue;
+    } 
     if (!ip->has(PACKAGE_ACT_NOTHING)) ++to_change;
     if (ip->has(PACKAGE_ACT_INSTALL) && ip->installer && !ip->installer->installer) ++to_download;
     if (ip->has(PACKAGE_ACT_REMOVE)) {
@@ -308,7 +441,7 @@ void PackagesWindow::onOk(wxCommandEvent& ev) {
     }
   }
   // anything to do?
-  if (!to_change) {
+  if (!to_change && !app_change) {
     ev.Skip();
     return;
   }
@@ -321,93 +454,193 @@ void PackagesWindow::onOk(wxCommandEvent& ev) {
     if (result == wxNO) return;
   }
   // progress dialog
-  wxProgressDialog progress(
-      _TITLE_("installing updates"),
-      String::Format(_ERROR_("downloading updates"), 0, to_download),
-      to_change + to_download,
-      this,
-      wxPD_AUTO_HIDE | wxPD_APP_MODAL | wxPD_CAN_ABORT | wxPD_SMOOTH
-    );
-  // Clear package list
-  package_manager.reset();
-  // Download installers
-  int package_pos = 0, step = 0;
-  FOR_EACH(ip, installable_packages) {
-    if (ip->has(PACKAGE_ACT_INSTALL) && ip->installer && !ip->installer->installer) {
-      if (!progress.Update(step++, String::Format(_ERROR_("downloading updates"), ++package_pos, to_download))) {
-        return; // aborted
+  PackagesProgressDialog progress(this, to_download, to_change);
+  try {
+    // Download installers, report how much has been downloaded
+    int package_pos = 0, step = 0;
+    FOR_EACH(ip, installable_packages) {
+      if (ip->description->name == mse_package) continue;
+      if (ip->has(PACKAGE_ACT_INSTALL) && ip->installer && !ip->installer->installer) {
+        if (!progress.setOverall(step++, _LABEL_2_("downloading updates", String()<<++package_pos, String()<<to_download), ip->description->short_name)) {
+          return; // aborted
+        }
+        ip->ensureIsDownloaded([&](long long received, long long total) {
+          String details;
+          if (received <= 0) {
+            details = _LABEL_("connecting updates");
+          } else if (total > 0) {
+            details = _LABEL_3_("downloaded updates",
+                                wxFileName::GetHumanReadableSize(wxULongLong((wxULongLong_t)received)),
+                                wxFileName::GetHumanReadableSize(wxULongLong((wxULongLong_t)total)),
+                                String()<<(int)min<long long>(100, received * 100 / total));
+          } else {
+            // the server did not tell us how large the package is
+            details = _LABEL_1_("downloaded updates unknown",
+                                wxFileName::GetHumanReadableSize(wxULongLong((wxULongLong_t)received)));
+          }
+          return progress.setDetail(received, total, details);
+        });
+        if (progress.wasCancelled()) return; // aborted
       }
-      // download installer
-      wxURL url(ip->installer->installer_url);
-      unique_ptr<wxInputStream> is(url.GetInputStream());
-      if (!is) {
-        throw Error(_ERROR_2_("can't download installer", ip->description->name, ip->installer->installer_url));
+    }
+    // Install stuff, report how many files have been written
+    progress.setCancelEnabled(false); // don't allow abort from now on
+    package_pos = 0;
+    int success = 0, install = 0, remove = 0;
+    FOR_EACH(ip, installable_packages) {
+      if (ip->description->name == mse_package) continue; // app, we'll do that last
+      if (ip->has(PACKAGE_ACT_NOTHING)) continue; // package unchanged
+      progress.setOverall(step++, _LABEL_2_("installing updates", String()<<++package_pos, String()<<to_change), ip->description->short_name);
+      if (ip->has(PACKAGE_ACT_REMOVE)) {
+        progress.setDetail(0, 0, _LABEL_("removing updates"));
       }
-      ip->installer->installer_file = wxFileName::CreateTempFileName(_("mse-installer"));
-      wxFileOutputStream os(ip->installer->installer_file);
-      os.Write(*is);
-      os.Close();
-      // open installer
-      ip->installer->installer = make_intrusive<Installer>();
-      ip->installer->installer->open(ip->installer->installer_file);
+      wxStopWatch since_update;
+      bool ok = package_manager.install(*ip, [&](int files_done, int files_total) {
+        if (files_total <= 0) return;
+        if (files_done > 0 && files_done < files_total && since_update.Time() < 50) return;
+        since_update.Start();
+        progress.setDetail(files_done, files_total, _LABEL_3_("installed updates",
+                                                              String()<<files_done,
+                                                              String()<<files_total,
+                                                              String()<<min(100, files_done * 100 / files_total)));
+      });
+      if (ok) {
+        install += ip->has(PACKAGE_ACT_INSTALL) && !ip->installed;
+        remove  += ip->has(PACKAGE_ACT_REMOVE);
+        success += 1;
+      }
     }
+    // Update the cards otherwise they will be saved with the new versions of the stylesheets without ever having been updated
+    progress.setOverall(step++, _LABEL_("updating cards"));
+    if (SetWindow* set_window = dynamic_cast<SetWindow*>(GetParent())) {
+      if (SetP set = set_window->getSet()) {
+        set->updateCardsScripts();
+      }
+    }
+  
+    // Report on package status
+    progress.finish();
+    if (to_change > 0) {
+      String report_message = install == success ? _ERROR_1_("install packages successful",String()<<success):
+                              remove  == success ? _ERROR_1_("remove packages successful", String()<<success):
+                                                    _ERROR_1_("change packages successful", String()<<success);
+      wxMessageDialog report = wxMessageDialog(this, report_message, _TITLE_("packages window"), wxICON_INFORMATION | wxOK | wxSTAY_ON_TOP);
+      report.ShowModal();
+    }
+  
+    // Launch exe updater if necessary
+    if (app_change) {
+      // Hard code the only updater, for now
+      PackagedP updater_package = package_manager.openAny(_("github-zip-extractor.mse-updater"));
+      if (updater_package) {
+        Updater* updater = dynamic_cast<Updater*>(updater_package.get());
+        if (updater) {
+          String darkmode = String("darkmode") << settings.darkMode();
+          String locale   = String("locale")   << settings.locale;
+          locale.Replace("-", "");
+          updater->updateApplication(darkmode + _(" ") + locale);
+        }
+        else {
+          queue_message(MESSAGE_ERROR, _("Failed to load updater package 'github-zip-extractor.mse-updater'."));
+        }
+      }
+      else {
+        queue_message(MESSAGE_ERROR, _("Failed to load updater package 'github-zip-extractor.mse-updater'."));
+      }
+    
+      // Check for any updater, for later (very slow)
+      //vector<InstallablePackageP> installed_packages;
+      //package_manager.findAllInstalledPackages(installed_packages);
+      //FOR_EACH(p, installed_packages) {
+      //  if (!p->description->name.EndsWith(".mse-updater")) continue;
+      //  PackagedP updater_package = package_manager.openAny(p->description->name);
+      //  Updater* updater = dynamic_cast<Updater*>(updater_package.get());
+      //  if (updater) {
+      //    String darkmode = String("darkmode") << settings.darkMode();
+      //    String locale   = String("locale")   << settings.locale;
+      //    locale.Replace("-", "");
+      //    updater->updateApplication(darkmode + _(" ") + locale);
+      //    break;
+      //  }
+      //  else {
+      //    queue_message(MESSAGE_ERROR, _("Failed to load updater package '" + p->description->name + "'."));
+      //  }
+      //}
+    }
+  } catch (...) {
+    progress.finish();
+    try { throw; } CATCH_ALL_ERRORS(true);
   }
-  // Install stuff
-  package_pos = 0;
-  int success = 0, install = 0, remove = 0;
-  FOR_EACH(ip, installable_packages) {
-    if (ip->has(PACKAGE_ACT_NOTHING)) continue; // package unchanged
-    if (!progress.Update(step++, String::Format(_ERROR_("installing updates"), ++package_pos, to_change))) {
-      // don't allow abort.
-    }
-    bool ok = package_manager.install(*ip);
-    if (ok) {
-      install += ip->has(PACKAGE_ACT_INSTALL) && !ip->installed;
-      remove  += ip->has(PACKAGE_ACT_REMOVE);
-      success += 1;
-    }
-  }
-  // Done
-  progress.Update(step++);
-  wxMessageBox(
-    install == success ? _ERROR_1_("install packages successful",String()<<success):
-    remove  == success ? _ERROR_1_("remove packages successful", String()<<success):
-                         _ERROR_1_("change packages successful", String()<<success),
-    _TITLE_("packages window"), wxICON_INFORMATION | wxOK);
+
+  // Notify that packages have changed
+  sendEvent();
   // Continue event propagation into the dialog window so that it closes.
   ev.Skip();
-  //%% TODO: will we delete packages?
-  //%%       If so, we need to warn with _ERROR_1_("remove packages") and _ERROR_2_("remove packages modified")
-  //%%       We probably also refer to the type of package, _TYPE_("package"), for example _TYPE_("locale")
-  //%%       NOTE: The above text is for the locale.pl program
 }
 
 void PackagesWindow::onUpdateUI(wxUpdateUIEvent& ev) {
+  bool is_group = package_list->selectionIsGroup();
   wxToggleButton* w = (wxToggleButton*)ev.GetEventObject();
   switch (ev.GetId()) {
     case ID_KEEP:
-      w->SetValue(package && package->has(PACKAGE_ACT_NOTHING));
-      w->Enable  (package && package->can(PACKAGE_ACT_NOTHING | where));
-      w->SetLabel(package && package->installed ? _BUTTON_("keep package") : _BUTTON_("don't install package"));
+      w->SetValue(
+        package_list->allSelectedPackages([&](const InstallablePackageP& p) {
+          return p->has(PACKAGE_ACT_NOTHING);
+        })
+      );
+      w->Enable(
+        package_list->anySelectedPackage([&](const InstallablePackageP& p) {
+          return p->can(PACKAGE_ACT_NOTHING | where);
+        })
+      );
+      w->SetLabel(is_group                                   ? _BUTTON_("keep group") :
+                  package && package->installed              ? _BUTTON_("keep package") :
+                                                               _BUTTON_("don't install package"));
       break;
     case ID_INSTALL:
-      w->SetValue(package && package->has(PACKAGE_ACT_INSTALL | where));
-      w->Enable  (package && package->can(PACKAGE_ACT_INSTALL | where));
-      w->SetLabel( !package || !package->installed ? _BUTTON_("install package")
-                 :  package->has(PACKAGE_UPDATES)  ? _BUTTON_("upgrade package")
-                 :                                   _BUTTON_("reinstall package"));
+      w->SetValue(
+        package_list->allSelectedPackages([&](const InstallablePackageP& p) {
+          return p->has(PACKAGE_ACT_INSTALL | where) ||
+            (p->has(PACKAGE_INSTALLED) && !p->has(PACKAGE_ACT_REMOVE) && !p->has(PACKAGE_UPDATES));
+        }) &&
+        package_list->anySelectedPackage([&](const InstallablePackageP& p) {
+          return p->has(PACKAGE_ACT_INSTALL | where);
+        })
+      );
+      w->Enable(
+        package_list->anySelectedPackage([&](const InstallablePackageP& p) {
+          return p->can(PACKAGE_ACT_INSTALL | where);
+        })
+      );
+      w->SetLabel(is_group                                   ? _BUTTON_("install group") :
+                 !(package && package->installed)            ? _BUTTON_("install package") :
+                  (package && package->has(PACKAGE_UPDATES)) ? _BUTTON_("upgrade package") :
+                                                               _BUTTON_("reinstall package"));
       break;
     case ID_REMOVE:
-      w->SetValue(package && package->has(PACKAGE_ACT_REMOVE  | where));
-      w->Enable  (package && package->can(PACKAGE_ACT_REMOVE  | where));
-      //w->SetLabel(package && package->... ? _BUTTON_("remove group") : _BUTTON_("remove package"));
+      w->SetValue(
+        package_list->allSelectedPackages([&](const InstallablePackageP& p) {
+          return p->has(PACKAGE_ACT_REMOVE | where) ||
+            (!p->has(PACKAGE_INSTALLED) && !p->has(PACKAGE_ACT_INSTALL));
+        }) &&
+        package_list->anySelectedPackage([&](const InstallablePackageP& p) {
+          return p->has(PACKAGE_ACT_REMOVE | where);
+        })
+      );
+      w->Enable(
+        package_list->anySelectedPackage([&](const InstallablePackageP& p) {
+          return p->can(PACKAGE_ACT_REMOVE | where);
+        })
+      );
+      w->SetLabel(is_group                                   ? _BUTTON_("remove group") :
+                                                               _BUTTON_("remove package"));
       break;
   }
-  // TODO: change labels to _BUTTON_("install group"), _BUTTON_("remove group"), _BUTTON_("upgrade group")
 }
 
 void PackagesWindow::onIdle(wxIdleEvent& ev) {
   ev.RequestMore(!checkInstallerList());
+  if (waiting_info && !waiting_for_list) waiting_info->SetLabel(_(""));
 }
 
 bool PackagesWindow::checkInstallerList(bool refresh) {
@@ -422,19 +655,24 @@ bool PackagesWindow::checkInstallerList(bool refresh) {
   // refresh
   if (refresh) {
     package_list->rebuild();
-    package_info->setPackage(package = package_list->getSelection());
+    package_info->setPackage(package = package_list->getSelectedPackage());
     UpdateWindowUI(wxUPDATE_UI_RECURSE);
   }
   return true;
 }
 
+void PackagesWindow::sendEvent() {
+  wxCommandEvent ev(EVENT_PACKAGE_LIST_CHANGED, GetId());
+  wxPostEvent(GetParent(), ev);
+}
+
 BEGIN_EVENT_TABLE(PackagesWindow, wxDialog)
-  EVT_LISTBOX(ID_PACKAGE_LIST, PackagesWindow::onPackageSelect)
-  EVT_TOGGLEBUTTON(ID_KEEP,     PackagesWindow::onActionChange)
-  EVT_TOGGLEBUTTON(ID_INSTALL,  PackagesWindow::onActionChange)
-  EVT_TOGGLEBUTTON(ID_REMOVE,   PackagesWindow::onActionChange)
-  EVT_TOGGLEBUTTON(ID_UPGRADE,  PackagesWindow::onActionChange)
-  EVT_BUTTON(wxID_OK,     PackagesWindow::onOk)
-  EVT_UPDATE_UI(wxID_ANY, PackagesWindow::onUpdateUI)
-  EVT_IDLE  (             PackagesWindow::onIdle)
+  EVT_LISTBOX     (ID_PACKAGE_LIST, PackagesWindow::onPackageSelect)
+  EVT_TOGGLEBUTTON(ID_KEEP,         PackagesWindow::onActionChange)
+  EVT_TOGGLEBUTTON(ID_INSTALL,      PackagesWindow::onActionChange)
+  EVT_TOGGLEBUTTON(ID_REMOVE,       PackagesWindow::onActionChange)
+  EVT_TOGGLEBUTTON(ID_UPGRADE,      PackagesWindow::onActionChange)
+  EVT_BUTTON      (wxID_OK,         PackagesWindow::onOk)
+  EVT_UPDATE_UI   (wxID_ANY,        PackagesWindow::onUpdateUI)
+  EVT_IDLE        (                 PackagesWindow::onIdle)
 END_EVENT_TABLE()

@@ -1,5 +1,5 @@
 //+----------------------------------------------------------------------------+
-//| Description:  Magic Set Editor - Program to make Magic (tm) cards          |
+//| Description:  Magic Set Editor - Program to make card games                |
 //| Copyright:    (C) Twan van Laarhoven and the other MSE developers          |
 //| License:      GNU General Public License 2 or later (see file COPYING)     |
 //+----------------------------------------------------------------------------+
@@ -35,6 +35,7 @@ private:
   #if USE_BETA_LOGO
   Bitmap logo2;
   #endif
+  wxComboBox* select_language;
     
   void onPaint(wxPaintEvent&);
   void draw(DC& dc);
@@ -42,7 +43,7 @@ private:
   void onOpenSet     (wxCommandEvent&);
   void onNewSet      (wxCommandEvent&);
   void onOpenLast    (wxCommandEvent&);
-  void onCheckUpdates(wxCommandEvent&);
+  void onSelectLanguage(wxCommandEvent&);
 //  void onIdle    (wxIdleEvent& ev);
   
   /// Close the welcome window, and show the given set

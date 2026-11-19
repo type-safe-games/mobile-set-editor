@@ -1,5 +1,5 @@
 //+----------------------------------------------------------------------------+
-//| Description:  Magic Set Editor - Program to make Magic (tm) cards          |
+//| Description:  Magic Set Editor - Program to make card games                |
 //| Copyright:    (C) Twan van Laarhoven and the other MSE developers          |
 //| License:      GNU General Public License 2 or later (see file COPYING)     |
 //+----------------------------------------------------------------------------+
@@ -52,6 +52,15 @@ String get_export_full_path(String& rel_name) {
   }
   rel_name = fn.GetFullName(); // TODO: does this work correctly with subdirectories in target dir?
   return fn.GetFullPath();
+}
+
+void ensure_dir_valid(String& path) {
+  if (!wxDirExists(path)) {
+    wxFileName filename = path;
+    if (!retry_io([&]{ return filename.Mkdir(wxS_DIR_DEFAULT, wxPATH_MKDIR_FULL); })) {
+      throw Error(_("Unable to create export folder for '") + path + _("'"));
+    }
+  }
 }
 
 // ----------------------------------------------------------------------------- : HTML
@@ -195,7 +204,10 @@ String symbols_to_html(const String& str, SymbolFont& symbol_font, double size) 
       wxFileName fn;
       fn.SetPath(ei.directory_absolute);
       fn.SetFullName(filename);
-      img.SaveFile(fn.GetFullPath());
+      String out_path = fn.GetFullPath();
+      if (!retry_io([&]{ return img.SaveFile(out_path); })) {
+        throw Error(_("Unable to write symbol image file '") + out_path + _("'"));
+      }
       it = ei.exported_images.insert(make_pair(filename, wxSize(img.GetWidth(), img.GetHeight()))).first;
     }
     html += _("<img src='") + filename + _("' alt='") + html_escape(sym.text)
@@ -210,6 +222,8 @@ String to_html(const String& str_in, const SymbolFontP& symbol_font, double symb
   String ret;
   Tag bold  (_("<b>"), _("</b>")),
       italic(_("<i>"), _("</i>")),
+      underline(_("<u>"), _("</u>")),
+      strikethrough(_("<s>"), _("</s>")),
       symbol(_("<span class=\"symbol\">"), _("</span>"));
   TagStack tags;
   String symbols;
@@ -225,6 +239,14 @@ String to_html(const String& str_in, const SymbolFontP& symbol_font, double symb
         tags.open (ret, italic);
       } else if (is_substr(str, i, _("/i"))) {
         tags.close(ret, italic);
+      } else if (is_substr(str, i, _("u"))) {
+        tags.open(ret, underline);
+      } else if (is_substr(str, i, _("/u"))) {
+        tags.close(ret, underline);
+      } else if (is_substr(str, i, _("strike"))) {
+        tags.open(ret, strikethrough);
+      } else if (is_substr(str, i, _("/strike"))) {
+        tags.close(ret, strikethrough);
       } else if (is_substr(str, i, _("sym"))) {
         tags.open (ret, symbol);
       } else if (is_substr(str, i, _("/sym"))) {
@@ -300,7 +322,9 @@ String to_bbcode(const String& str_in) {
   String str = remove_tag_contents(str_in,_("<sep-soft"));
   String ret;
   Tag bold  (_("[b]"), _("[/b]")),
-        italic(_("[i]"), _("[/i]"));
+      italic(_("[i]"), _("[/i]")),
+      underline(_("[u]"), _("[/u]")),
+      strikethrough(_("[s]"), _("[/s]"));
   TagStack tags;
   String symbols;
   for (size_t i = 0 ; i < str.size() ; ) {
@@ -315,7 +339,16 @@ String to_bbcode(const String& str_in) {
         tags.open (ret, italic);
       } else if (is_substr(str, i, _("/i"))) {
         tags.close(ret, italic);
-      } /*else if (is_substr(str, i, _("sym"))) {
+      } else if (is_substr(str, i, _("u"))) {
+        tags.open(ret, underline);
+      } else if (is_substr(str, i, _("/u"))) {
+        tags.close(ret, underline);
+      } else if (is_substr(str, i, _("strike"))) {
+        tags.open(ret, strikethrough);
+      } else if (is_substr(str, i, _("/strike"))) {
+        tags.close(ret, strikethrough);
+      }
+      /*else if (is_substr(str, i, _("sym"))) {
         tags.open (ret, symbol);
       } else if (is_substr(str, i, _("/sym"))) {
         if (!symbols.empty()) {
@@ -375,9 +408,17 @@ SCRIPT_FUNCTION(copy_file) {
   // copy
   ExportInfo& ei = *export_info();
   auto in = ei.export_template->openIn(input);
-  wxFileOutputStream out(out_path);
-  if (!out.Ok()) throw Error(_("Unable to open file '") + out_path + _("' for output"));
-  out.Write(*in);
+  ensure_dir_valid(out_path);
+  unique_ptr<wxFileOutputStream> out;
+  retry_io([&]{
+    out = make_unique<wxFileOutputStream>(out_path);
+    return out->Ok();
+  });
+  if (!out->Ok()) throw Error(_("Unable to open file '") + out_path + _("' for output"));
+  out->Write(*in);
+  if (!out->Ok() || (!in->Eof() && in->GetLastError() != wxSTREAM_NO_ERROR)) {
+    throw Error(_("Unable to write file '") + out_path + _("'"));
+  }
   SCRIPT_RETURN(out_name);
 }
 
@@ -389,11 +430,17 @@ SCRIPT_FUNCTION(write_text_file) {
   // output path
   String out_path = get_export_full_path(file);
   // write
-  wxFileOutputStream out(out_path);
-  if (!out.Ok()) throw Error(_("Unable to open file '") + out_path + _("' for output"));
-  wxTextOutputStream tout(out);
+  ensure_dir_valid(out_path);
+  unique_ptr<wxFileOutputStream> out;
+  retry_io([&]{
+    out = make_unique<wxFileOutputStream>(out_path);
+    return out->Ok();
+  });
+  if (!out->Ok()) throw Error(_("Unable to open file '") + out_path + _("' for output"));
+  wxTextOutputStream tout(*out);
   tout.WriteString(BYTE_ORDER_MARK);
   tout.WriteString(input);
+  if (!out->Ok()) throw Error(_("Unable to write file '") + out_path + _("'"));
   SCRIPT_RETURN(file);
 }
 
@@ -408,21 +455,42 @@ SCRIPT_FUNCTION(write_image_file) {
     SCRIPT_RETURN(file); // already written an image with this name
   }
   // get image
+  Image img;
+  SCRIPT_PARAM(Set*, set);
   SCRIPT_PARAM_C(ScriptValueP, input);
-  SCRIPT_OPTIONAL_PARAM_(int, width);
-  SCRIPT_OPTIONAL_PARAM_(int, height);
-  ScriptObject<CardP>* card = dynamic_cast<ScriptObject<CardP>*>(input.get()); // is it a card?
-  Image image;
-  GeneratedImage::Options options(width, height, ei.export_template.get(), ei.set.get());
+  ScriptObject<CardP>* card = dynamic_cast<ScriptObject<CardP>*>(input.get()); // is the input a card or image?
   if (card) {
-    image = conform_image(export_bitmap(ei.set, card->getValue()).ConvertToImage(), options);
+    SCRIPT_PARAM_DEFAULT(double, zoom, 100.0);
+    SCRIPT_PARAM_DEFAULT(Degrees, angle, 0.0);
+    SCRIPT_PARAM_DEFAULT(double, bleed, 0.0);
+    SCRIPT_PARAM_DEFAULT(bool, dfc, false);
+    SCRIPT_PARAM_DEFAULT(bool, use_user_settings, false);
+    if (use_user_settings) {
+      // Use the User's Preferences for Export Zoom, Angle, Bleed and DFC settings.
+      Settings::ExportSettings card_settings = settings.exportSettingsFor(set->stylesheetFor(card->getValue()));
+      zoom =  card_settings.zoom;
+      angle = card_settings.angle_radians;
+      bleed = card_settings.bleed_pixels;
+      dfc = card_settings.dfc_export;
+    } else {
+      // Use the provided (or defaulted) Zoom, Angle, Bleed and DFC.
+      zoom = zoom / 100.0;
+      angle = deg_to_rad(angle);
+    }
+    img = export_image(set, card->getValue(), true, Settings::ExportSettings{zoom, angle, bleed, dfc});
   } else {
-    image = input->toImage()->generateConform(options);
+    SCRIPT_OPTIONAL_PARAM_(int, width)
+    SCRIPT_OPTIONAL_PARAM_(int, height)
+    GeneratedImage::Options options(width, height, ei.export_template.get(), ei.set.get());
+    img = input->toImage()->generateConform(options);
   }
-  if (!image.Ok()) throw Error(_("Unable to generate image for file ") + file);
+  if (!img.Ok()) throw Error(_("Unable to generate image for file ") + file);
   // write
-  image.SaveFile(out_path);
-  ei.exported_images.insert(make_pair(file, wxSize(image.GetWidth(), image.GetHeight())));
+  ensure_dir_valid(out_path);
+  if (!retry_io([&]{ return img.SaveFile(out_path); })) {
+    throw Error(_("Unable to write image file '") + out_path + _("'"));
+  }
+  ei.exported_images.insert(make_pair(file, wxSize(img.GetWidth(), img.GetHeight())));
   SCRIPT_RETURN(file);
 }
 
@@ -433,6 +501,7 @@ SCRIPT_FUNCTION(write_set_file) {
   String out_path = get_export_full_path(file);
   // export
   SCRIPT_PARAM_C(Set*, set);
+  ensure_dir_valid(out_path);
   set->saveCopy(out_path); // TODO: use export_set instead?
   SCRIPT_RETURN(file);
   

@@ -1,5 +1,5 @@
 //+----------------------------------------------------------------------------+
-//| Description:  Magic Set Editor - Program to make Magic (tm) cards          |
+//| Description:  Magic Set Editor - Program to make card games                |
 //| Copyright:    (C) Twan van Laarhoven and the other MSE developers          |
 //| License:      GNU General Public License 2 or later (see file COPYING)     |
 //+----------------------------------------------------------------------------+
@@ -42,7 +42,9 @@ public:
   void selectFirst();
   /// Select all items
   void doSelectAll();
-  
+  /// Find the position for a given item
+  long findGivenItemPos(const VoidP& item);
+
   // --------------------------------------------------- : Clipboard
   
   virtual bool canCut()    const { return canCopy() && canDelete(); }
@@ -70,7 +72,7 @@ protected:
   
   // --------------------------------------------------- : Protected interface
   /// Return the card at the given position in the sorted list
-  inline const VoidP& getItem(long pos) const { return sorted_list[pos]; }
+  inline const VoidP& getItem(long pos) const { if (pos < 0 || pos >= sorted_list.size()) throw InternalError(_("Trying to access out of bounds item")); return sorted_list[pos]; }
   /// Sort by the given column
   virtual void sortBy(long column, bool ascending);
   /// Refresh the card list (resort, refresh and reselect current item)
@@ -105,6 +107,8 @@ protected:
   VoidP          selected_item;     ///< The currently selected item
   long           selected_item_pos; ///< Position of the selected item in the sorted_list, or -1 if no card is selected
   long           sort_by_column;    ///< Column to use for sorting, or -1 if not sorted
+  long           sort_by_column2;   ///< Previous column used for sorting, or -1 if not sorted
+  long           sort_by_column3;   ///< Previous previous column used for sorting, or -1 if not sorted (stable sort aint workin so we doing this I guess)
   bool           sort_ascending;    ///< Sort order
   vector<VoidP>  sorted_list;       ///< Sorted list of items, can be considered a map: pos->item
   

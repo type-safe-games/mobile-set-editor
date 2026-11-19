@@ -1,5 +1,5 @@
 //+----------------------------------------------------------------------------+
-//| Description:  Magic Set Editor - Program to make Magic (tm) cards          |
+//| Description:  Magic Set Editor - Program to make card games                |
 //| Copyright:    (C) Twan van Laarhoven and the other MSE developers          |
 //| License:      GNU General Public License 2 or later (see file COPYING)     |
 //+----------------------------------------------------------------------------+
@@ -11,6 +11,7 @@
 #include <util/error.hpp>
 #include <util/file_utils.hpp>
 #include <data/game.hpp>
+#include <data/updater.hpp>
 #include <data/stylesheet.hpp>
 #include <data/symbol_font.hpp>
 #include <data/locale.hpp>
@@ -18,6 +19,7 @@
 #include <data/installer.hpp>
 #include <wx/stdpaths.h>
 #include <wx/wfstream.h>
+#include <wx/dir.h>
 
 // ----------------------------------------------------------------------------- : PackageManager : in memory
 
@@ -31,6 +33,8 @@ void PackageManager::init() {
     throw Error(_("The MSE data files can not be found, there should be a directory called 'data' with these files. ")
                 _("The expected place to find it in was either ") + wxStandardPaths::Get().GetDataDir() + _(" or ") +
                 wxStandardPaths::Get().GetUserDataDir());
+  local.deleteEmptyFolders();
+  global.deleteEmptyFolders();
 }
 void PackageManager::destroy() {
   loaded_packages.clear();
@@ -39,12 +43,20 @@ void PackageManager::reset() {
   loaded_packages.clear();
 }
 
-PackagedP PackageManager::openAny(const String& name_, bool just_header) {
+void PackageManager::evictFromCache(const String& name_) {
+  String filename = normalizeFilename(cleanFilename(name_));
+  loaded_packages.erase(filename);
+}
+
+String PackageManager::cleanFilename(const String& name_) {
   String name = trim(name_);
-  if (starts_with(name,_("/"))) name = name.substr(1);
-  if (starts_with(name,_(":NO-WARN-DEP:"))) name = name.substr(13);
-  // Attempt to load local data first.
+  while (starts_with(name,_("/"))) name = name.substr(1);
+  while (starts_with(name,_(":NO-WARN-DEP:"))) name = name.substr(13);
+  return name;
+}
+String PackageManager::normalizeFilename(const String& name) {
   String filename;
+  // Attempt to load local data first.
   if (wxFileName(name).IsRelative()) {
     // local data dir?
     filename = normalize_filename(local.name(name));
@@ -55,18 +67,26 @@ PackagedP PackageManager::openAny(const String& name_, bool just_header) {
   } else { // Absolute filename
     filename = normalize_filename(name);
   }
+  return filename;
+}
 
+PackagedP PackageManager::openAny(const String& name_, bool just_header) {
+  String name = cleanFilename(name_);
+  String filename = normalizeFilename(name);
   // Is this package already loaded?
   PackagedP& p = loaded_packages[filename];
   if (!p) {
     // load with the right type, based on extension
     wxFileName fn(filename);
-    if      (fn.GetExt() == _("mse-game"))            p = make_intrusive<Game>();
-    else if (fn.GetExt() == _("mse-style"))           p = make_intrusive<StyleSheet>();
-    else if (fn.GetExt() == _("mse-locale"))          p = make_intrusive<Locale>();
-    else if (fn.GetExt() == _("mse-include"))         p = make_intrusive<IncludePackage>();
-    else if (fn.GetExt() == _("mse-symbol-font"))     p = make_intrusive<SymbolFont>();
-    else if (fn.GetExt() == _("mse-export-template")) p = make_intrusive<ExportTemplate>();
+    String ext = fn.GetExt();
+    if      (ext == _("mse-style"))           p = make_intrusive<StyleSheet>();
+    else if (ext == _("mse-symbol-font"))     p = make_intrusive<SymbolFont>();
+    else if (ext == _("mse-include"))         p = make_intrusive<IncludePackage>();
+    else if (ext == _("mse-game"))            p = make_intrusive<Game>();
+    else if (ext == _("mse-locale"))          p = make_intrusive<Locale>();
+    else if (ext == _("mse-export-template")) p = make_intrusive<ExportTemplate>();
+    //else if (ext == _("mse-import-template")) p = make_intrusive<ImportTemplate>();
+    else if (ext == _("mse-updater"))         p = make_intrusive<Updater>();
     else {
       throw PackageError(_("Unrecognized package type: '") + fn.GetExt() + _("'\nwhile trying to open: ") + name);
     }
@@ -81,18 +101,36 @@ void PackageManager::findMatching(const String& pattern, vector<PackagedP>& out)
   // first find local packages
   String file = local.findFirstMatching(pattern);
   while (!file.empty()) {
-    out.push_back(openAny(file, true));
+    if (local.checkForPackageFile(file)) {
+      out.push_back(openAny(file, true));
+    }
     file = wxFindNextFile();
   }
   // then global packages not already in the list
   file = global.findFirstMatching(pattern);
   while (!file.empty()) {
-    PackagedP p = openAny(file, true);
-    if (find(out.begin(), out.end(), p) == out.end()) {
-      out.push_back(p);
+    if (global.checkForPackageFile(file)) {
+      PackagedP p = openAny(file, true);
+      if (find(out.begin(), out.end(), p) == out.end()) {
+        out.push_back(p);
+      }
     }
     file = wxFindNextFile();
   }
+}
+
+bool PackageManager::existsInPackage(const String& name) {
+  if (!name.empty() && name.GetChar(0) == _('/')) {
+    // break name
+    size_t start = name.find_first_not_of(_("/\\"), 1); // allow "//package/name" from incorrect scripts
+    size_t pos = name.find_first_of(_("/\\"), start);
+    if (start < pos && pos != String::npos) {
+      // open package
+      PackagedP p = openAny(name.substr(start, pos - start));
+      return p->contains(name.substr(pos + 1));
+    }
+  }
+  throw FileNotFoundError(name, _("No package name specified, use '/package/filename'"));
 }
 
 pair<unique_ptr<wxInputStream>,Packaged*> PackageManager::openFileFromPackage(Packaged* package, const String& name) {
@@ -140,7 +178,7 @@ String PackageManager::openFilenameFromPackage(Packaged* package, const String& 
 
 String PackageManager::getDictionaryDir(bool l) const {
   String dir = (l ? local : global).getDirectory();
-  if (dir.empty()) return wxEmptyString;
+  if (dir.empty()) return _("");
   else             return dir + _("/dictionaries/");
 }
 
@@ -192,9 +230,9 @@ void PackageManager::findAllInstalledPackages(vector<InstallablePackageP>& packa
   sort(packages);
 }
 
-bool PackageManager::install(const InstallablePackage& package) {
+bool PackageManager::install(const InstallablePackage& package, const InstallProgressCallback& progress) {
   bool install_local = package.has(PACKAGE_ACT_LOCAL);
-  return (install_local ? local : global).install(package);
+  return (install_local ? local : global).install(package, progress);
 }
 
 // ----------------------------------------------------------------------------- : PackageDirectory
@@ -229,9 +267,20 @@ void PackageDirectory::init(const String& dir) {
     directory.clear();
 }
 
+void PackageDirectory::deleteEmptyFolders() {
+  for (String file = findFirstMatching(_("*.mse-*")) ; !file.empty() ; file = wxFindNextFile()) {
+    if (!wxDir::Exists(file)) continue;
+    wxDir outerDir(file);
+    if (!outerDir.HasFiles() && !outerDir.HasSubDirs()) {
+      retry_io([&]{ return wxRmdir(file); });
+    }
+  }
+}
+
 String PackageDirectory::name(const String& name) const {
   return directory + _("/") + name;
 }
+
 bool PackageDirectory::exists(const String& filename) const {
   String fn = name(filename);
   return wxFileExists(fn) || wxDirExists(fn);
@@ -246,6 +295,21 @@ bool compare_name(const PackageVersionP& a, const PackageVersionP& b) {
   return a->name < b->name;
 }
 
+bool PackageDirectory::checkForPackageFile(const String& folder_name) {
+  size_t package_pos = folder_name.rfind(_(".mse-"));
+  if (package_pos == String::npos) {
+    queue_message(MESSAGE_WARNING, _ERROR_1_("package name parse error", folder_name));
+    return false;
+  }
+  String package_name = folder_name.substr(package_pos+5);
+  String package_file = folder_name + wxFileName::GetPathSeparator() + package_name;
+  if (!wxFileExists(package_file) && !wxFileExists(directory + wxFileName::GetPathSeparator() + package_file)) {
+    queue_message(MESSAGE_WARNING, _ERROR_2_("file not found package like init", package_name, folder_name));
+    return false;
+  }
+  return true;
+}
+
 void PackageDirectory::installedPackages(vector<InstallablePackageP>& packages_out) {
   loadDatabase();
   // find all package files
@@ -254,7 +318,9 @@ void PackageDirectory::installedPackages(vector<InstallablePackageP>& packages_o
     size_t pos = s.find_last_of(_("/\\"));
     if (pos != String::npos) s = s.substr(pos+1);
     // TODO : check for valid package names
-    in_dir.push_back(s);
+    if (checkForPackageFile(s)) {
+      in_dir.push_back(s);
+    }
   }
   sort(in_dir.begin(), in_dir.end());
   // merge with package database
@@ -355,25 +421,26 @@ String PackageDirectory::databaseFile() {
 
 // ----------------------------------------------------------------------------- : PackageDirectory : installing
 
-bool PackageDirectory::install(const InstallablePackage& package) {
+bool PackageDirectory::install(const InstallablePackage& package, const InstallProgressCallback& progress) {
   String n = name(package.description->name);
   if (package.action & PACKAGE_ACT_REMOVE) {
     if (!remove_file_or_dir(n)) return false;
     removeFromDatabase(package.description->name);
   } else if (package.action & PACKAGE_ACT_INSTALL) {
     if (!remove_file_or_dir(n + _(".new"))) return false;
-    bool ok = actual_install(package, n + _(".new"));
+    bool ok = actual_install(package, n + _(".new"), progress);
     if (!ok) return false;
-    move_ignored_files(n, n + _(".new")); // copy over files from the old installed version to the new one
+    move_ignored_files(n, n + _(".new"), package.description->read_only_files); // copy over files from the old installed version to the new one
     if (!remove_file_or_dir(n)) return false;
     if (!rename_file_or_dir(n + _(".new"), n)) return false;
     bless(package.description->name);
   }
   saveDatabase();
+  package_manager.evictFromCache(package.description->name);
   return true;
 }
 
-bool PackageDirectory::actual_install(const InstallablePackage& package, const String& install_dir) {
+bool PackageDirectory::actual_install(const InstallablePackage& package, const String& install_dir, const InstallProgressCallback& progress) {
   String name = package.description->name;
   if (!package.installer->installer) {
     queue_message(MESSAGE_ERROR, _("Installer not found for package: ") + name);
@@ -382,6 +449,14 @@ bool PackageDirectory::actual_install(const InstallablePackage& package, const S
   Installer& installer = *package.installer->installer;
   // install files
   const Packaged::FileInfos& file_infos = installer.getFileInfos();
+  // count the files that belong to this package, so we can report progress
+  int files_total = 0, files_done = 0;
+  if (progress) {
+    for (Packaged::FileInfos::const_iterator it = file_infos.begin() ; it != file_infos.end() ; ++it) {
+      if (is_substr_i(it->first,0,name)) ++files_total;
+    }
+    progress(files_done, files_total);
+  }
   for (Packaged::FileInfos::const_iterator it = file_infos.begin() ; it != file_infos.end() ; ++it) {
     String file = it->first;
     if (!is_substr_i(file,0,name)) continue; // not the right package
@@ -390,12 +465,23 @@ bool PackageDirectory::actual_install(const InstallablePackage& package, const S
     create_parent_dirs(local_file);
     // copy file
     auto in_stream = installer.openIn(file);
-    wxFileOutputStream out_stream(local_file);
-    if (!out_stream.IsOk()) {
-      int act = wxMessageBox(_ERROR_1_("cannot create file", file), _TITLE_("cannot create file"), wxICON_ERROR | wxYES_NO);
+    unique_ptr<wxFileOutputStream> out_stream;
+    retry_io([&]{
+      out_stream = make_unique<wxFileOutputStream>(local_file);
+      return out_stream->IsOk();
+    });
+    if (out_stream->IsOk()) {
+      out_stream->Write(*in_stream);
+    }
+    if (!out_stream->IsOk() || (!in_stream->Eof() && in_stream->GetLastError() != wxSTREAM_NO_ERROR)) {
+      out_stream.reset();
+      remove_file(local_file);
+      int act = wxMessageBox(_ERROR_1_("cannot create file", file), _TITLE_("cannot create file"), wxICON_ERROR | wxYES_NO, wxGetActiveWindow());
       if (act == wxNO) return false;
     }
-    out_stream.Write(*in_stream);
+    // report progress
+    ++files_done;
+    if (progress) progress(files_done, files_total);
   }
   // update package database
   // TODO: bless the package?

@@ -1,5 +1,5 @@
 //+----------------------------------------------------------------------------+
-//| Description:  Magic Set Editor - Program to make Magic (tm) cards          |
+//| Description:  Magic Set Editor - Program to make card games                |
 //| Copyright:    (C) Twan van Laarhoven and the other MSE developers          |
 //| License:      GNU General Public License 2 or later (see file COPYING)     |
 //+----------------------------------------------------------------------------+
@@ -20,6 +20,7 @@ class HistoryTextCtrl;
 class ConsolePanel : public SetWindowPanel {
 public:
   ConsolePanel(Window* parent, int id);
+  ~ConsolePanel();
   
   // --------------------------------------------------- : UI
   
@@ -49,6 +50,8 @@ private:
   MessageCtrl* messages;
   wxPanel* entry_panel;
   HistoryTextCtrl* entry;
+
+  wxMenu* menuConsole;
   
   void get_pending_errors();
   void exec(String const& code);

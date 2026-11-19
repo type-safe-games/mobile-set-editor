@@ -1,5 +1,5 @@
 //+----------------------------------------------------------------------------+
-//| Description:  Magic Set Editor - Program to make Magic (tm) cards          |
+//| Description:  Magic Set Editor - Program to make card games                |
 //| Copyright:    (C) Twan van Laarhoven and the other MSE developers          |
 //| License:      GNU General Public License 2 or later (see file COPYING)     |
 //+----------------------------------------------------------------------------+
@@ -16,6 +16,14 @@
 #include <util/prec.hpp>
 #include <util/action_stack.hpp>
 #include <util/defaultable.hpp>
+#include <data/field/text.hpp>
+#include <data/field/choice.hpp>
+#include <data/field/multiple_choice.hpp>
+#include <data/field/color.hpp>
+#include <data/field/image.hpp>
+#include <data/field/symbol.hpp>
+#include <data/field/package_choice.hpp>
+#include <gui/control/card_list.hpp>
 
 class StyleSheet;
 class LocalFileName;
@@ -23,15 +31,8 @@ DECLARE_POINTER_TYPE(Card);
 DECLARE_POINTER_TYPE(Set);
 DECLARE_POINTER_TYPE(Value);
 DECLARE_POINTER_TYPE(Style);
-DECLARE_POINTER_TYPE(TextValue);
-DECLARE_POINTER_TYPE(ChoiceValue);
-DECLARE_POINTER_TYPE(MultipleChoiceValue);
-DECLARE_POINTER_TYPE(ColorValue);
-DECLARE_POINTER_TYPE(ImageValue);
-DECLARE_POINTER_TYPE(SymbolValue);
-DECLARE_POINTER_TYPE(PackageChoiceValue);
 
-// ----------------------------------------------------------------------------- : ValueAction (based class)
+// ----------------------------------------------------------------------------- : ValueAction (base class)
 
 /// An Action the changes a Value
 class ValueAction : public Action {
@@ -53,13 +54,98 @@ private:
 
 // ----------------------------------------------------------------------------- : Simple
 
+/// Set the value in a Value object to a new one
+inline void set_value(ColorValue&          a, ColorValue         ::ValueType& b) { a.value        = b; }
+inline void set_value(ChoiceValue&         a, ChoiceValue        ::ValueType& b) { a.value        = b; }
+inline void set_value(PackageChoiceValue&  a, PackageChoiceValue ::ValueType& b) { a.package_name = b; }
+inline void set_value(MultipleChoiceValue& a, MultipleChoiceValue::ValueType& b) { a.value        = b.value; a.last_change = b.last_change; }
+inline void set_value(ImageValue&          a, ImageValue         ::ValueType& b) { a.filename     = b;       a.last_update.update(); }
+inline void set_value(SymbolValue&         a, SymbolValue        ::ValueType& b) { a.filename     = b;       a.last_update.update(); }
+inline void set_value(TextValue&           a, TextValue          ::ValueType& b) { a.value        = b;       a.last_update.update(); }
+
+/// Get the value in a Value object
+inline void get_value(ColorValue&          a, ColorValue         ::ValueType& b) { b       = a.value; }
+inline void get_value(ChoiceValue&         a, ChoiceValue        ::ValueType& b) { b       = a.value; }
+inline void get_value(PackageChoiceValue&  a, PackageChoiceValue ::ValueType& b) { b       = a.package_name; }
+inline void get_value(MultipleChoiceValue& a, MultipleChoiceValue::ValueType& b) { b.value = a.value;        b.last_change = a.last_change; }
+inline void get_value(ImageValue&          a, ImageValue         ::ValueType& b) { b       = a.filename; }
+inline void get_value(SymbolValue&         a, SymbolValue        ::ValueType& b) { b       = a.filename; }
+inline void get_value(TextValue&           a, TextValue          ::ValueType& b) { b       = a.value; }
+
+/// Swap the value in a Value object with a new one
+inline void swap_value(ColorValue&          a, ColorValue         ::ValueType& b) { swap(a.value,        b); }
+inline void swap_value(ChoiceValue&         a, ChoiceValue        ::ValueType& b) { swap(a.value,        b); }
+inline void swap_value(PackageChoiceValue&  a, PackageChoiceValue ::ValueType& b) { swap(a.package_name, b); }
+inline void swap_value(MultipleChoiceValue& a, MultipleChoiceValue::ValueType& b) { swap(a.value,        b.value); swap(a.last_change, b.last_change); }
+inline void swap_value(ImageValue&          a, ImageValue         ::ValueType& b) { swap(a.filename,     b);       a.last_update.update(); }
+inline void swap_value(SymbolValue&         a, SymbolValue        ::ValueType& b) { swap(a.filename,     b);       a.last_update.update(); }
+inline void swap_value(TextValue&           a, TextValue          ::ValueType& b) { swap(a.value,        b);       a.last_update.update(); }
+
 /// Action that updates a Value to a new value
+unique_ptr<ValueAction> value_action(const TextValueP&           value, const Defaultable<String>& new_value);
 unique_ptr<ValueAction> value_action(const ChoiceValueP&         value, const Defaultable<String>& new_value);
 unique_ptr<ValueAction> value_action(const MultipleChoiceValueP& value, const Defaultable<String>& new_value, const String& last_change);
 unique_ptr<ValueAction> value_action(const ColorValueP&          value, const Defaultable<Color>&  new_value);
 unique_ptr<ValueAction> value_action(const ImageValueP&          value, const LocalFileName&       new_value);
 unique_ptr<ValueAction> value_action(const SymbolValueP&         value, const LocalFileName&       new_value);
 unique_ptr<ValueAction> value_action(const PackageChoiceValueP&  value, const String&              new_value);
+
+/// A ValueAction that swaps between old and new values
+template <typename T, bool ALLOW_MERGE>
+class SimpleValueAction : public ValueAction {
+public:
+  inline SimpleValueAction(const intrusive_ptr<T>& value, const typename T::ValueType& new_value)
+    : ValueAction(value), new_value(new_value)
+  {}
+
+  void perform(bool to_undo) override {
+    ValueAction::perform(to_undo);
+    swap_value(static_cast<T&>(*valueP), new_value);
+    valueP->onAction(*this, to_undo); // notify value
+  }
+
+  bool merge(const Action& action) override {
+    if (!ALLOW_MERGE) return false;
+    TYPE_CASE(action, SimpleValueAction) {
+      if (action.valueP == valueP) {
+        // adjacent actions on the same value, discard the other one,
+        // because it only keeps an intermediate value
+        return true;
+      }
+    }
+    return false;
+  }
+
+  typename T::ValueType new_value;
+};
+
+/// A ValueAction that resets a value to its default state
+template <typename T, bool ALLOW_MERGE>
+class ResetValueAction : public ValueAction {
+public:
+  inline ResetValueAction(const intrusive_ptr<T>& value)
+    : ValueAction(value)
+  {
+    get_value(*value, old_value);
+  }
+
+  String getName(bool to_undo) const override {
+    return _ACTION_1_("reset", valueP->fieldP->name);
+  }
+
+  void perform(bool to_undo) override {
+    ValueAction::perform(to_undo);
+    set_value(static_cast<T&>(*valueP), old_value);
+    valueP->makeDefault(!to_undo);
+    valueP->onAction(*this, to_undo); // notify value
+  }
+
+  bool merge(const Action& action) override {
+    return false;
+  }
+
+  typename T::ValueType old_value;
+};
 
 // ----------------------------------------------------------------------------- : Text
 
@@ -84,8 +170,16 @@ private:
   String name;
 };
 
-/// Action for toggling some formating tag on or off in some range
-unique_ptr<TextValueAction> toggle_format_action(const TextValueP& value, const String& tag, size_t start_i, size_t end_i, size_t start, size_t end, const String& action_name);
+/// Action for toggling some formating tag(s) on or off in some range.
+unique_ptr<TextValueAction> toggle_format_action(const TextValueP& value, vector<String>& tags, size_t start_i, size_t end_i, size_t start, size_t end, const String& action_name);
+unique_ptr<TextValueAction> toggle_format_action(const TextValueP& value, const String& tag,    size_t start_i, size_t end_i, size_t start, size_t end, const String& action_name);
+
+/// New value obtained by toggling a simple tag (<b>, <i>, etc...)
+String compute_new_simple_value(const String& str, const String& tag, size_t start_i, size_t end_i);
+/// New value obtained by toggling a tag that has variations (<color:#000000>, <color:#FFFFFF>, etc...)
+String compute_new_variable_value(const String& str, const String& tag, size_t start_i, size_t end_i);
+/// New value obtained by toggling a bullet point tag (<li>)
+String compute_new_bullet_value(const String& str, int& offset, size_t start_i, size_t end_i);
 
 /// Typing in a TextValue, replace the selection [start...end) with replacement
 /** start and end are cursor positions, start_i and end_i are indices*/
@@ -158,6 +252,25 @@ public:
   const Style*      style;      ///< The modified style
 };
 
+// ----------------------------------------------------------------------------- : Bulk action
+
+// An action that's just a list of other actions
+class BulkAction : public Action {
+public:
+  BulkAction(const vector<ActionP>& actions, const SetP& set, CardListBase* card_list_window, bool change_name);
+  ~BulkAction() override;
+
+  String getName(bool to_undo) const override;
+  void perform(bool to_undo) override;
+  bool merge(const Action& action) override;
+
+private:
+  String name_do;
+  String name_undo;
+  vector<ActionP> actions;
+  SetP set;
+  CardListBase* card_list_window;
+};
 
 // ----------------------------------------------------------------------------- : Action performer
 

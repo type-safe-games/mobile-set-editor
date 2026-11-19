@@ -1,0 +1,17 @@
+Function: brighten_image
+
+DOC_MSE_VERSION: since 2.6.0
+
+--Usage--
+> brighten_image(input: image, amount: brightening amount)
+
+Brighten or darken an image.
+
+To brighten use an amount between @0@ (no effect) and @1@ (entire image is pure white).
+
+To darken use an amount between @0@ (no effect) and @-1@ (entire image is pure black).
+
+--Parameters--
+! Parameter	Type			Description
+| @input@	[[type:image]]		Image to brighten/darken.
+| @alpha@	[[type:double]]		Brightening factor.

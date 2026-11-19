@@ -1,5 +1,5 @@
 //+----------------------------------------------------------------------------+
-//| Description:  Magic Set Editor - Program to make Magic (tm) cards          |
+//| Description:  Magic Set Editor - Program to make card games                |
 //| Copyright:    (C) Twan van Laarhoven and the other MSE developers          |
 //| License:      GNU General Public License 2 or later (see file COPYING)     |
 //+----------------------------------------------------------------------------+
@@ -44,6 +44,8 @@ void KeywordsPanel::initControls() {
   ref_param = new wxButton(panel, ID_KEYWORD_REF_PARAM, _BUTTON_("refer parameter"));
   rules     = new TextCtrl(panel, ID_RULES,    true);
   errors    = new wxStaticText(panel, wxID_ANY, _(""));
+  reminder->SetMinSize(wxSize(-1, 48));
+  rules   ->SetMinSize(wxSize(-1, 48));
   filter    = nullptr;
   errors->SetForegroundColour(*wxRED);
   // warning about fixed keywords
@@ -60,29 +62,32 @@ void KeywordsPanel::initControls() {
   sp = new wxBoxSizer(wxVERTICAL);
     sp->Add(fixed, 0, wxEXPAND); sp->Show(fixed,false);
     wxSizer* s1 = new wxBoxSizer(wxVERTICAL);
-      s1->Add(new wxStaticText(panel, wxID_ANY, _LABEL_("keyword")+_(":")), 0, wxTOP, 2);
-      s1->Add(keyword, 0, wxEXPAND | wxTOP, 2);
-      s1->Add(new wxStaticText(panel, wxID_ANY, _LABEL_("mode")+_(":")), 0, wxTOP, 2);
-      s1->Add(mode, 0, wxEXPAND | wxTOP, 2);
+      s1->Add(new wxStaticText(panel, wxID_ANY, _LABEL_("keyword")+_(":")), 0, wxTOP | wxLEFT, 4);
+      s1->Add(keyword, 0, wxEXPAND | wxTOP | wxLEFT, 4);
     sp->Add(s1, 0, wxEXPAND | wxRIGHT, 4);
-    sp->Add(new wxStaticLine(panel), 0, wxEXPAND | wxTOP | wxBOTTOM, 8);
+    sp->Add(new wxStaticLine(panel), 0, wxEXPAND | wxTOP | wxBOTTOM, 16);
+    wxSizer* s9 = new wxBoxSizer(wxVERTICAL);
+      s9->Add(new wxStaticText(panel, wxID_ANY, _LABEL_("mode")+_(":")), 0, wxTOP | wxLEFT, 4);
+      s9->Add(mode, 0, wxEXPAND | wxTOP | wxLEFT, 4);
+    sp->Add(s9, 0, wxEXPAND | wxRIGHT, 4);
+    sp->Add(new wxStaticLine(panel), 0, wxEXPAND | wxTOP | wxBOTTOM, 16);
     wxSizer* s2 = new wxBoxSizer(wxVERTICAL);
-      s2->Add(new wxStaticText(panel, wxID_ANY, _LABEL_("match")+_(":")), 0);
-      s2->Add(match, 0, wxEXPAND | wxTOP, 2);
-      s2->Add(add_param, 0, wxALIGN_LEFT | wxTOP, 2);
+      s2->Add(new wxStaticText(panel, wxID_ANY, _LABEL_("match")+_(":")), 0, wxTOP | wxLEFT, 4);
+      s2->Add(match, 0, wxEXPAND | wxTOP | wxLEFT, 4);
+      s2->Add(add_param, 0, wxALIGN_LEFT | wxTOP | wxLEFT, 4);
     sp->Add(s2, 0, wxEXPAND | wxRIGHT, 4);
-    sp->Add(new wxStaticLine(panel), 0, wxEXPAND | wxTOP | wxBOTTOM, 8);
+    sp->Add(new wxStaticLine(panel), 0, wxEXPAND | wxTOP | wxBOTTOM, 16);
     wxSizer* s3 = new wxBoxSizer(wxVERTICAL);
-      s3->Add(new wxStaticText(panel, wxID_ANY, _LABEL_("reminder")+_(":")), 0);
-      s3->Add(reminder, 1, wxEXPAND | wxTOP, 2);
-      s3->Add(ref_param, 0, wxALIGN_LEFT | wxTOP, 2);
-      s3->Add(errors,   0, wxEXPAND | wxTOP, 4);
+      s3->Add(new wxStaticText(panel, wxID_ANY, _LABEL_("reminder")+_(":")), 0, wxTOP | wxLEFT, 4);
+      s3->Add(reminder, 1, wxEXPAND | wxTOP | wxLEFT, 4);
+      s3->Add(ref_param, 0, wxALIGN_LEFT | wxTOP | wxLEFT, 4);
+      s3->Add(errors,   0, wxEXPAND | wxTOP | wxLEFT, 4);
       //s3->Add(new wxStaticText(panel, wxID_ANY, _("Example:")), 0, wxTOP, 6);
     sp->Add(s3, 1, wxEXPAND | wxRIGHT, 4);
-    sp->Add(new wxStaticLine(panel), 0, wxEXPAND | wxTOP | wxBOTTOM, 8);
+    sp->Add(new wxStaticLine(panel), 0, wxEXPAND | wxTOP | wxBOTTOM, 16);
     wxSizer* s4 = new wxBoxSizer(wxVERTICAL);
-      s4->Add(new wxStaticText(panel, wxID_ANY, _LABEL_("rules")+_(":")), 0);
-      s4->Add(rules, 1, wxEXPAND | wxTOP, 2);
+      s4->Add(new wxStaticText(panel, wxID_ANY, _LABEL_("rules")+_(":")), 0, wxTOP | wxLEFT, 4);
+      s4->Add(rules, 1, wxEXPAND | wxTOP | wxLEFT, 4);
     sp->Add(s4, 1, wxEXPAND | wxRIGHT, 4);
   panel->SetSizer(sp);
   // init splitter
@@ -92,8 +97,8 @@ void KeywordsPanel::initControls() {
   // init sizer
   wxSizer* s = new wxBoxSizer(wxHORIZONTAL);
     s->Add(splitter, 1, wxEXPAND);
-  s->SetSizeHints(this);
   SetSizer(s);
+  s->SetSizeHints(this);
   
   //s->Add(new wxStaticText(this, wxID_ANY, _("Sorry, no keywords for now"),wxDefaultPosition,wxDefaultSize,wxALIGN_CENTER), 1, wxALIGN_CENTER); // TODO: Remove
   /*  wxSizer* s2 = new wxBoxSizer(wxVERTICAL);
@@ -223,9 +228,14 @@ void KeywordsPanel::onCommand(int id) {
     default:
       if (id >= ID_PARAM_TYPE_MIN && id < ID_PARAM_TYPE_MAX) {
         // add parameter
-        KeywordParamP param = set->game->keyword_parameter_types.at(id - ID_PARAM_TYPE_MIN);
-        String to_insert = _("<atom-param>") + param->name + _("</atom-param>");
-        match->insert(to_insert, _("Insert parameter"));
+        if (id - ID_PARAM_TYPE_MIN < set->game->keyword_parameter_types.size()) {
+          KeywordParamP param = set->game->keyword_parameter_types.at(id - ID_PARAM_TYPE_MIN);
+          String to_insert = _("<atom-param>") + param->name + _("</atom-param>");
+          match->insert(to_insert, _("Insert parameter"));
+        }
+        else {
+          throw InternalError(_("type param ID out of bounds!"));
+        }
       } else if (id >= ID_PARAM_REF_MIN && id < ID_PARAM_REF_MAX) {
         String to_insert = runRefScript(id - ID_PARAM_REF_MIN);
         reminder->insert(to_insert, _("Use parameter"));
@@ -257,7 +267,7 @@ String KeywordsPanel::runRefScript(int find_i) {
       }
     }
   }
-  return wxEmptyString;
+  return _("");
 }
 
 // ----------------------------------------------------------------------------- : Clipboard

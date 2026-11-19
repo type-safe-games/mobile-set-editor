@@ -1,5 +1,5 @@
 //+----------------------------------------------------------------------------+
-//| Description:  Magic Set Editor - Program to make Magic (tm) cards          |
+//| Description:  Magic Set Editor - Program to make card games                |
 //| Copyright:    (C) Twan van Laarhoven and the other MSE developers          |
 //| License:      GNU General Public License 2 or later (see file COPYING)     |
 //+----------------------------------------------------------------------------+
@@ -7,6 +7,7 @@
 // ----------------------------------------------------------------------------- : Includes
 
 #include <util/prec.hpp>
+#include <script/functions/english_exceptions.cpp>
 #include <script/functions/functions.hpp>
 #include <script/functions/util.hpp>
 #include <util/tagged_string.hpp>
@@ -153,6 +154,21 @@ SCRIPT_FUNCTION(english_number_ordinal) {
 // ----------------------------------------------------------------------------- : Singular/plural
 
 String english_singular(const String& str) {
+  if (str.empty()) return String();
+
+  String lower = str.Lower();
+  if (english_singular_exceptions.find(lower) != english_singular_exceptions.end()) {
+    if (isupper(str[0])) {
+      if (isupper(str[str.size()-1])) {
+        return english_singular_exceptions[lower].Upper();
+      } else {
+        return capitalize(english_singular_exceptions[lower]);
+      }
+    } else {
+      return english_singular_exceptions[lower];
+    }
+  }
+
   if (str.size() > 3 && is_substr(str, str.size()-3, _("ies"))) {
     return str.substr(0, str.size() - 3) + _("y");
   } else if (str.size() > 3 && is_substr(str, str.size()-3, _("oes"))) {
@@ -174,6 +190,21 @@ String english_singular(const String& str) {
   }
 }
 String english_plural(const String& str) {
+  if (str.empty()) return String();
+
+  String lower = str.Lower();
+  if (english_plural_exceptions.find(lower) != english_plural_exceptions.end()) {
+    if (isupper(str[0])) {
+      if (isupper(str[str.size()-1])) {
+        return english_plural_exceptions[lower].Upper();
+      } else {
+        return capitalize(english_plural_exceptions[lower]);
+      }
+    } else {
+      return english_plural_exceptions[lower];
+    }
+  }
+
   if (str.size() > 2) {
     Char a = str.GetChar(str.size() - 2);
     Char b = str.GetChar(str.size() - 1);
@@ -239,6 +270,8 @@ String process_english_hints(const String& str) {
   // have we seen a <hint-1/2>?
   // 1 for singular, 2 for plural
   int singplur = 0;
+  int sing_found = 0;
+  int plur_found = 0;
   for (size_t i = 0 ; i < str.size() ; ) {
     Char c = str.GetChar(i);
     if (is_substr(str, i, _("<hint-"))) {
@@ -257,7 +290,7 @@ String process_english_hints(const String& str) {
           // a -> an, where the a originates from english_number_a(1)
           size_t after_end = skip_tag(str,after+1);
           if (after_end == String::npos) {
-            throw Error(_("Incomplete </param> tag"));
+            throw ScriptError(_("Incomplete </param> tag"));
           }
           if (after_end != String::npos && after_end + 1 < str.size()
           && isSpace(str.GetChar(after_end)) && is_vowel(str.GetChar(after_end+1))) {
@@ -283,22 +316,30 @@ String process_english_hints(const String& str) {
       ret.append(str,i,min(after,str.size())-i);
       i = after;
     } else if (is_substr(str, i, _("<singular>"))) {
+      sing_found++;
       // singular -> keep, plural -> drop
       size_t start = skip_tag(str, i);
-      size_t end   = match_close_tag(str, start);
-      if (singplur == 1 && end != String::npos) {
-        ret += str.substr(start, end - start);
+      size_t end   = match_close_tag(str, i);
+      if (end == String::npos) {
+        throw ScriptError(_("<singular> tag found without matching closing tag."));
       }
-      singplur = 0;
+      else if (singplur == 1) {
+        ret += str.substr(start, end - start);
+        singplur = 0;
+      }
       i = skip_tag(str, end);
     } else if (is_substr(str, i, _("<plural>"))) {
+      plur_found++;
       // singular -> drop, plural -> keep
       size_t start = skip_tag(str, i);
-      size_t end   = match_close_tag(str, start);
-      if (singplur == 2 && end != String::npos) {
-        ret += str.substr(start, end - start);
+      size_t end   = match_close_tag(str, i);
+      if (end == String::npos) {
+        throw ScriptError(_("<plural> tag found without matching closing tag."));
       }
-      singplur = 0;
+      else if (singplur == 2) {
+        ret += str.substr(start, end - start);
+        singplur = 0;
+      }
       i = skip_tag(str, end);
     } else if (c == _('(') && singplur) {
       // singular -> drop (...), plural -> keep it
@@ -321,6 +362,12 @@ String process_english_hints(const String& str) {
       ret += c;
       ++i;
     }
+  }
+  if (sing_found > plur_found) {
+    throw ScriptError(_("<singular> tag found without matching <plural> tag."));
+  }
+  else if (sing_found < plur_found) {
+    throw ScriptError(_("<plural> tag found without matching <singular> tag."));
   }
   return ret;
 }

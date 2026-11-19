@@ -1,5 +1,5 @@
 //+----------------------------------------------------------------------------+
-//| Description:  Magic Set Editor - Program to make Magic (tm) cards          |
+//| Description:  Magic Set Editor - Program to make card games                |
 //| Copyright:    (C) Twan van Laarhoven and the other MSE developers          |
 //| License:      GNU General Public License 2 or later (see file COPYING)     |
 //+----------------------------------------------------------------------------+
@@ -30,6 +30,21 @@ IndexMap<Key,Value>& DelayedIndexMaps<Key,Value>::get(const String& name, const 
     item->unread_data.clear();
   }
   return item->read_data;
+}
+
+/// Initialize this map with cloned values from another map
+template <typename Key, typename Value>
+void DelayedIndexMaps<Key,Value>::cloneFrom(const DelayedIndexMaps<Key,Value>& values) {
+  clear();
+  for (const auto& [name, src_ptr] : values.data) {
+    if (!src_ptr) continue;
+    auto dst_ptr = make_intrusive<DelayedIndexMapsData<Key,Value>>();
+    dst_ptr->unread_data = src_ptr->unread_data;
+    if (src_ptr->unread_data.empty()) {
+      dst_ptr->read_data.cloneFrom(src_ptr->read_data);
+    }
+    data[name] = dst_ptr;
+  }
 }
 
 template <typename Key, typename Value>

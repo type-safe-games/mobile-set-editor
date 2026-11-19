@@ -1,5 +1,5 @@
 //+----------------------------------------------------------------------------+
-//| Description:  Magic Set Editor - Program to make Magic (tm) cards          |
+//| Description:  Magic Set Editor - Program to make card games                |
 //| Copyright:    (C) Twan van Laarhoven and the other MSE developers          |
 //| License:      GNU General Public License 2 or later (see file COPYING)     |
 //+----------------------------------------------------------------------------+
@@ -56,9 +56,10 @@ TextFieldP TextCtrl::getFieldP() {
 void TextCtrl::updateSize() {
   wxSize cs = GetClientSize();
   ValueViewer& viewer = *viewers.front();
-  viewer.bounding_box.width  = cs.GetWidth()  - 2;
-  viewer.bounding_box.height = cs.GetHeight() - 2;
+  viewer.bounding_box.width  = max(1, cs.GetWidth()  - 2);
+  viewer.bounding_box.height = max(1, cs.GetHeight() - 2);
   viewers.front()->getEditor()->determineSize(true);
+  InvalidateBestSize();
 }
 
 void TextCtrl::setValue(String* value, bool untagged) {
@@ -93,7 +94,7 @@ void TextCtrl::onChangeSet() {
     setStyles(set->stylesheet, styles);
     setData(values);
     updateSize();
-    onChange();
+    onChange(true);
   } else {
     setValue(nullptr);
   }
@@ -114,7 +115,7 @@ void TextCtrl::onInit() {
 void TextCtrl::onSize(wxSizeEvent&) {
   if (!viewers.empty()) {
     updateSize();
-    onChange();
+    onChange(true);
   }
 }
 wxSize TextCtrl::DoGetBestSize() const {

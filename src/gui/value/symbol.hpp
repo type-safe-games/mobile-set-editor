@@ -1,5 +1,5 @@
 //+----------------------------------------------------------------------------+
-//| Description:  Magic Set Editor - Program to make Magic (tm) cards          |
+//| Description:  Magic Set Editor - Program to make card games                |
 //| Copyright:    (C) Twan van Laarhoven and the other MSE developers          |
 //| License:      GNU General Public License 2 or later (see file COPYING)     |
 //+----------------------------------------------------------------------------+
@@ -27,6 +27,12 @@ public:
   bool onLeftDClick(const RealPoint& pos, wxMouseEvent&) override;
   bool onMotion    (const RealPoint& pos, wxMouseEvent&) override;
   void determineSize(bool) override;
+
+  // --------------------------------------------------- : Resetting
+
+  bool canDefaultReset() const override { return true; }
+  void doDefaultReset() override;
+
 private:
   /// Draw a button, buttons are numbered from the right
   void drawButton(RotatedDC& dc, int button, const String& text);

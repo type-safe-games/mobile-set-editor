@@ -1,14 +1,118 @@
 Magic Set Editor changelog, for the details see `git log`
 ==============================================================================
 
-HEAD: new items added as changes are made
+------------------------------------------------------------------------------
+version 2.5.6 (Unofficial), 2024-10-01
+------------------------------------------------------------------------------
+
+Note that this skips some minor versions due to a series of releases off another fork.
+The intention here is to realign with those.
+
+Features:
+ * In program card preview applies DPI factor to normalize scaling. (@G-e-n-e-v-e-n-s-i-S, haganbmj#90)
+ * Additional script functions, blending, exists_in. (@G-e-n-e-v-e-n-s-i-S)
+ * Add globally scoped script variables. (@CajunAvenger, haganbmj#95)
+
+Bug fixes:
+ * Except symbol-fonts from package dependency checks. (@G-e-n-e-v-e-n-s-i-S, G-e-n-e-v-e-n-s-i-S#13)
+ * Prevent empty card list crash (@CajunAvenger, haganbmj#94)
+
+------------------------------------------------------------------------------
+version 2.5.0 (Unofficial), 2024-08-23
 ------------------------------------------------------------------------------
 
 Features:
- * You can now check/uncheck all selected cards in the export window (#93)
+ * Add Russian and Korean translations. Update locale files from Full-Magic-Pack (haganbmj#69)
+ * Increase stats column width by 50% (haganbmj#72)
 
-Template features:
- * Localization of game/stylesheet/symbol_font names is now done in those templates, instead of via the program-wide locale file. (#100)
+Bug fixes:
+ * Fixed scrolled widgets not scrolling fully (or at all) on Linux (@llemoi, haganbmj#54)
+ * Fixed crash when 0 keywords match filter string in keyword panel (@llemoi, haganbmj#57)
+ * Correct "all images" filter when selecting files. (@BaconCatBug, haganbmj#70)
+ * Correct localization of strings on Print window.
+ * Correct how blend functions handle alpha channels. (haganbmj#83)
+
+Internal:
+ * Add Mac OS build resources (@halian, haganbmj#67, haganbmj#68)
+ * CMakeLists updates for static compilation. (@BackCatBug, haganbmj#74) 
+
+------------------------------------------------------------------------------
+version 2.4.0 (Unofficial), 2022-11-19
+------------------------------------------------------------------------------
+
+Features:
+ * Add Language selector to Welcome Window. (haganbmj#51)
+ * Allow script to_date() function to accept "now". (haganbmj#52)
+ * Allow export scripts to write to subdirectories. (haganbmj#53)
+
+Bug fixes:
+ * Fix build errors with Mac OS X+ (haganbmj#50)
+
+------------------------------------------------------------------------------
+version 2.3.2 (Unofficial), 2022-09-14
+------------------------------------------------------------------------------
+
+Features:
+ * Script functions for generating and manipulating card images. (haganbmj#34)
+ * Stylesheet properties for defining card regions. (haganbmj#34)
+ * Updated Spanish locale translations. (haganbmj#49)
+ * Disable update checking on startup.
+
+------------------------------------------------------------------------------
+version 2.3.1 (Unofficial), 2022-08-02
+------------------------------------------------------------------------------
+
+Features:
+ * Add missing French locale translations. (haganbmj#40)
+ * Restore reading of package translations from top level locale file. (haganbmj#43)
+ * Bundle other locale files, provide English translations as fallback rather than just using the key name.
+
+------------------------------------------------------------------------------
+version 2.3.0 (Unofficial), 2022-07-29
+------------------------------------------------------------------------------
+
+Features:
+ * Add ability to underline text using `<u>` tags or panel buttons/hotkeys. (haganbmj#30)
+
+------------------------------------------------------------------------------
+version 2.2.2 (Unofficial), 2022-07-22
+------------------------------------------------------------------------------
+
+Bug fixes:
+ * Correct unicode text entry behavior. (twanvl#121)
+
+------------------------------------------------------------------------------
+version 2.2.1 (Unofficial), 2022-07-19
+------------------------------------------------------------------------------
+
+Bug fixes:
+ * Fix Add Cards toolbar not showing script multi-add functions on initial load. (twanvl#153)
+ * Correct default Export Zoom value to 100%.
+
+------------------------------------------------------------------------------
+version 2.2.0 (Unofficial), 2022-07-16
+------------------------------------------------------------------------------
+
+Features:
+ * Independently control Export Zoom setting in Preferences Window.
+ * Center align the loaded image by default in the Image Slice Window.
+ * Add Buttons to Align the loaded image in the Image Slice Window. (haganbmj#18)
+ * Add filter box to Game and Stylesheet selection. (haganbmj#1)
+ * Add Clear button to console panel. (haganbmj#4)
+ * Store images internally with PNG extension for ease of manual tinkering. (haganbmj#5)
+ * Add ability to change scale (relative to template) of internally stored images. (haganbmj#6, haganbmj#15)
+ * Impose some rudimentary constraints on the Image Slice Window's initial size.
+ * Merge String capitilization changes by @SoaringMoon. (twanvl#144)
+ * Add timestamps to console messages. (haganbmj#16)
+ * You can now check/uncheck all selected cards in the export window (twanvl#93)
+
+Template Features
+ * Expose `extra_card` and `extra_card_style` script for accessing Extra Card Fields/Styles. (haganbmj#20)
+ * Localization of game/stylesheet/symbol_font names is now done in those templates, instead of via the program-wide locale file. (twanvl#100)
+
+Bug fixes:
+ * Make viewer image rotate button operate clockwise to match dropdown options. (haganbmj#9)
+ * Fix storage/retrieval of Stylesheet Settings when the stylesheet name includes spaces. (haganbmj#8)
 
 ------------------------------------------------------------------------------
 version 2.1.2, 2020-09-28

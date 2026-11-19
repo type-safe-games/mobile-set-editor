@@ -1,5 +1,5 @@
 //+----------------------------------------------------------------------------+
-//| Description:  Magic Set Editor - Program to make Magic (tm) cards          |
+//| Description:  Magic Set Editor - Program to make card games                |
 //| Copyright:    (C) Twan van Laarhoven and the other MSE developers          |
 //| License:      GNU General Public License 2 or later (see file COPYING)     |
 //+----------------------------------------------------------------------------+
@@ -48,7 +48,10 @@ public:
   
   /// Redraw only the selected items
   void RefreshSelection();
-  
+
+  /// Make sure the given item is visible
+  void ensureVisible(size_t item);
+
 protected:
   static const size_t NO_SELECTION = (size_t)-1;
   size_t active_subcolumn;  ///< The active subcolumn

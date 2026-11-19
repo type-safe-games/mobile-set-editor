@@ -1,5 +1,5 @@
 //+----------------------------------------------------------------------------+
-//| Description:  Magic Set Editor - Program to make Magic (tm) cards          |
+//| Description:  Magic Set Editor - Program to make card games                |
 //| Copyright:    (C) Twan van Laarhoven and the other MSE developers          |
 //| License:      GNU General Public License 2 or later (see file COPYING)     |
 //+----------------------------------------------------------------------------+
@@ -46,7 +46,7 @@ public:
   /** The drawing information is cached,
    *  before calling draw again with different text/style reset() should be called
    */
-  void draw(RotatedDC& dc, const TextStyle& style, DrawWhat what);
+  void draw(RotatedDC& dc, const TextStyle& style, DrawWhat what, bool native_look);
   /// Draw an indicator for selected text
   void drawSelection(RotatedDC& dc, const TextStyle& style, size_t sel_start, size_t sel_end);
   /// Draw separators for <line> tags
@@ -139,7 +139,7 @@ private:
   void prepareLinesTryScales(RotatedDC& dc, const String& text, const TextStyle& style, vector<CharInfo>& chars_out);
   /// Prepare the lines, layout the text; at a specific scale
   /** Stores output in lines_out */
-  bool prepareLinesAtScale(RotatedDC& dc, const vector<CharInfo>& chars, const TextStyle& style, bool stop_if_too_long, vector<Line>& lines_out) const;
+  bool prepareLinesAtScale(RotatedDC& dc, const vector<CharInfo>& chars, const TextStyle& style, bool stop_if_too_long, vector<Line>& lines_out, double top_offset = 0.0) const;
   /// Move the line down until it fits in the masked area
   /// Return the line's size
   RealSize fitLineWidth(Line& line, RotatedDC& dc, const TextStyle& style) const;

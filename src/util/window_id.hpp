@@ -1,5 +1,5 @@
 //+----------------------------------------------------------------------------+
-//| Description:  Magic Set Editor - Program to make Magic (tm) cards          |
+//| Description:  Magic Set Editor - Program to make card games                |
 //| Copyright:    (C) Twan van Laarhoven and the other MSE developers          |
 //| License:      GNU General Public License 2 or later (see file COPYING)     |
 //+----------------------------------------------------------------------------+
@@ -54,6 +54,7 @@ enum MenuID {
   ID_EDIT_REPLACE = wxID_REPLACE,
   ID_EDIT_AUTO_REPLACE = 104,
   ID_EDIT_PREFERENCES = 105,
+  ID_EDIT_DEFAULT_RESET = 106,
 
   // Window menu (MainWindow)
   ID_WINDOW_NEW = 201,
@@ -81,6 +82,9 @@ enum MenuID {
   ID_MODE_SYMMETRY,
   ID_MODE_PAINT,
   ID_MODE_MAX,
+
+  // Welcome Window
+  ID_SELECT_LANGUAGE,
 };
 
 
@@ -93,6 +97,7 @@ enum ChildMenuID {
 
   // Cards menu
   ID_CARD_ADD = 6001,
+  ID_CARD_ADD_DOUBLE,
   ID_CARD_ADD_MULT,
   ID_CARD_REMOVE,
   ID_CARD_PREV,
@@ -105,6 +110,19 @@ enum ChildMenuID {
   ID_CARD_ROTATE_270,
   // CardList
   ID_SELECT_COLUMNS,
+  ID_CARD_LINK,
+  ID_CARD_AND_LINK_COPY,
+  ID_CARD_ADD_CSV,
+  ID_CARD_ADD_CSV_SEP,
+  ID_CARD_ADD_CSV_BROWSE,
+  ID_CARD_ADD_JSON,
+  ID_CARD_ADD_JSON_ARRAY,
+  ID_CARD_ADD_JSON_BROWSE,
+  ID_CARD_BULK,
+  ID_CARD_BULK_TYPE,
+  ID_CARD_BULK_FIELD,
+  ID_CARD_BULK_MODIFICATION,
+  ID_CARD_BULK_PREDICATE,
 
   // Keyword menu
   ID_KEYWORD_ADD = 6101,
@@ -116,9 +134,14 @@ enum ChildMenuID {
   // Format menu
   ID_FORMAT_BOLD = 6201,
   ID_FORMAT_ITALIC,
+  ID_FORMAT_UNDERLINE,
+  ID_FORMAT_STRIKETHROUGH,
+  ID_FORMAT_COLOR,
+  ID_FORMAT_BULLETPOINT,
   ID_FORMAT_SYMBOL,
   ID_FORMAT_REMINDER,
   ID_INSERT_SYMBOL,
+  ID_FORMAT_FONT,
 
   // Spelling errors
   ID_SPELLING_ADD_TO_DICT = 6301,
@@ -141,8 +164,12 @@ enum ChildMenuID {
   ID_SYMBOL_COMBINE_INTERSECTION = ID_SYMBOL_COMBINE + 2, //SYMBOL_COMBINE_INTERSECTION
   ID_SYMBOL_COMBINE_DIFFERENCE   = ID_SYMBOL_COMBINE + 3, //SYMBOL_COMBINE_DIFFERENCE
   ID_SYMBOL_COMBINE_OVERLAP      = ID_SYMBOL_COMBINE + 4, //SYMBOL_COMBINE_OVERLAP
-  ID_SYMBOL_COMBINE_BORDER       = ID_SYMBOL_COMBINE + 5, //SYMBOL_COMBINE_BORDER
   ID_SYMBOL_COMBINE_MAX,
+  ID_SYMBOL_REGION,
+  ID_SYMBOL_REGION_FILL = ID_SYMBOL_REGION,
+  ID_SYMBOL_REGION_ACCENT,
+  ID_SYMBOL_REGION_BORDER,
+  ID_SYMBOL_REGION_MAX,
   ID_EDIT_DUPLICATE, // duplicating symbol parts
   ID_EDIT_GROUP,
   ID_EDIT_UNGROUP,
@@ -181,6 +208,13 @@ enum ChildMenuID {
   // On cards panel
   ID_COLLAPSE_NOTES = 8001,
   ID_CARD_FILTER,
+  ID_CARD_COUNTER,
+  ID_CARD_LINK_TYPE,
+  ID_CARD_LINK_SELECT,
+  ID_CARD_LINK_UNLINK_1,
+  ID_CARD_LINK_UNLINK_2,
+  ID_CARD_LINK_UNLINK_3,
+  ID_CARD_LINK_UNLINK_4,
   
   // Style panel
   ID_STYLE_USE_FOR_ALL = 8011,
@@ -200,7 +234,7 @@ enum ChildMenuID {
   ID_FIELD_LIST = 8301,
   
   // Random pack panel
-  ID_PACK_AMOUNT = 8111,
+  ID_PACK_AMOUNT = 8401,
   ID_PACK_TYPE,
   ID_SEED_RANDOM,
   ID_SEED_FIXED,
@@ -209,6 +243,7 @@ enum ChildMenuID {
   
   // Console panel
   ID_EVALUATE,
+  ID_CLEAR_CONSOLE,
   
   // SymbolFont (Format menu)
   ID_INSERT_SYMBOL_MENU_MIN =  9001,
@@ -226,6 +261,10 @@ enum ChildMenuID {
 enum ControlID {
   ID_CONTROL_MIN = 1000,
   ID_CONTROL_MAX = 1999,
+
+  // New Set Window
+  ID_STYLESHEET_FILTER,
+  ID_GAME_FILTER,
 
   // Controls
   ID_VIEWER = 1001,
@@ -249,6 +288,8 @@ enum ControlID {
   ID_MOVE_DOWN,
   ID_SHOW,
   ID_HIDE,
+  // Card list drag'n'drop timer
+  ID_DROP_TIMER,
   // Card select
   ID_SELECT_CARDS,
   ID_SELECTION_CHOICE,
@@ -263,16 +304,26 @@ enum ControlID {
   ID_PREVIEW,
   ID_SELECTOR,
   ID_SIZE,
+  ID_GRID,
   ID_LEFT,
   ID_TOP,
   ID_WIDTH,
   ID_HEIGHT,
+  ID_SELECTION_CENTER,
+  ID_SELECTION_CENTER_HORIZONTALLY,
+  ID_SELECTION_CENTER_VERTICALLY,
   ID_FIX_ASPECT,
   ID_ZOOM,
   ID_ZOOM_X,
   ID_ZOOM_Y,
+  ID_EXPORT_ZOOM,
+  ID_EXPORT_ZOOM_X,
+  ID_EXPORT_ZOOM_Y,
   ID_SHARPEN,
   ID_SHARPEN_AMOUNT,
+  // Internal window
+  ID_IMPORT_ZOOM,
+  ID_CLIPBOARD_ZOOM,
   // Updates window
   ID_PACKAGE_LIST,
   ID_KEEP,
@@ -285,5 +336,20 @@ enum ControlID {
   ID_ADD_ITEM,
   ID_REMOVE_ITEM,
   ID_DEFAULTS,
+  ID_CARD_LINK_EDITOR,
+  ID_CARD_LINK_VIEWER,
+  ID_CARD_LINK_RELATION_1,
+  ID_CARD_LINK_RELATION_2,
+  ID_CARD_LINK_RELATION_3,
+  ID_CARD_LINK_RELATION_4,
+  // Select stylesheet window
+  ID_DOWNLOAD_STYLESHEET,
+  // Select stylesheet window
+  ID_REDRAW_TIMER,
 };
+
+// ----------------------------------------------------------------------------- : Custom Events
+
+DECLARE_EVENT_TYPE(EVENT_PACKAGE_LIST_CHANGED, <not used>);
+
 

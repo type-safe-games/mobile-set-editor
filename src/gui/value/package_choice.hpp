@@ -1,5 +1,5 @@
 //+----------------------------------------------------------------------------+
-//| Description:  Magic Set Editor - Program to make Magic (tm) cards          |
+//| Description:  Magic Set Editor - Program to make card games                |
 //| Copyright:    (C) Twan van Laarhoven and the other MSE developers          |
 //| License:      GNU General Public License 2 or later (see file COPYING)     |
 //+----------------------------------------------------------------------------+
@@ -26,7 +26,12 @@ public:
   bool onLeftDown(const RealPoint& pos, wxMouseEvent& ev) override;
   bool onChar(wxKeyEvent& ev) override;
   void onLoseFocus() override;
-  
+
+  // --------------------------------------------------- : Resetting
+
+  bool canDefaultReset() const override { return true; }
+  void doDefaultReset() override;
+
 private:
   DropDownListP drop_down;
   friend class DropDownPackageChoiceList;

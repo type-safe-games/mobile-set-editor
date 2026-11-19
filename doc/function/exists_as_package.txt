@@ -1,0 +1,16 @@
+Function: exists_as_package
+
+--Usage--
+> exists_as_package("package")
+
+Check if a package exists in the data folder.
+
+Returns the package's version number as major-minor-patch, or nil if the package does not exists.
+
+--Parameters--
+! Parameter	Type			Description
+| @input@	[[type:string]]		Full name of the package folder, including game and extension.
+
+--Examples--
+> exists_as_package("magic-modules.mse-include")  ==  "2026-02-28"
+> exists_as_package("magic-quadruple-faced-leveler.mse-style")  ==  nil

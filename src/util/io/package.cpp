@@ -1,5 +1,5 @@
 //+----------------------------------------------------------------------------+
-//| Description:  Magic Set Editor - Program to make Magic (tm) cards          |
+//| Description:  Magic Set Editor - Program to make card games                |
 //| Copyright:    (C) Twan van Laarhoven and the other MSE developers          |
 //| License:      GNU General Public License 2 or later (see file COPYING)     |
 //+----------------------------------------------------------------------------+
@@ -12,6 +12,7 @@
 #include <util/error.hpp>
 #include <script/to_value.hpp> // for reflection
 #include <script/profiler.hpp> // for PROFILER
+#include <data/set.hpp>
 #include <wx/wfstream.h>
 #include <wx/zipstrm.h>
 #include <wx/dir.h>
@@ -69,7 +70,7 @@ void Package::open(const String& n, bool fast) {
   filename = fn.GetFullPath();
   // get modified time
   if (!fn.FileExists() || !fn.GetTimes(0, &modified, 0)) {
-    modified = wxDateTime(0.0); // long time ago
+    modified = wxDateTime(time_t(0)); // long time ago
   }
   // type of package
   if (wxDirExists(filename)) {
@@ -77,7 +78,7 @@ void Package::open(const String& n, bool fast) {
   } else if (wxFileExists(filename)) {
     openZipfile();
   } else {
-    throw PackageNotFoundError(_("Package not found: '") + filename + _("'"));
+    throw PackageNotFoundError(_ERROR_1_("package not found", filename), filename);
   }
 }
 
@@ -98,6 +99,7 @@ void Package::save(bool remove_unused) {
 }
 
 void Package::saveAs(const String& name, bool remove_unused, bool as_directory) {
+  if (Set* s = dynamic_cast<Set*>(this)) s->referenceActionStackFiles();
   // type of package
   if (wxDirExists(name) || as_directory) {
     saveToDirectory(name, remove_unused, false);
@@ -110,6 +112,7 @@ void Package::saveAs(const String& name, bool remove_unused, bool as_directory) 
 }
 
 void Package::saveCopy(const String& name) {
+  if (Set* s = dynamic_cast<Set*>(this)) s->referenceActionStackFiles();
   saveToZipfile(name, true, true);
   clearKeepFlag();
 }
@@ -122,7 +125,7 @@ void Package::removeTempFiles(bool remove_unused) {
       // remove corresponding temp file
       remove_file(it->second.tempName);
     }
-    if (!it->second.keep && remove_unused) {
+    if (!it->second.keep && remove_unused && !isIgnoredOnSave(it->first)) {
       // also remove the record of deleted files
       FileInfos::iterator to_remove = it;
       ++it;
@@ -157,7 +160,7 @@ protected:
 
 /// Class that is a wxZipInputStream over a wxFileInput stream
 /** Note that wxFileInputStream is also a base class, because it must be constructed first
- */
+*/
 class ZipFileInputStream : private FileInputStream_aux, public wxZipInputStream {
 public:
   ZipFileInputStream(const String& filename)
@@ -173,9 +176,9 @@ public:
 
 /// A buffered version of wxFileInputStream
 /** 2007-08-24:
- *    According to profiling this gives a significant speedup
- *    Bringing the avarage run time of read_utf8_line from 186k to 54k (in cpu time units)
- */
+*    According to profiling this gives a significant speedup
+*    Bringing the avarage run time of read_utf8_line from 186k to 54k (in cpu time units)
+*/
 class BufferedFileInputStream : private FileInputStream_aux, public wxBufferedInputStream {
 public:
   inline BufferedFileInputStream(const String& filename)
@@ -186,6 +189,35 @@ public:
 
 // ----------------------------------------------------------------------------- : Package : inside
 
+bool Package::contains(const String& file) {
+  FileInfos::iterator it = files.find(normalize_internal_filename(file));
+  if (it == files.end()) {
+    // does it look like a relative filename?
+    if (filename.find(_(".mse-")) != String::npos) {
+      return false;
+    }
+  }
+
+  unique_ptr<wxInputStream> stream;
+  if (it != files.end() && it->second.wasWritten()) {
+    // written to this file, open the temp file
+    retry_io([&]{ stream = make_unique<wxFileInputStream>(it->second.tempName); return stream->IsOk(); });
+  }
+  else if (wxFileExists(filename + _("/") + file)) {
+    // a file in directory package
+    retry_io([&]{ stream = make_unique<wxFileInputStream>(filename + _("/") + file); return stream->IsOk(); });
+  }
+  else if (wxFileExists(filename) && it != files.end() && it->second.zipEntry) {
+    // a file in a zip archive
+    retry_io([&]{ stream = make_unique<ZipFileInputStream>(filename, it->second.zipEntry); return stream->IsOk(); });
+  }
+  else {
+    // shouldn't happen, packaged changed by someone else since opening it
+    return false;
+  }
+  return stream && stream->IsOk();
+}
+
 unique_ptr<wxInputStream> Package::openIn(const String& file) {
   if (!file.empty() && file.GetChar(0) == _('/')) {
     // absolute path, open file from another package
@@ -195,20 +227,29 @@ unique_ptr<wxInputStream> Package::openIn(const String& file) {
   FileInfos::iterator it = files.find(normalize_internal_filename(file));
   if (it == files.end()) {
     // does it look like a relative filename?
-    if (filename.find(_(".mse-")) != String::npos) {
-      throw PackageError(_ERROR_2_("file not found package like", file, filename));
+    size_t pos = filename.find(_(".mse-"));
+    if (pos != String::npos) {
+      // check for nested folder
+      pos = filename.find_last_of(_("/\\"));
+      String nestedFilename = filename + filename.SubString(pos, filename.size()) + wxFileName::GetPathSeparator() + file;
+      if (wxFileExists(nestedFilename)) {
+        throw PackageError(_ERROR_1_("nested folder", filename));
+      }
+      else {
+        throw PackageNotFoundError(_ERROR_2_("file not found package like", file, filename));
+      }
     }
   }
   unique_ptr<wxInputStream> stream;
   if (it != files.end() && it->second.wasWritten()) {
     // written to this file, open the temp file
-    stream = make_unique<wxFileInputStream>(it->second.tempName);
+    retry_io([&]{ stream = make_unique<wxFileInputStream>(it->second.tempName); return stream->IsOk(); });
   } else if (wxFileExists(filename+_("/")+file)) {
     // a file in directory package
-    stream = make_unique<wxFileInputStream>(filename+_("/")+file);
+    retry_io([&]{ stream = make_unique<wxFileInputStream>(filename+_("/")+file); return stream->IsOk(); });
   } else if (wxFileExists(filename) && it != files.end() && it->second.zipEntry) {
     // a file in a zip archive
-    stream = make_unique<ZipFileInputStream>(filename, it->second.zipEntry);
+    retry_io([&]{ stream = make_unique<ZipFileInputStream>(filename, it->second.zipEntry); return stream->IsOk(); });
   } else {
     // shouldn't happen, packaged changed by someone else since opening it
     throw FileNotFoundError(file, filename);
@@ -227,6 +268,9 @@ unique_ptr<wxOutputStream> Package::openOut(const String& file) {
 String Package::nameOut(const String& file) {
   assert(wxThread::IsMain()); // Writing should only be done from the main thread
   String name = normalize_internal_filename(file);
+  if (isIgnoredOnSave(name)) {
+    throw PackageError(_ERROR_1_("write to read only", name));
+  }
   FileInfos::iterator it = files.find(name);
   if (it == files.end()) {
     // new file
@@ -269,7 +313,7 @@ LocalFileName Package::newFileName(const String& prefix, const String& suffix) {
 void Package::referenceFile(const String& file) {
   if (file.empty()) return;
   FileInfos::iterator it = files.find(file);
-  if (it == files.end()) throw InternalError(_("referencing a nonexistant file"));
+  if (it == files.end()) throw InternalError(_("Referencing a non-existent file: ") + file + _("\nin package: ") + relativeFilename());
   it->second.keep = true;
 }
 
@@ -297,7 +341,8 @@ unique_ptr<wxInputStream> Package::openAbsoluteFile(const String& name) {
   size_t pos = name.find_first_of(_('\1'));
   if (pos == String::npos) {
     // temp or dir file
-    auto stream = make_unique<wxFileInputStream>(name);
+    unique_ptr<wxFileInputStream> stream;
+    retry_io([&]{ stream = make_unique<wxFileInputStream>(name); return stream->IsOk(); });
     if (!stream->IsOk()) throw FileNotFoundError(_("<unknown>"), name);
     return stream;
   } else {
@@ -329,7 +374,7 @@ LocalFileName LocalFileName::fromReadString(String const& fn, String const& pref
   if (!fn.empty() && clipboard_package()) {
     // copy file into current package
     try {
-      LocalFileName local_name = clipboard_package()->newFileName(_("image"),_("")); // a new unique name in the package, assume it's an image
+      LocalFileName local_name = clipboard_package()->newFileName(_("image"), _("")); // a new unique name in the package, assume it's an image
       auto out_stream = clipboard_package()->openOut(local_name);
       auto in_stream  = Package::openAbsoluteFile(fn);
       out_stream->Write(*in_stream); // copy
@@ -366,7 +411,7 @@ void Package::loadZipStream() {
 }
 
 void Package::openDirectory(bool fast) {
-  if (!fast) openSubdir(wxEmptyString);
+  if (!fast) openSubdir(_(""));
 }
 
 void Package::openSubdir(const String& name) {
@@ -374,7 +419,7 @@ void Package::openSubdir(const String& name) {
   if (!d.IsOpened()) return; // ignore errors here
   // find files
   String f; // filename
-  for(bool ok = d.GetFirst(&f, wxEmptyString, wxDIR_FILES | wxDIR_HIDDEN) ; ok ; ok = d.GetNext(&f)) {
+  for(bool ok = d.GetFirst(&f, _(""), wxDIR_FILES | wxDIR_HIDDEN) ; ok ; ok = d.GetNext(&f)) {
     if (ignore_file(f)) continue;
     // add file to list of known files
     addFile(name + f);
@@ -383,7 +428,7 @@ void Package::openSubdir(const String& name) {
     modified = max(modified,file_time);
   }
   // find subdirs
-  for(bool ok = d.GetFirst(&f, wxEmptyString, wxDIR_DIRS | wxDIR_HIDDEN) ; ok ; ok = d.GetNext(&f)) {
+  for(bool ok = d.GetFirst(&f, _(""), wxDIR_DIRS | wxDIR_HIDDEN) ; ok ; ok = d.GetNext(&f)) {
     if (!f.empty() && f.GetChar(0) != _('.')) {
       // skip directories starting with '.', like ., .. and .svn
       openSubdir(name+f+_("/"));
@@ -392,8 +437,11 @@ void Package::openSubdir(const String& name) {
 }
 
 void Package::openZipfile() {
-  // open stream
-  zipStream = make_unique<ZipFileInputStream>(filename);
+  // open stream, retry a few times
+  retry_io([&]{
+    zipStream = make_unique<ZipFileInputStream>(filename);
+    return zipStream->IsOk();
+  });
   if (!zipStream->IsOk())  throw PackageError(_ERROR_1_("package not found", filename));
   // read zip entries
   loadZipStream();
@@ -406,7 +454,7 @@ void Package::saveToDirectory(const String& saveAs, bool remove_unused, bool is_
   VCSP vcs = getVCS();
   FOR_EACH(f, files) {
     String f_out_path = saveAs + _("/") + f.first;
-    if (!f.second.keep && remove_unused) {
+    if (!f.second.keep && remove_unused && !isIgnoredOnSave(f.first)) {
       // remove files that are not to be kept
       // ignore failure (new file that is not kept)
       vcs->removeFile(f_out_path);
@@ -417,8 +465,8 @@ void Package::saveToDirectory(const String& saveAs, bool remove_unused, bool is_
     if (f.second.wasWritten()) {
       // move files that were updated
       remove_file(f_out_path);
-      if (!(is_copy ? wxCopyFile  (f.second.tempName, f_out_path)
-                    : wxRenameFile(f.second.tempName, f_out_path))) {
+      if (!(is_copy ? copy_file        (f.second.tempName, f_out_path)
+        : rename_file_or_dir(f.second.tempName, f_out_path))) {
         throw PackageError(_ERROR_("unable to store file"));
       }
       if (f.second.created) {
@@ -426,13 +474,22 @@ void Package::saveToDirectory(const String& saveAs, bool remove_unused, bool is_
         f.second.created = false;
       }
     } else if (filename != saveAs) {
-      // save as, copy old filess
+      // save as, copy old files
       if (isZipfile()) {
         auto in_stream  = openIn(f.first);
-        wxFileOutputStream out(f_out_path);
-        out.Write(*in_stream);
+        unique_ptr<wxFileOutputStream> out;
+        retry_io([&]{
+          out = make_unique<wxFileOutputStream>(f_out_path);
+          return out->IsOk();
+        });
+        if (out->IsOk()) {
+          out->Write(*in_stream);
+        }
+        if (!out->IsOk() || (!in_stream->Eof() && in_stream->GetLastError() != wxSTREAM_NO_ERROR)) {
+          throw PackageError(_ERROR_("unable to store file"));
+        }
       } else {
-        if (!wxCopyFile(filename+_("/")+f.first, f_out_path)) {
+        if (!copy_file(filename+_("/")+f.first, f_out_path)) {
           throw PackageError(_ERROR_("unable to store file"));
         }
       }
@@ -444,10 +501,14 @@ void Package::saveToDirectory(const String& saveAs, bool remove_unused, bool is_
 }
 
 void Package::saveToZipfile(const String& saveAs, bool remove_unused, bool is_copy) {
-  // create a temporary zip file name
-  String tempFile = saveAs + _(".tmp");
-  remove_file(tempFile);
-  // open zip file
+  // create temp file names
+  // tempFile is deliberately NOT saveAs + ".tmp". CreateTempFileName guarantees
+  // it will be in a local drive. To create it we need to do a lot of writes, so
+  // we don't want to do that on a potential cloud-synced drive.
+  String tempFile    = wxFileName::CreateTempFileName(_("mse-zip"));
+  String bakFile     = saveAs + _(".bak");
+  String bakTempFile = saveAs + _(".bak.tmp");
+  // open temp zip file
   try {
     unique_ptr<wxFileOutputStream> newFile(new wxFileOutputStream(tempFile));
     if (!newFile->IsOk()) throw PackageError(_ERROR_("unable to open output file"));
@@ -456,19 +517,38 @@ void Package::saveToZipfile(const String& saveAs, bool remove_unused, bool is_co
     // copy everything to a new zip file, unless it's updated or removed
     if (zipStream) newZip->CopyArchiveMetaData(*zipStream);
     FOR_EACH(f, files) {
-      if (!f.second.keep && remove_unused) {
+      if (!f.second.keep && remove_unused && !isIgnoredOnSave(f.first)) {
         // to remove a file simply don't copy it
       } else if (!is_copy && f.second.zipEntry && !f.second.wasWritten()) {
         // old file, was also in zip, not changed
         // can't do this when saving a copy, since it destroys the zip entry
         zipStream->CloseEntry();
-        newZip->CopyEntry(f.second.zipEntry, *zipStream);
+        if (!newZip->CopyEntry(f.second.zipEntry, *zipStream)) {
+          throw PackageError(
+            _("Unable to save: the file\n'") + f.first + _("'\n") +
+            _("could not be read from the existing package file\n'") + filename + _("'.\n\n") +
+            _("This often happens when a set is stored on a cloud-synced drive.\n") +
+            _("Please make sure the file is fully available offline\n") +
+            _("(for example by marking it 'Always keep on this device')\n") +
+            _("then try saving again. Your changes have not been lost.")
+          );
+        }
         f.second.zipEntry = 0;
       } else {
         // changed file, or the old package was not a zipfile
         newZip->PutNextEntry(f.first);
         auto temp_stream = openIn(f.first);
         newZip->Write(*temp_stream);
+        if (!newZip->IsOk() || (!temp_stream->Eof() && temp_stream->GetLastError() != wxSTREAM_NO_ERROR)) {
+          throw PackageError(
+            _("Unable to save: the file\n'") + f.first + _("'\n") +
+            _("could not be written to the package.\n\n") +
+            _("This often happens when a set is stored on a cloud-synced drive.\n") +
+            _("Please make sure the file is fully available offline\n") +
+            _("(for example by marking it 'Always keep on this device')\n") +
+            _("then try saving again. Your changes have not been lost.")
+          );
+        }
       }
     }
     // close the old file
@@ -478,15 +558,82 @@ void Package::saveToZipfile(const String& saveAs, bool remove_unused, bool is_co
   } catch (Error const& e) {
     // when things go wrong delete the temp file
     remove_file(tempFile);
+    // and release our read handle on the original file
+    if (!is_copy) {
+      zipStream.reset();
+    }
     throw e;
   }
   // replace the old file with the new file, in effect commiting the changes
-  if (wxFileExists(saveAs)) {
-    // rename old file to .bak
-    remove_file(saveAs + _(".bak"));
-    wxRenameFile(saveAs, saveAs + _(".bak"));
+  {
+    wxLogNull noLog;
+    // move .bak to .bak.temp
+    bool bak_temp_created = false;
+    if (wxFileExists(bakFile)) {
+      remove_file(bakTempFile); // clear out any stale leftover from an earlier crash
+      bak_temp_created = rename_file_or_dir(bakFile, bakTempFile);
+      if (!bak_temp_created) {
+        // couldn't even move .bak, bail
+        throw PackageError(
+          _("Unable to save to\n'") + saveAs + _("'\n") +
+          _("The existing backup file\n'") + bakFile + _("'\n") +
+          _("could not be accessed, likely because it is in use by another program\n") +
+          _("(for example another MSE instance, a virus scanner, cloud sync, etc...).\n\n") +
+          _("Your changes have not been lost, but the save did not complete.\n") +
+          _("Please try saving to a different file name (use 'Save As').\n\n") +
+          _("System error: ") + wxSysErrorMsg(wxSysErrorCode())
+        );
+      }
+    }
+    if (wxFileExists(saveAs)) {
+      // move old .mse-set to .bak
+      if (!rename_file_or_dir(saveAs, bakFile)) {
+        // failed, restore .bak.tmp to .bak, bail
+        if (bak_temp_created) rename_file_or_dir(bakTempFile, bakFile);
+        throw PackageError(
+          _("Unable to save to\n'") + saveAs + _("'\n") +
+          _("The existing file could not be replaced, likely because it is in use by another program\n") +
+          _("(for example another MSE instance, a virus scanner, cloud sync, etc...).\n\n") +
+          _("Your changes have not been lost, but the save did not complete.\n") +
+          _("Please try saving to a different file name (use 'Save As').\n\n") +
+          _("System error: ") + wxSysErrorMsg(wxSysErrorCode())
+        );
+      }
+    }
+    // move .tmp to .mse-set
+    if (!rename_file_or_dir(tempFile, saveAs)) {
+      // failed. try to move .bak to .mse-set, otherwise there would be no .mse-set file in the folder
+      if (rename_file_or_dir(bakFile, saveAs)) {
+        // success, try to also restore .bak.temp to .bak
+        if (bak_temp_created) rename_file_or_dir(bakTempFile, bakFile);
+        // bail
+        throw PackageError(
+          _("Unable to save to\n'") + saveAs + _("'\n") +
+          _("The new file could not be put in place, likely because it is in use by another program\n") +
+          _("(for example another MSE instance, a virus scanner, cloud sync, etc...).\n\n") +
+          _("Your changes have not been lost, but the save did not complete.\n") +
+          _("Please try saving to a different file name (use 'Save As').\n\n") +
+          _("System error: ") + wxSysErrorMsg(wxSysErrorCode())
+        );
+      } else {
+        // could not even restore .bak, there is now no .mse-set file
+        // tell the user their data is in .tmp
+        throw PackageError(
+          _("Something went wrong while saving to\n'") + saveAs + _("'\n") +
+          _("The destination path is unavailable, likely because it is in use by another program\n") +
+          _("(for example another MSE instance, a virus scanner, cloud sync, etc...).\n\n") +
+          _("The previous version of the file could not be restored either, so there is currently no file at that location.\n\n") +
+          _("Your changes have NOT been lost: a complete, up to date copy has been saved to\n'") + tempFile + _("'\n") +
+          _("You can rename that file to\n'") + saveAs + _("'\n") +
+          _("manually yourself (outside of the program) to recover this save,\n") +
+          _("or try saving to a different file name (use 'Save As').\n\n") +
+          _("System error: ") + wxSysErrorMsg(wxSysErrorCode())
+        );
+      }
+    }
+    // save succeeded, delete .bak.temp
+    if (bak_temp_created) remove_file(bakTempFile);
   }
-  wxRenameFile(tempFile, saveAs);
   // re-open zip file
   filename = saveAs;
   openZipfile();
@@ -538,12 +685,15 @@ template <> void Writer::handle(const PackageDependency& dep) {
 IMPLEMENT_REFLECTION(Packaged) {
   REFLECT(short_name);
   REFLECT(full_name);
+  REFLECT(folder_name);
   REFLECT_N("icon", icon_filename);
+  REFLECT_N("dark_icon", dark_icon_filename);
   REFLECT_NO_SCRIPT(position_hint);
   REFLECT(installer_group);
   REFLECT(version);
   REFLECT(compatible_version);
   REFLECT_NO_SCRIPT_N("depends_ons", dependencies); // hack for singular_form
+  REFLECT_NO_SCRIPT(read_only_files);
 }
 
 Packaged::Packaged()
@@ -551,9 +701,20 @@ Packaged::Packaged()
   , fully_loaded(true)
 {}
 
+bool Packaged::isIgnoredOnSave(const String& file) const {
+  for (const String& pattern : read_only_files) {
+    if (match_filename_wildcard(file, normalize_internal_filename(pattern))) return true;
+  }
+  return false;
+}
+
 unique_ptr<wxInputStream> Packaged::openIconFile() {
-  if (!icon_filename.empty()) {
-    return openIn(icon_filename);
+  String filename = icon_filename;
+  if (settings.darkMode() && !dark_icon_filename.empty()) {
+    filename = dark_icon_filename;
+  }
+  if (!filename.empty()) {
+    return openIn(filename);
   } else {
     return unique_ptr<wxInputStream>();
   }
@@ -589,6 +750,8 @@ void Packaged::open(const String& package, bool just_header) {
 
 void Packaged::loadFully() {
   if (fully_loaded) return;
+  dependencies.clear();
+  read_only_files.clear();
   auto stream = openIn(typeName());
   Reader reader(*stream, this, absoluteFilename() + _("/") + typeName());
   try {
@@ -599,11 +762,11 @@ void Packaged::loadFully() {
   }
 }
 
-void Packaged::save() {
+void Packaged::save(bool remove_unused) {
   WITH_DYNAMIC_ARG(writing_package, this);
   writeFile(typeName(), *this, fileVersion());
   referenceFile(typeName());
-  Package::save();
+  Package::save(remove_unused);
 }
 void Packaged::saveAs(const String& package, bool remove_unused, bool as_directory) {
   WITH_DYNAMIC_ARG(writing_package, this);
@@ -619,10 +782,11 @@ void Packaged::saveCopy(const String& package) {
 }
 
 void Packaged::validate(Version) {
+  folder_name = name();
   // a default for the short name
   if (short_name.empty()) {
     if (!full_name.empty()) short_name = full_name;
-    short_name = name();
+    else short_name = folder_name;
   }
   // check dependencies
   FOR_EACH(dep, dependencies) {
@@ -632,7 +796,9 @@ void Packaged::validate(Version) {
 
 void Packaged::requireDependency(Packaged* package) {
   if (package == this) return; // dependency on self
+  if (this->relativeFilename().find("mse-set") != String::npos) return; // skip checks on sets
   String n = package->relativeFilename();
+  if (n.find("mse-symbol-font") != String::npos) return; // skip checks for symbol-fonts
   FOR_EACH(dep, dependencies) {
     if (dep->package == n) {
       if (package->version < dep->version) {

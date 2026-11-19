@@ -1,5 +1,5 @@
 //+----------------------------------------------------------------------------+
-//| Description:  Magic Set Editor - Program to make Magic (tm) cards          |
+//| Description:  Magic Set Editor - Program to make card games                |
 //| Copyright:    (C) Twan van Laarhoven and the other MSE developers          |
 //| License:      GNU General Public License 2 or later (see file COPYING)     |
 //+----------------------------------------------------------------------------+
@@ -23,6 +23,7 @@
 /// Resample (resize) an image, uses bilenear filtering
 void resample(const Image& img_in, Image& img_out);
 Image resample(const Image& img_in, int width, int height);
+Image resample(const Image& img_in, double zoom);
 
 /// Resamples an image, first clips the input image to a specified rectangle
 /** The selected rectangle is resampled into the entire output image */
@@ -52,10 +53,24 @@ void sharp_resample_and_clip(const Image& img_in, Image& img_out, wxRect rect, i
  *  rect    = rectangle to draw in (a rectangle somewhere around pos)
  *  stretch = amount to stretch in the direction of the text after drawing
  */
-void draw_resampled_text(DC& dc, const RealPoint& pos, const RealRect& rect, double stretch, Radians angle, Color color, const String& text, int blur_radius = 0, int repeat = 1);
+void draw_resampled_text(DC& dc, const String& text, const RealPoint& pos, const RealRect& rect, Radians angle, Color color, int blur_radius = 0, Color stroke_color = Color(0,0,0), int stroke_radius = 0, double stretch = 1.0);
 
 // scaling factor to use when drawing resampled text
 extern const int text_scaling;
+
+// Downsamples the red channel of the input image to the alpha channel of the output image
+// img_in must be text_scaling times as large as img_out
+void downsample_to_alpha(Bitmap& bmp_in, Image& img_out);
+
+/// Resize an image, but keep a border of unchanged pixels along
+/// each edge (9-slice scaling): the corners are copied verbatim, the top/bottom
+/// edges are stretched only horizontally, the left/right edges are stretched only
+/// vertically, and only the remaining center is stretched in both directions.
+void resample_nine_slice(const Image& img_in, Image& img_out, int left, int right, int top, int bottom);
+
+// ----------------------------------------------------------------------------- : Crop
+
+Image crop(const Image& base_img, int width, int height, int offset_x, int offset_y, const Color& background_color);
 
 // ----------------------------------------------------------------------------- : Image rotation
 
@@ -81,15 +96,39 @@ void linear_blend(Image& img1, const Image& img2, double x1,double y1, double x2
  *  mask is used as a mask, white pixels are taken from img1, black pixels from img2
  *  color channels are blended separatly
  */
-void mask_blend(Image& img1, const Image& img2, const Image& mask);
+void mask_blend(Image& light, const Image& dark, const Image& mask);
 
 // ----------------------------------------------------------------------------- : Effects
 
 /// Saturate an image
 void saturate(Image& image, double amount);
 
+/// Brighten an image
+void brighten(Image& image, double amount);
+
 /// Invert the colors in an image
 void invert(Image& img);
+
+// Blur the alpha of a pixel
+Byte blur_pixel_alpha(Byte* in, int x, int y, int width, int height, int center_weight = 2);
+// Blur the alpha channel of an image
+void blur_image_alpha(Image& img, int center_weight = 2);
+
+// Thicken the alpha of a pixel
+Byte thicken_pixel_alpha_3x3(const std::vector<Byte>& in, int i, int x, int y, int width, int height);
+Byte thicken_pixel_alpha_5x5(const std::vector<Byte>& in, int i, int x, int y, int width, int height);
+Byte thicken_pixel_alpha_7x7(const std::vector<Byte>& in, int i, int x, int y, int width, int height);
+// Thicken the alpha channel of an image
+void thicken_image_alpha(Image& img, int radius);
+
+// Create a stroke effect that goes around an image
+Image make_stroke_image(Image& img, Color stroke_color, int stroke_radius, int blur_radius = 0);
+
+// Create a mask that encodes which pixels are or neighbor transparent pixels
+Image make_visibility_mask(Image& img, int threshold, int radius);
+
+/// Extend an image by mirroring the pixels on its edges
+bool mirror_bleed_edge(Image& img, int bleed_x, int bleed_y);
 
 // ----------------------------------------------------------------------------- : Combining
 
@@ -100,6 +139,7 @@ enum ImageCombine
 ,  COMBINE_NORMAL
 ,  COMBINE_ADD
 ,  COMBINE_SUBTRACT
+,  COMBINE_AVERAGE
 ,  COMBINE_STAMP
 ,  COMBINE_DIFFERENCE
 ,  COMBINE_NEGATION
@@ -120,8 +160,114 @@ enum ImageCombine
 ,  COMBINE_OR
 ,  COMBINE_XOR
 ,  COMBINE_SHADOW
+,  COMBINE_LIGHTMAP_ABSOLUTE
+,  COMBINE_LIGHTMAP_RELATIVE
 ,  COMBINE_SYMMETRIC_OVERLAY
+,  COMBINE_BRIGHTNESS_TO_ALPHA
+,  COMBINE_DARKNESS_TO_ALPHA
+,  COMBINE_GREATER_THAN_5
+,  COMBINE_GREATER_THAN_10
+,  COMBINE_GREATER_THAN_15
+,  COMBINE_GREATER_THAN_20
+,  COMBINE_GREATER_THAN_25
+,  COMBINE_GREATER_THAN_30
+,  COMBINE_GREATER_THAN_35
+,  COMBINE_GREATER_THAN_40
+,  COMBINE_GREATER_THAN_45
+,  COMBINE_GREATER_THAN_50
+,  COMBINE_GREATER_THAN_55
+,  COMBINE_GREATER_THAN_60
+,  COMBINE_GREATER_THAN_65
+,  COMBINE_GREATER_THAN_70
+,  COMBINE_GREATER_THAN_75
+,  COMBINE_GREATER_THAN_80
+,  COMBINE_GREATER_THAN_85
+,  COMBINE_GREATER_THAN_90
+,  COMBINE_GREATER_THAN_95
+,  COMBINE_GREATER_THAN_100
+,  COMBINE_GREATER_THAN_105
+,  COMBINE_GREATER_THAN_110
+,  COMBINE_GREATER_THAN_115
+,  COMBINE_GREATER_THAN_120
+,  COMBINE_GREATER_THAN_125
+,  COMBINE_GREATER_THAN_130
+,  COMBINE_GREATER_THAN_135
+,  COMBINE_GREATER_THAN_140
+,  COMBINE_GREATER_THAN_145
+,  COMBINE_GREATER_THAN_150
+,  COMBINE_GREATER_THAN_155
+,  COMBINE_GREATER_THAN_160
+,  COMBINE_GREATER_THAN_165
+,  COMBINE_GREATER_THAN_170
+,  COMBINE_GREATER_THAN_175
+,  COMBINE_GREATER_THAN_180
+,  COMBINE_GREATER_THAN_185
+,  COMBINE_GREATER_THAN_190
+,  COMBINE_GREATER_THAN_195
+,  COMBINE_GREATER_THAN_200
+,  COMBINE_GREATER_THAN_205
+,  COMBINE_GREATER_THAN_210
+,  COMBINE_GREATER_THAN_215
+,  COMBINE_GREATER_THAN_220
+,  COMBINE_GREATER_THAN_225
+,  COMBINE_GREATER_THAN_230
+,  COMBINE_GREATER_THAN_235
+,  COMBINE_GREATER_THAN_240
+,  COMBINE_GREATER_THAN_245
+,  COMBINE_GREATER_THAN_250
+,  COMBINE_SMALLER_THAN_5
+,  COMBINE_SMALLER_THAN_10
+,  COMBINE_SMALLER_THAN_15
+,  COMBINE_SMALLER_THAN_20
+,  COMBINE_SMALLER_THAN_25
+,  COMBINE_SMALLER_THAN_30
+,  COMBINE_SMALLER_THAN_35
+,  COMBINE_SMALLER_THAN_40
+,  COMBINE_SMALLER_THAN_45
+,  COMBINE_SMALLER_THAN_50
+,  COMBINE_SMALLER_THAN_55
+,  COMBINE_SMALLER_THAN_60
+,  COMBINE_SMALLER_THAN_65
+,  COMBINE_SMALLER_THAN_70
+,  COMBINE_SMALLER_THAN_75
+,  COMBINE_SMALLER_THAN_80
+,  COMBINE_SMALLER_THAN_85
+,  COMBINE_SMALLER_THAN_90
+,  COMBINE_SMALLER_THAN_95
+,  COMBINE_SMALLER_THAN_100
+,  COMBINE_SMALLER_THAN_105
+,  COMBINE_SMALLER_THAN_110
+,  COMBINE_SMALLER_THAN_115
+,  COMBINE_SMALLER_THAN_120
+,  COMBINE_SMALLER_THAN_125
+,  COMBINE_SMALLER_THAN_130
+,  COMBINE_SMALLER_THAN_135
+,  COMBINE_SMALLER_THAN_140
+,  COMBINE_SMALLER_THAN_145
+,  COMBINE_SMALLER_THAN_150
+,  COMBINE_SMALLER_THAN_155
+,  COMBINE_SMALLER_THAN_160
+,  COMBINE_SMALLER_THAN_165
+,  COMBINE_SMALLER_THAN_170
+,  COMBINE_SMALLER_THAN_175
+,  COMBINE_SMALLER_THAN_180
+,  COMBINE_SMALLER_THAN_185
+,  COMBINE_SMALLER_THAN_190
+,  COMBINE_SMALLER_THAN_195
+,  COMBINE_SMALLER_THAN_200
+,  COMBINE_SMALLER_THAN_205
+,  COMBINE_SMALLER_THAN_210
+,  COMBINE_SMALLER_THAN_215
+,  COMBINE_SMALLER_THAN_220
+,  COMBINE_SMALLER_THAN_225
+,  COMBINE_SMALLER_THAN_230
+,  COMBINE_SMALLER_THAN_235
+,  COMBINE_SMALLER_THAN_240
+,  COMBINE_SMALLER_THAN_245
+,  COMBINE_SMALLER_THAN_250
 };
+
+String combine_to_string(const ImageCombine&);
 
 /// Combine image b onto image a using some combining function.
 /// The results are stored in the image A.

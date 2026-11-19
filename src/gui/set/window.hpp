@@ -1,5 +1,5 @@
 //+----------------------------------------------------------------------------+
-//| Description:  Magic Set Editor - Program to make Magic (tm) cards          |
+//| Description:  Magic Set Editor - Program to make card games                |
 //| Copyright:    (C) Twan van Laarhoven and the other MSE developers          |
 //| License:      GNU General Public License 2 or later (see file COPYING)     |
 //+----------------------------------------------------------------------------+
@@ -47,9 +47,6 @@ private:
   SetWindowPanel*         current_panel;
   wxMenu*                 export_menu = nullptr;
   
-  /// Number of items in the recent sets list
-  size_t number_of_recentSets;
-  
   // data for find/replace
   unique_ptr<wxDialog> find_dialog;
   wxFindReplaceData find_data;
@@ -75,6 +72,10 @@ private:
   /// Switch this window to the new set, or open another window for it (depending on the settings)
   void switchSet(const SetP& new_set);
   
+public:
+  /// Rebuild the "recent sets" menu entries in every open SetWindow
+  static void updateRecentSetsInAllWindows();
+
   // --------------------------------------------------- : Action related
 protected:
   /// We want to respond to set changes
@@ -112,9 +113,9 @@ private:
   // --------------------------------------------------- : Window events - update UI
     
   void onUpdateUI(wxUpdateUIEvent&);
-  /// The number of 'recent set' menu items shown
-  UInt number_of_recent_sets;
-  void updateRecentSets();
+
+  /// Rebuild this window's "recent sets" menu entries from settings.recent_sets
+  void rebuildRecentSetsMenu();
   
   wxMenu* makeExportMenu();
 
@@ -147,6 +148,7 @@ private:
   void onEditCopy            (wxCommandEvent&);
   void onEditPaste           (wxCommandEvent&);
   void onEditSelectAll       (wxCommandEvent&);
+  void onEditDefaultReset    (wxCommandEvent&);
   void onEditFind            (wxCommandEvent&);
   void onEditFindNext        (wxCommandEvent&);
   void onEditReplace         (wxCommandEvent&);
@@ -166,6 +168,7 @@ private:
   
   void onHelpIndex           (wxCommandEvent&);
   void onHelpWebsite         (wxCommandEvent&);
+  void onHelpDocumentation   (wxCommandEvent&);
   void onHelpAbout           (wxCommandEvent&);
   
   // --------------------------------------------------- : Window events - other
@@ -176,5 +179,7 @@ private:
   void onIdle                (wxIdleEvent&);
   
   void onSizeChange          (wxCommandEvent&);
+
+  void onPackageListChange   (wxCommandEvent&);
 };
 

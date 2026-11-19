@@ -1,5 +1,5 @@
 //+----------------------------------------------------------------------------+
-//| Description:  Magic Set Editor - Program to make Magic (tm) cards          |
+//| Description:  Magic Set Editor - Program to make card games                |
 //| Copyright:    (C) Twan van Laarhoven and the other MSE developers          |
 //| License:      GNU General Public License 2 or later (see file COPYING)     |
 //+----------------------------------------------------------------------------+
@@ -9,6 +9,7 @@
 // ----------------------------------------------------------------------------- : Includes
 
 #include <script/script.hpp>
+#include <set>
 
 class Dependency;
 
@@ -54,6 +55,7 @@ public:
   void setVariable(const String& name, const ScriptValueP& value);
   /// Set a variable to a new value (in the current scope)
   void setVariable(Variable name, const ScriptValueP& value);
+  void setGlobalVariable(Variable name, const ScriptValueP& value);
   
   /// Get the value of a variable, throws if it not set
   ScriptValueP getVariable(const String& name);
@@ -89,6 +91,7 @@ public:// public for FOR_EACH
     VariableValue() : level(0) {}
     unsigned int level; ///< Scope level on which this variable was set
     ScriptValueP value; ///< Value of this variable
+    bool global_scope = false; ///< Is this variable globally scoped? 
   };
   /// Record of a variable binding that is being shadowed (overwritten) by another binding
   struct Binding {
@@ -112,6 +115,9 @@ private:
   // utility types for dependency analysis
   struct Jump;
   struct JumpOrder;
+
+  /// Scripts for which dependency analysis is currently in progress somewhere up the call stack.
+  set<const Script*> scripts_being_analyzed;
   
   /// Return the bindings in the current scope
   void getBindings(size_t scope, vector<Binding>&);

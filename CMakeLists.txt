@@ -1,11 +1,16 @@
 cmake_minimum_required(VERSION 3.13)
 
-project(magicseteditor VERSION 2.1.2)
+project(magicseteditor VERSION 2.6.4)
+
+add_definitions(-DUNOFFICIAL_BUILD)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
-find_package(wxWidgets 3 REQUIRED COMPONENTS core base net html)
+find_package(wxWidgets 3.3.3 CONFIG QUIET COMPONENTS core base net)
+if(NOT wxWidgets_FOUND)
+  find_package(wxWidgets 3.3.3 MODULE REQUIRED COMPONENTS core base net)
+endif()
 find_package(Boost REQUIRED COMPONENTS regex)
 
 find_package(PkgConfig)
@@ -14,8 +19,10 @@ find_package(PkgConfig)
 pkg_check_modules(HUNSPELL hunspell)
 if( NOT HUNSPELL_FOUND )
 	message("-- Cannot find Hunspell via pkg-config, checking directly...")
-	find_path(HUNSPELL_INCLUDE_DIRS hunspell/hunspell.hxx)
+	find_path(HUNSPELL_INCLUDE_DIRS hunspell.hxx)
+	message("-- HUNSPELL_INCLUDE_DIRS = ${HUNSPELL_INCLUDE_DIRS}")
 	find_library(HUNSPELL_LIBRARIES NAMES hunspell libhunspell)
+	message("-- HUNSPELL_LIBRARIES = ${HUNSPELL_LIBRARIES}")
 	if ( ${HUNSPELL_INCLUDE_DIRS} STREQUAL "HUNSPELL_INCLUDE_DIRS-NOTFOUND" )
 		message(FATAL_ERROR "Hunspell cannot be found")
 	else()
@@ -23,18 +30,19 @@ if( NOT HUNSPELL_FOUND )
 	endif()
 endif()
 
+# You will most likely get a message about being unable to open hunspell-1.7.lib because pkgconf forgets to add the actual path to HUNSPELL_LIBRARIES.
+# If so, uncomment the below line and point it to the correct vcpkg root folder/library. (For debug builds, add "debug\\" just before "lib\\")
+#set(HUNSPELL_LIBRARIES "C:\\PATH\\TO\\ROOT\\vcpkg\\installed\\${VCPKG_TARGET_TRIPLET}\\lib\\hunspell-1.7.lib")
+
 include_directories("${PROJECT_BINARY_DIR}/src")
 include_directories("${PROJECT_SOURCE_DIR}/src")
-include(${wxWidgets_USE_FILE})
 include_directories(${Boost_INCLUDE_DIRS})
 include_directories(${HUNSPELL_INCLUDE_DIRS})
 
 # Magic Set Editor executable
 
 add_executable(magicseteditor WIN32)
-target_link_libraries(${PROJECT_NAME} ${wxWidgets_LIBRARIES})
-target_link_libraries(${PROJECT_NAME} ${Boost_LIBRARIES})
-target_link_libraries(${PROJECT_NAME} ${HUNSPELL_LIBRARIES})
+target_link_libraries(${PROJECT_NAME} PRIVATE wxWidgets::wxWidgets ${Boost_LIBRARIES} ${HUNSPELL_LIBRARIES})
 
 file(GLOB_RECURSE sources src/*.cpp)
 list(FILTER sources EXCLUDE REGEX win32_cli_wrapper.cpp)
@@ -47,6 +55,62 @@ configure_file(src/config.hpp.in src/config.hpp)
 
 target_sources(magicseteditor PRIVATE resource/win32_res.rc)
 
+# Halian trying Mac stuff
+
+if(BUILD_APPLE_BUNDLE)
+  set(CMAKE_LIBRARY_OUTPUT_DIRECTORY
+    "${CMAKE_BINARY_DIR}/magicseteditor.app/Contents/PlugIns")
+  set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}")
+  set_target_properties(
+  "magicseteditor"
+    PROPERTIES
+    MACOSX_BUNDLE_NAME                             "magicseteditor"
+    MACOSX_BUNDLE_VERSION                          "${PROJECT_VERSION}"
+    MACOSX_BUNDLE_GUI_IDENTIFIER                   "org.magicseteditor.gui"
+    MACOSX_BUNDLE_ICON_FILE                        "mse.icns"
+    MACOSX_BUNDLE_INFO_PLIST                       "MacOSXBundleInfo.plist.in"
+    MACOSX_BUNDLE                                  "TRUE"
+    # MACHO_COMPATIBILITY_VERSION                  "12.0.0"
+    RESOURCE                                       "${RESOURCE_FILES}"
+    XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY             ""
+    XCODE_ATTRIBUTE_CODE_SIGNING_REQUIRED          NO
+    XCODE_ATTRIBUTE_DEBUG_INFORMATION_FORMAT       dwarf
+    XCODE_ATTRIBUTE_GCC_INLINES_ARE_PRIVATE_EXTERN YES
+    XCODE_ATTRIBUTE_CLANG_LINK_OBJC_RUNTIME        NO
+  )
+  add_custom_command(
+    TARGET "magicseteditor"
+    POST_BUILD
+    COMMAND dylibbundler ARGS -od -ns -b -x "${CMAKE_BINARY_DIR}/magicseteditor.app/Contents/MacOS/magicseteditor" -d "${CMAKE_BINARY_DIR}/magicseteditor.app/Contents/libs"
+    WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
+    COMMENT "Changing library search path from absolute to relative…"
+  )
+  add_custom_command(
+    TARGET "magicseteditor"
+    POST_BUILD
+    COMMAND "${CMAKE_COMMAND}" -E make_directory "${CMAKE_BINARY_DIR}/magicseteditor.app/Contents/Resources"
+    COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${PROJECT_SOURCE_DIR}/mse.icns" "${CMAKE_BINARY_DIR}/magicseteditor.app/Contents/Resources/mse.icns"
+    COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${PROJECT_SOURCE_DIR}/mse-set.icns" "${CMAKE_BINARY_DIR}/magicseteditor.app/Contents/Resources/mse-set.icns"
+    WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
+    COMMENT "Copying icons…"
+  )
+  add_custom_command(
+    TARGET "magicseteditor"
+    POST_BUILD
+    COMMAND "${CMAKE_COMMAND}" -E make_directory "${CMAKE_BINARY_DIR}/magicseteditor.app/Contents/SharedSupport"
+    COMMAND "${CMAKE_COMMAND}" -E copy_directory "${PROJECT_SOURCE_DIR}/resource" "${CMAKE_BINARY_DIR}/magicseteditor.app/Contents/SharedSupport/resource"
+    WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
+    COMMENT "Copying application resources…"
+  )
+  add_custom_command(
+    TARGET "magicseteditor"
+    POST_BUILD
+    COMMAND "${CMAKE_COMMAND}" -DBUNDLE_PATH="${CMAKE_BINARY_DIR}/magicseteditor.app" -P "${PROJECT_SOURCE_DIR}/cmake/SignAppleBundle.cmake"
+    WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
+    COMMENT "Ad-hoc signing application bundle…"
+  )
+endif()
+
 # magicseteditor.com: wrapper to enable command line executable on windows
 
 if(WIN32)
@@ -57,6 +121,11 @@ if(WIN32)
   )
 endif()
 
+# Magic Set Editor Updater executable
+
+add_executable(magicseteditor-updater WIN32)
+target_link_libraries(magicseteditor-updater PRIVATE wxWidgets::wxWidgets)
+target_sources(magicseteditor-updater PRIVATE src_updater/main.cpp src_updater/win32_res.rc src_updater/updater.ico)
 
 # warnings
 if(CMAKE_COMPILER_IS_GNUCC OR CMAKE_COMPILER_IS_GNUCXX)
@@ -77,15 +146,6 @@ if (${VCPKG_TARGET_TRIPLET} MATCHES ".*-static")
   set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /GL")
   set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} /GL")
   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /LTCG")
-  # Need explicit dependencies on wx's dependencies
-  find_package(png REQUIRED)
-  find_package(tiff REQUIRED)
-  find_package(jpeg REQUIRED)
-  find_package(zlib REQUIRED)
-  target_link_libraries(${PROJECT_NAME} ${PNG_LIBRARIES})
-  target_link_libraries(${PROJECT_NAME} ${JPEG_LIBRARIES})
-  target_link_libraries(${PROJECT_NAME} ${ZLIB_LIBRARIES})
-  target_link_libraries(${PROJECT_NAME} ${TIFF_LIBRARIES})
   # Defines
   add_definitions(-DSTATIC)
   add_definitions(-DHUNSPELL_STATIC)
@@ -93,3 +153,6 @@ endif()
 
 # Test suite
 include(test/tests.cmake)
+
+# Debug Message
+message("-- Does this have a full path? If not, and it's just a file name, it's broken: ${HUNSPELL_LIBRARIES}")

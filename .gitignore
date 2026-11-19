@@ -6,14 +6,11 @@
 .vs
 .vscode
 
-/data/*.mse-game
-/data/*.mse-style
-/data/*.mse-include
-/data/*.mse-symbol-font
-/data/*.mse-export-template
-/data/dictionaries
-/data/packages
-/data/old
+/data/**/*
+
+# Explicitly include the locale files as they relate to UI changes.
+!/data/*.mse-locale/
+!/data/*.mse-locale/**/*
 
 /build_*
 /build

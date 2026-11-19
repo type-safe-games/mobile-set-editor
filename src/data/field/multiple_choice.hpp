@@ -1,5 +1,5 @@
 //+----------------------------------------------------------------------------+
-//| Description:  Magic Set Editor - Program to make Magic (tm) cards          |
+//| Description:  Magic Set Editor - Program to make card games                |
 //| Copyright:    (C) Twan van Laarhoven and the other MSE developers          |
 //| License:      GNU General Public License 2 or later (see file COPYING)     |
 //+----------------------------------------------------------------------------+
@@ -51,7 +51,10 @@ class MultipleChoiceValue : public ChoiceValue {
 public:
   inline MultipleChoiceValue(const MultipleChoiceFieldP& field) : ChoiceValue(field, false) {}
   DECLARE_HAS_FIELD(MultipleChoice);
+
   ValueP clone() const override;
+
+  void copyDataFrom(const Value& other) override;
   
   String last_change; ///< Which of the choices was selected/deselected last?
   
@@ -63,7 +66,11 @@ public:
   
   /// Splits the value, stores the selected choices in the out parameter
   void get(vector<String>& out) const;
-  
+
+  bool isDefault() override;
+
+  void makeDefault(bool d = true) override;
+
   bool update(Context&) override;
   
 private:

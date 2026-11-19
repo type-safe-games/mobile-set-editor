@@ -1,5 +1,5 @@
 //+----------------------------------------------------------------------------+
-//| Description:  Magic Set Editor - Program to make Magic (tm) cards          |
+//| Description:  Magic Set Editor - Program to make card games                |
 //| Copyright:    (C) Twan van Laarhoven and the other MSE developers          |
 //| License:      GNU General Public License 2 or later (see file COPYING)     |
 //+----------------------------------------------------------------------------+
@@ -163,6 +163,22 @@ public:
 private:
   void add(const SymbolPartP&, SymbolShapeCombine mode);
   vector<pair<SymbolShapeP,SymbolShapeCombine>> parts;  ///< Affected parts with new combining modes
+};
+
+// ----------------------------------------------------------------------------- : Change region
+
+/// Change on what region shapes act (fill, accent or border)
+class SymbolRegionAction : public SymbolPartsAction {
+public:
+  /// All parts must be SymbolParts, groups are applied to their contents
+  SymbolRegionAction(const set<SymbolPartP>& parts, SymbolShapeRegion region);
+  
+  String getName(bool to_undo) const override;
+  void perform(bool to_undo) override;
+  
+private:
+  void add(const SymbolPartP&, SymbolShapeRegion region);
+  vector<pair<SymbolShapeP,SymbolShapeRegion>> shapes;  ///< Affected shapes with their new region
 };
 
 // ----------------------------------------------------------------------------- : Change name

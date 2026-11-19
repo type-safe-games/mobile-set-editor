@@ -1,5 +1,5 @@
 //+----------------------------------------------------------------------------+
-//| Description:  Magic Set Editor - Program to make Magic (tm) cards          |
+//| Description:  Magic Set Editor - Program to make card games                |
 //| Copyright:    (C) Twan van Laarhoven and the other MSE developers          |
 //| License:      GNU General Public License 2 or later (see file COPYING)     |
 //+----------------------------------------------------------------------------+
@@ -41,13 +41,25 @@ class AddCardAction : public CardListAction {
 public:
   /// Add a newly allocated card
   AddCardAction(Set& set);
-  AddCardAction(AddingOrRemoving, Set& set, const CardP& card);
   AddCardAction(AddingOrRemoving, Set& set, const vector<CardP>& cards);
   
   String getName(bool to_undo) const override;
   void perform(bool to_undo) override;
   
   const GenericAddAction<CardP> action;
+  vector<ActionP> card_link_actions;
+};
+
+/// Update one or more cards from a set by replacing them with other cards
+class UpdateCardAction : public CardListAction {
+public:
+  UpdateCardAction(Set& set, const vector<CardP>& cards_to_add, const vector<CardP>& cards_to_remove);
+
+  String getName(bool to_undo) const override;
+  void perform(bool to_undo) override;
+
+  AddCardAction action_add;
+  AddCardAction action_remove;
 };
 
 // ----------------------------------------------------------------------------- : Reorder cards
@@ -64,6 +76,24 @@ public:
   const size_t card_id1, card_id2;  ///< Positions of the two cards to swap
 };
 
+// ----------------------------------------------------------------------------- : Link cards
+
+/// Add a link between two or more cards
+class OneWayLinkCardsAction : public Action {
+public:
+  OneWayLinkCardsAction(CardP& card, const String& uid, const String& relation, int index);
+
+  String getName(bool to_undo) const override;
+  void perform(bool to_undo) override;
+
+  //private:
+  CardP   card;            ///< The card we change the link of. We hold a reference so it doesn't get destroyed before this.
+  String* linked_uid;      ///< The uid slot we need to change
+  String* linked_relation; ///< The relation slot we need to change
+  String  uid;             ///< The uid we have to change the link to
+  String  relation;        ///< The relation we have to change the link to
+};
+
 // ----------------------------------------------------------------------------- : Change stylesheet
 
 /// An action that affects the rendering/display/look of a set or cards in the set
@@ -71,6 +101,10 @@ class DisplayChangeAction : public Action {
 public:
   String getName(bool to_undo) const override;
   void perform(bool to_undo) override;
+};
+
+
+class GlobalDisplayChangeAction : public DisplayChangeAction {
 };
 
 /// Changing the style of a a card
@@ -116,6 +150,36 @@ public:
   Set&                    set;          ///< The set to copy styling from
   CardP                   card;         ///< The affected card
   IndexMap<FieldP,ValueP> styling_data; ///< The old styling of the card
+};
+
+// ----------------------------------------------------------------------------- : Change notes
+
+/// Changing the notes of a card
+class ChangeCardNotesAction : public Action {
+public:
+  ChangeCardNotesAction(const CardP& card, const String& notes);
+
+  String getName(bool to_undo) const override;
+  void perform(bool to_undo) override;
+
+  //private:
+  CardP  card;  ///< The affected card
+  String notes; ///< Its old notes
+};
+
+// ----------------------------------------------------------------------------- : Change uid
+
+/// Changing the uid of a card
+class ChangeCardUIDAction : public CardListAction {
+public:
+  ChangeCardUIDAction(Set& set, const CardP& card, const String& id);
+
+  String getName(bool to_undo) const override;
+  void perform(bool to_undo) override;
+
+  //private:
+  CardP  card; ///< The affected card
+  String uid;  ///< Its old uid
 };
 
 // ----------------------------------------------------------------------------- : Pack types

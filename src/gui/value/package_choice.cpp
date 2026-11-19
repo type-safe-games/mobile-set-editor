@@ -1,5 +1,5 @@
 //+----------------------------------------------------------------------------+
-//| Description:  Magic Set Editor - Program to make Magic (tm) cards          |
+//| Description:  Magic Set Editor - Program to make card games                |
 //| Copyright:    (C) Twan van Laarhoven and the other MSE developers          |
 //| License:      GNU General Public License 2 or later (see file COPYING)     |
 //+----------------------------------------------------------------------------+
@@ -95,7 +95,7 @@ bool PackageChoiceValueEditor::onChar(wxKeyEvent& ev) {
   return drop_down->onCharInParent(ev);
 }
 void PackageChoiceValueEditor::onLoseFocus() {
-  if (drop_down) drop_down->hide(false);
+  //if (drop_down) drop_down->hide(false);
 }
 
 void PackageChoiceValueEditor::draw(RotatedDC& dc) {
@@ -115,4 +115,12 @@ void PackageChoiceValueEditor::change(const String& c) {
 void PackageChoiceValueEditor::initDropDown() {
   if (drop_down) return;
   drop_down = make_shared<DropDownPackageChoiceList>(&editor(), this);
+}
+
+// ----------------------------------------------------------------------------- : Resetting
+
+void PackageChoiceValueEditor::doDefaultReset() {
+  if (!valueP()) return;
+  unique_ptr<ResetValueAction<PackageChoiceValue, false>> action = make_unique<ResetValueAction<PackageChoiceValue, false>>(valueP());
+  addAction(std::move(action));
 }

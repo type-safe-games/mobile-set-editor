@@ -1,5 +1,5 @@
 //+----------------------------------------------------------------------------+
-//| Description:  Magic Set Editor - Program to make Magic (tm) cards          |
+//| Description:  Magic Set Editor - Program to make card games                |
 //| Copyright:    (C) Twan van Laarhoven and the other MSE developers          |
 //| License:      GNU General Public License 2 or later (see file COPYING)     |
 //+----------------------------------------------------------------------------+
@@ -10,6 +10,7 @@
 #include <data/format/formats.hpp>
 #include <data/set.hpp>
 #include <data/settings.hpp>
+#include <gui/set/window.hpp>
 
 // ----------------------------------------------------------------------------- : MSE2FileFormat
 
@@ -32,6 +33,7 @@ public:
     SetP set = make_intrusive<Set>();
     set->open(set_name);
     settings.addRecentFile(set_name);
+    SetWindow::updateRecentSetsInAllWindows();
     return set;
   }
   void exportSet(Set& set, const String& filename, bool is_copy) override {
@@ -40,6 +42,7 @@ public:
     } else {
       set.saveAs(filename);
       settings.addRecentFile(filename);
+      SetWindow::updateRecentSetsInAllWindows();
       set.actions.setSavePoint();
     }
   }

@@ -1,0 +1,10 @@
+Function: is_default
+
+--Usage--
+> is_default(some_field)
+
+Returns true if the field is in its default state, that is, if the user hasn't modified the value yet, false otherwise.
+
+--Parameters--
+! Parameter	Type			Description
+| @input@	[[type:field]]		Field to test.

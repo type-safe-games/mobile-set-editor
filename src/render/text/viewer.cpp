@@ -1,5 +1,5 @@
 //+----------------------------------------------------------------------------+
-//| Description:  Magic Set Editor - Program to make Magic (tm) cards          |
+//| Description:  Magic Set Editor - Program to make card games                |
 //| Copyright:    (C) Twan van Laarhoven and the other MSE developers          |
 //| License:      GNU General Public License 2 or later (see file COPYING)     |
 //+----------------------------------------------------------------------------+
@@ -13,20 +13,25 @@
 // ----------------------------------------------------------------------------- : Line
 
 struct TextViewer::Line {
-  size_t         start;       ///< Index of the first character in this line
-  size_t         end_or_soft; ///< Index just beyond the last non-soft character
-  vector<double> positions;   ///< x position of each character in this line, gives the number of characters + 1, never empty
-  double         top;         ///< y position of (the top of) this line
-  double         line_height; ///< The height of this line in pixels
-  LineBreak      break_after; ///< Is there a saparator after this line?
-  optional<Alignment> alignment; ///< Alignment of this line
-  bool           justifying;  ///< Is the text justified? Only true when *really* justifying.
-  double         margin_left; ///< Left margin
-  double         margin_right;///< Rightmargin
+  size_t         start;                     ///< Index of the first character in this line
+  size_t         end_or_soft;               ///< Index just beyond the last non-soft character
+  vector<double> positions;                 ///< x position of each character in this line, gives the number of characters + 1, never empty
+  double         top;                       ///< y position of (the top of) this line
+  double         line_height;               ///< The height of this line in pixels
+  LineBreak      break_after;               ///< Is there a saparator after this line?
+  optional<Alignment> alignment;            ///< Alignment of this line
+  bool           justifying;                ///< Is the text justified? Only true when *really* justifying.
+  double         margin_left_after_bullet;  ///< Left margin including the margin tag and bullet point
+  double         margin_left_before_bullet; ///< Left margin including the margin tag but just before the bullet point
+  double         margin_right;              ///< Right margin
+  bool           bullet;                    ///< Does this line start with a bullet point?
+  double         mask_left;                 ///< Leftmost x the mask allows on this line's row (before margins)
+  double         mask_right;                ///< Rightmost x the mask allows on this line's row (before margins)
   
   Line()
     : start(0), end_or_soft(0), top(0), line_height(0)
-    , break_after(LineBreak::NO), justifying(false)
+    , break_after(LineBreak::NO), justifying(false), bullet(false)
+    , mask_left(0), mask_right(0)
   {}
   
   /// The position (just beyond) the bottom of this line
@@ -72,7 +77,7 @@ TextViewer::~TextViewer() {}
 
 // ----------------------------------------------------------------------------- : Drawing
 
-void TextViewer::draw(RotatedDC& dc, const TextStyle& style, DrawWhat what) {
+void TextViewer::draw(RotatedDC& dc, const TextStyle& style, DrawWhat what, bool native_look) {
   assert(!lines.empty());
   // draw anything?
   if (what == DRAW_NOTHING) return;
@@ -88,11 +93,11 @@ void TextViewer::draw(RotatedDC& dc, const TextStyle& style, DrawWhat what) {
         // Draw characters separatly
         for (size_t i = 0 ; i < l.positions.size() - 1 ; ++i) {
           RealRect rect(l.positions[i], l.top, l.positions[i+1] - l.positions[i] , l.line_height);
-          elements.draw(dc, scale, rect, &l.positions[i], what, l.start + i, l.start + i + 1);
+          elements.draw(dc, scale, rect, &l.positions[i], what, l.start + i, l.start + i + 1, native_look);
         }
       } else {
         RealRect rect(l.positions.front(), l.top, l.width(), l.line_height);
-        elements.draw(dc, scale, rect, &*l.positions.begin(), what, l.start, l.end());
+        elements.draw(dc, scale, rect, &*l.positions.begin(), what, l.start, l.end(), native_look);
       }
     }
   }
@@ -108,19 +113,35 @@ RealRect intersect(const RealRect& a, const RealRect& b) {
 void TextViewer::drawSelection(RotatedDC& dc, const TextStyle& style, size_t sel_start, size_t sel_end) {
   if (sel_start == sel_end) return;
   if (sel_end < sel_start) swap(sel_start, sel_end);
-  dc.SetBrush(*wxBLACK_BRUSH);
-  dc.SetPen(*wxTRANSPARENT_PEN);
-  dc.SetLogicalFunction(wxINVERT);
+#ifdef __WXMSW__
+  dc.SetBrush(*wxWHITE_BRUSH);
+  dc.SetPen(*wxWHITE_PEN);
+  dc.SetLogicalFunction(wxXOR);
+#endif
   RealRect prev_rect(0,0,0,0);
   FOR_EACH(l, lines) {
     RealRect rect = l.selectionRectangle(dc, sel_start, sel_end);
-    if (rect.height > 0) dc.DrawRectangle(rect);
+    if (rect.height > 0) {
+#ifdef __WXMSW__
+      dc.DrawRectangle(rect);
+#else
+      dc.DrawInvertRectangle(rect);
+#endif
+    }
     // compensate for overlap between lines
     RealRect overlap = intersect(rect, prev_rect);
-    if (overlap.height > 0 && overlap.width > 0) dc.DrawRectangle(overlap);
+    if (overlap.height > 0 && overlap.width > 0) {
+#ifdef __WXMSW__
+      dc.DrawRectangle(overlap);
+#else
+      dc.DrawInvertRectangle(overlap);
+#endif
+    }
     prev_rect = rect;
   }
+#ifdef __WXMSW__
   dc.SetLogicalFunction(wxCOPY);
+#endif
 }
 
 RealRect TextViewer::Line::selectionRectangle(const Rotation& rot, size_t sel_start, size_t sel_end) {
@@ -299,7 +320,9 @@ size_t TextViewer::firstVisibleLine() const {
 }
 
 void TextViewer::scrollTo(size_t line_id) {
-  scrollBy(-lines.at(line_id).top);
+  if (lines.empty()) return;
+  if (line_id >= lines.size()) line_id = lines.size() - 1;
+  scrollBy(-lines[line_id].top);
 }
 void TextViewer::scrollBy(double delta) {
   if (delta == 0) return;
@@ -355,7 +378,7 @@ void update_size(LineLayout& layout, TextViewer::Line const& l) {
 TextLayoutP TextViewer::extractLayoutInfo() const {
   // store information about the content/layout
   TextLayoutP layout = make_intrusive<TextLayout>();
-  LineLayoutP paragraph, block;
+  LineLayoutP clause, paragraph, block;
   for (auto const& l : lines) {
     LineLayoutP line = make_intrusive<LineLayout>(l.width(), l.top, l.line_height, LineLayout::Type::LINE);
     if (!block) {
@@ -369,18 +392,29 @@ TextLayoutP TextViewer::extractLayoutInfo() const {
       block->paragraphs.push_back(paragraph);
       layout->paragraphs.push_back(paragraph);
     }
+    if (!clause) {
+      clause = make_intrusive<LineLayout>(*line);
+      clause->type = LineLayout::Type::CLAUSE;
+      paragraph->clauses.push_back(clause);
+      block->clauses.push_back(clause);
+      layout->clauses.push_back(clause);
+    }
+    clause->lines.push_back(line);
     paragraph->lines.push_back(line);
     block->lines.push_back(line);
     layout->lines.push_back(line);
     if (l.line_height > 0) {
+      update_size(*clause, l);
       update_size(*paragraph, l);
       update_size(*block, l);
       update_size(*layout, l);
     }
     if (l.break_after == LineBreak::LINE) {
-      paragraph = block = nullptr;
+      clause = paragraph = block = nullptr;
     } else if (l.break_after == LineBreak::HARD) {
-      paragraph = nullptr;
+      clause = paragraph = nullptr;
+    } else if (l.break_after == LineBreak::SOFT) {
+      clause = nullptr;
     }
   }
   for (size_t i=0; i+1 < layout->blocks.size() ; ++i) {
@@ -389,12 +423,7 @@ TextLayoutP TextViewer::extractLayoutInfo() const {
   return layout;
 }
 
-void TextViewer::prepareLines(RotatedDC& dc, const String& text, TextStyle& style, Context& ctx) {
-  vector<CharInfo> chars;
-  prepareLinesTryScales(dc, text, style, chars);
-  assert(!lines.empty());
-  
-  // no text, find a dummy height for the single line we have
+void fix_empty_line_height(vector<TextViewer::Line>& lines, RotatedDC& dc, const TextStyle& style, double scale) {
   if (lines.size() == 1 && lines[0].width() < 0.0001) {
     if (style.always_symbol && style.symbol_font.valid()) {
       lines[0].line_height = style.symbol_font.font->defaultSymbolSize(style.symbol_font.size).height;
@@ -403,14 +432,75 @@ void TextViewer::prepareLines(RotatedDC& dc, const String& text, TextStyle& styl
       lines[0].line_height = dc.GetCharHeight();
     }
   }
+}
+
+// Height spanned by lines [start_line,end_line), don't count trailing empty lines
+double lines_content_height(const vector<TextViewer::Line>& lines, size_t start_line, size_t end_line) {
+  double height = 0;
+  for (size_t li = end_line - 1 ; li + 1 > start_line ; --li) {
+    const TextViewer::Line& l = lines[li];
+    height = l.top + l.line_height;
+    if (l.line_height) break; // not an empty line
+  }
+  return height - lines[start_line].top;
+}
+
+void TextViewer::prepareLines(RotatedDC& dc, const String& text, TextStyle& style, Context& ctx) {
+  vector<CharInfo> chars;
+  prepareLinesTryScales(dc, text, style, chars);
+  assert(!lines.empty());
   
-  // store information about the content/layout, allow this to change alignment
-  if (style.alignment.isScripted()) {
-    style.layout = extractLayoutInfo();
-    style.alignment.update(ctx); // allow this to affect the alignment
+  // no text, find a dummy height for the single line we have
+  fix_empty_line_height(lines, dc, style, scale);
+  
+  RealSize s = add_diagonal(
+          dc.getInternalSize(),
+          -RealSize(style.padding_left+style.padding_right, style.padding_top + style.padding_bottom));
+  
+  // Resolve alignment and vertical position together; they can depend on each other:
+  //  - a scripted alignment can look at content_lines (via style.layout), which depends
+  //    on how the text ends up wrapped and positioned;
+  //  - with a mask, how the text wraps depends on the vertical offset alignment applies,
+  //    which depends on the (possibly scripted) alignment itself.
+  // So: iterate, refreshing style. layout each pass so a scripted alignment always sees
+  // the line count that's actually about to be used, and re-run line breaking with the
+  // resulting offset baked in (see prepareLinesAtScale's top_offset) so the mask gets
+  // sampled at the right rows. A line that barely fits can flip the line count back and
+  // forth forever (2 lines <-> 3 lines) without ever truly converging -- if we detect
+  // we're revisiting an offset we've already tried, stop there.
+  double offset = 0;
+  vector<double> seen_offsets;
+  const int max_iterations = 6;
+  for (int iteration = 0 ; iteration < max_iterations ; ++iteration) {
+    if (style.alignment.isScripted()) {
+      style.layout = extractLayoutInfo();
+      style.alignment.update(ctx); // allow this to affect the alignment
+    }
+    if (style.direction.isScripted()) {
+      style.layout = extractLayoutInfo();
+      style.direction.update(ctx); // allow this to affect the direction
+    }
+    if (!(style.paragraph_height <= 0 && (style.alignment & (ALIGN_MIDDLE | ALIGN_BOTTOM)))) {
+      break; // no vertical shift to account for; one pass is enough
+    }
+    double height = lines_content_height(lines, 0, lines.size());
+    double new_offset = align_delta_y(style.alignment, s.height, height);
+    if (fabs(new_offset - offset) < 0.5) break; // converged (within half a pixel)
+    bool seen_before = false;
+    for (double o : seen_offsets) {
+      if (fabs(o - new_offset) < 0.5) { seen_before = true; break; }
+    }
+    if (seen_before) break; // oscillating: stop instead of flip-flopping forever
+    seen_offsets.push_back(new_offset);
+    offset = new_offset;
+    vector<Line> lines_try;
+    prepareLinesAtScale(dc, chars, style, false, lines_try, offset);
+    if (lines_try.empty()) break; // shouldn't happen, but don't clobber a good layout
+    fix_empty_line_height(lines_try, dc, style, scale);
+    lines.swap(lines_try);
   }
   
-  // align
+  // align (mostly horizontal at this point; any leftover vertical delta is a small correction)
   alignLines(dc, chars, style);
   
   // HACK : fix empty first line before <line>, do this after align, so layout is not affected
@@ -545,28 +635,52 @@ void TextViewer::prepareLinesTryScales(RotatedDC& dc, const String& text, const 
 
 // Try to fit a blank line in the masked image, move down until it fits
 RealSize TextViewer::fitLineWidth(Line& line, RotatedDC& dc, const TextStyle& style) const {
-  RealSize line_size(line.margin_left + lineLeft(dc, style, line.top), 0);
-  while (line.top < dc.getHeight() && line_size.width + 1 >= dc.getWidth() - style.padding_right - line.margin_right) {
+  double margin_left = line.bullet ? line.margin_left_before_bullet : line.margin_left_after_bullet;
+  // Snap to a whole pixel here, once, so every later use agrees regardless of rounding convention
+  // (mask queries below, the rect handed to draw(), the next line's starting point)
+  line.top = floor(line.top + 0.5);
+  double left  = lineLeft (dc, style, line.top);
+  double right = lineRight(dc, style, line.top);
+  RealSize line_size(margin_left + left, 0);
+  while (line.top < dc.getHeight() &&
+         (right <= left || // the mask leaves no usable window at all on this row
+          line_size.width + 1 >= dc.getWidth() - style.padding_right - line.margin_right)) {
     // nothing fits on this line, move down one pixel
     line.top += 1;
-    line_size.width = line.margin_left + lineLeft(dc, style, line.top);
+    left  = lineLeft (dc, style, line.top);
+    right = lineRight(dc, style, line.top);
+    line_size.width = margin_left + left;
   }
+  // remember the raw (margin-free) mask bounds for this row, so alignHorizontal() can
+  // center/right-align against the true field bounds while still clamping into what
+  // the mask allows here, instead of only ever seeing the already-mask-shifted position.
+  line.mask_left  = left;
+  line.mask_right = right;
   return line_size;
 }
 
-bool TextViewer::prepareLinesAtScale(RotatedDC& dc, const vector<CharInfo>& chars, const TextStyle& style, bool stop_if_too_long, vector<Line>& lines) const {
+bool TextViewer::prepareLinesAtScale(RotatedDC& dc, const vector<CharInfo>& chars, const TextStyle& style, bool stop_if_too_long, vector<Line>& lines, double top_offset) const {
   // Try to layout the text at the current scale
   lines.clear();
+
+  // The current "clause" in the input string
+  size_t i_clause = 0;
+  assert(elements.clauses.size() > 0);
 
   // The current "paragraph" in the input string
   size_t i_para = 0;
   assert(elements.paragraphs.size() > 0);
 
   // first line
+  // top_offset lets a caller seed the layout with the (estimated) offset that vertical
+  // alignment will end up applying, so that fitLineWidth()/lineLeft()/lineRight() sample
+  // the mask at the rows the text will actually be drawn on, not always row 0. See the
+  // vertical alignment pre-pass in prepareLines().
   Line line;
-  line.top = style.padding_top;
-  line.margin_left  = elements.paragraphs[0].margin_left;
-  line.margin_right = elements.paragraphs[0].margin_right;
+  line.top = style.padding_top + elements.clauses[0].margin_top + top_offset;
+  line.margin_left_after_bullet = elements.clauses[0].margin_left;
+  line.margin_left_before_bullet = elements.clauses[0].margin_left;
+  line.margin_right = elements.clauses[0].margin_right;
   line.alignment = elements.paragraphs[0].alignment;
   // size of the line so far
   RealSize line_size = fitLineWidth(line, dc, style);
@@ -574,31 +688,43 @@ bool TextViewer::prepareLinesAtScale(RotatedDC& dc, const vector<CharInfo>& char
 
   // The word we are currently reading
   RealSize       word_size;
-  vector<double> positions_word; // positios for this word
+  vector<double> positions_word; // positions for this word
   size_t         word_end_or_soft = 0;
   size_t         word_start = 0;
   // For each character ...
   for (size_t i = 0 ; i < chars.size() ; ++i) {
     const CharInfo& c = chars[i];
+    assert(i_clause < elements.clauses.size());
     assert(i_para < elements.paragraphs.size());
     assert(c.size.width == 0 || elements.paragraphs[i_para].start <= i && i < elements.paragraphs[i_para].end);
+    // If we found the paragraph's bullet point, calculate the margins
+    if (i == elements.paragraphs[i_para].margin_after_bullet) {
+      for (size_t j = line.start; j < elements.paragraphs[i_para].margin_after_bullet; ++j) {
+        line.margin_left_after_bullet += chars[j].size.width;
+      }
+    }
+    if (i == elements.paragraphs[i_para].margin_before_bullet) {
+      for (size_t j = line.start; j < elements.paragraphs[i_para].margin_before_bullet; ++j) {
+        line.margin_left_before_bullet += chars[j].size.width;
+      }
+    }
     // Should we break?
     bool word_too_long = false;
     bool break_now     = false;
     bool accept_word   = false; // the current word should be added to the line
     bool hide_breaker  = true;  // hide the \n or _(' ') that caused a line break
-    if (c.break_after == LineBreak::SOFT || c.break_after == LineBreak::HARD || c.break_after == LineBreak::LINE) {
+    if (c.break_after >= LineBreak::WRAP) {
       break_now   = true;
       accept_word = true;
       line.break_after = c.break_after;
     } else if (c.break_after == LineBreak::SPACE && style.field().multi_line) {
       // Soft break == end of word
       accept_word = true;
-    } else if (c.break_after == LineBreak::MAYBE && style.direction == TOP_TO_BOTTOM) {
-      break_now   = true;
-      accept_word = true;
+    } else if (c.break_after == LineBreak::MAYBE && style.direction() == TOP_TO_BOTTOM) {
+      break_now    = true;
+      accept_word  = true;
       hide_breaker = false;
-      line.break_after = LineBreak::SOFT;
+      line.break_after = LineBreak::WRAP;
     }
     // Add size of the character
     if (c.break_after != LineBreak::LINE) {
@@ -608,12 +734,9 @@ bool TextViewer::prepareLinesAtScale(RotatedDC& dc, const vector<CharInfo>& char
     }
     positions_word.push_back(word_size.width);
     if (!c.soft) word_end_or_soft = i + 1;
-    if (i < elements.paragraphs[i_para].margin_end_char) {
-      line.margin_left += c.size.width; // character in left margin
-    }
     // Did the word become too long?
     if (!break_now) {
-      double max_width = lineRight(dc, style, line.top);
+      double max_width = lineRight(dc, style, line.top) - line.margin_right;
       if (line_size.width + word_size.width > max_width) {
         if (!style.field().multi_line) {
           // single line word does not fit
@@ -628,12 +751,12 @@ bool TextViewer::prepareLinesAtScale(RotatedDC& dc, const vector<CharInfo>& char
             accept_word = true;
             hide_breaker = false;
             word_too_long = true;
-            line.break_after = LineBreak::SOFT;
+            line.break_after = LineBreak::WRAP;
           }
         } else {
           // line would become too long, break before the current word
           break_now = true;
-          line.break_after = LineBreak::SOFT;
+          line.break_after = LineBreak::WRAP;
         }
       }
     }
@@ -681,20 +804,37 @@ bool TextViewer::prepareLinesAtScale(RotatedDC& dc, const vector<CharInfo>& char
       line.top += line.line_height * line_height_multiplier;
       line.start = word_start;
       line.positions.clear();
-      if (line.break_after == LineBreak::LINE) line.line_height = 0;
+      if (line.break_after >= LineBreak::SOFT) {
+        // end of clause
+        assert(elements.clauses[i_clause].end == i + 1);
+        assert(i_clause + 1 < elements.clauses.size());
+        if (i_clause + 1 < elements.clauses.size()) ++i_clause;
+        assert(elements.clauses[i_clause].start == i + 1);
+        line.margin_right = elements.clauses[i_clause].margin_right;
+        //if (line.start == elements.clauses[i_clause].start) {
+          line.top += elements.clauses[i_clause].margin_top;
+        //}
+      }
       if (line.break_after >= LineBreak::HARD) {
         // end of paragraph
-        // look at next paragraph
         assert(elements.paragraphs[i_para].end == i + 1);
         assert(i_para + 1 < elements.paragraphs.size());
-        if (i_para+1 < elements.paragraphs.size()) ++i_para;
+        if (i_para + 1 < elements.paragraphs.size()) ++i_para;
         assert(elements.paragraphs[i_para].start == i + 1);
-        line.margin_left = elements.paragraphs[i_para].margin_left;
-        line.margin_right = elements.paragraphs[i_para].margin_right;
-        line.top += elements.paragraphs[i_para].margin_top;
+        line.margin_left_after_bullet = elements.clauses[i_clause].margin_left;
+        line.margin_left_before_bullet = elements.clauses[i_clause].margin_left;
         line.alignment = elements.paragraphs[i_para].alignment;
       }
+      if (line.break_after == LineBreak::LINE) line.line_height = 0;
       line.break_after = LineBreak::NO;
+      // is the first visible character of the line a bullet point?
+      line.bullet = false;
+      for (size_t j = line.start ; j < chars.size() ; ++j) {
+        if (!chars[j].soft) {
+          line.bullet = chars[j].bullet;
+          break;
+        }
+      }
       // reset line_size
       line_size = fitLineWidth(line, dc, style);
       line.positions.push_back(line_size.width); // start position
@@ -721,7 +861,7 @@ bool TextViewer::prepareLinesAtScale(RotatedDC& dc, const vector<CharInfo>& char
     // per paragraph alignment
     size_t start = 0;
     for (size_t last = 0 ; last < lines.size() ; ++last) {
-      if (lines[last].break_after != LineBreak::SOFT || last == lines.size()) {
+      if (lines[last].break_after >= LineBreak::HARD || last+1 == lines.size()) {
         max_height = max(max_height, lines[last].bottom() - lines[start].top);
         start = last + 1;
       }
@@ -749,15 +889,30 @@ void TextViewer::alignLines(RotatedDC& dc, const vector<CharInfo>& chars, const 
   if (style.paragraph_height <= 0) {
     // whole text box alignment
     assert(!lines.empty());
-    double top = lines[0].top;
+    // Note: this is deliberately the *natural* top-aligned position, not lines[0].top.
+    // prepareLines() may already have nudged lines[0].top down/up so that line breaking
+    // sampled the mask at (approximately) the right rows (see the pre-pass there). Using
+    // lines[0].top here would make alignParagraph() shift everything a second time.
+    double top;
+    if (style.alignment & (ALIGN_MIDDLE | ALIGN_BOTTOM)) {
+      // prepareLines()'s vertical pre-pass only runs (and only nudges lines[0].top) for
+      // MIDDLE/BOTTOM alignment. Anchor to the natural top-aligned position here so
+      // alignParagraph() doesn't shift everything a second time on top of that nudge.
+      top = style.padding_top + elements.clauses[0].margin_top;
+    } else {
+      top = lines[0].top;
+    }
     alignParagraph(0, lines.size(), chars, style, RealRect(RealPoint(0,top),s));
   } else {
     // per paragraph alignment
     size_t start = 0;
     int n = 0;
     for (size_t last = 0 ; last < lines.size() ; ++last) {
-      if (lines[last].break_after != LineBreak::SOFT || last+1 == lines.size()) {
-        alignParagraph(start, last + 1, chars, style, RealRect(0, style.padding_top+n*style.paragraph_height, s.width, style.paragraph_height));
+      if (lines[last].break_after >= LineBreak::HARD || last+1 == lines.size()) {
+        double y = (style.alignment & (ALIGN_MIDDLE | ALIGN_BOTTOM)) ?
+                    style.padding_top + n*style.paragraph_height :
+                    lines[start].top;
+        alignParagraph(start, last + 1, chars, style, RealRect(0, y, s.width, style.paragraph_height));
         start = last + 1;
         ++n;
       }
@@ -769,13 +924,7 @@ void TextViewer::alignParagraph(size_t start_line, size_t end_line, const vector
   if (start_line >= end_line) return;
   
   // Find height of the text, don't count the last lines if they are empty
-  double height = 0;
-  for (size_t li = end_line - 1 ; li + 1 > start_line ; --li) {
-    Line& l = lines[li];
-    height = l.top + l.line_height;
-    if (l.line_height) break; // not an empty line
-  }
-  height -= lines[start_line].top;
+  double height = lines_content_height(lines, start_line, end_line);
   
   // stretch lines by increasing the space between them
   if (height < s.height) {
@@ -795,9 +944,9 @@ void TextViewer::alignParagraph(size_t start_line, size_t end_line, const vector
       double sum = 0;
       for (size_t li = start_line ; li < end_line ; ++li) {
         const Line& l = lines[li];
-        if ((soft && l.break_after == LineBreak::SOFT)
-         || (hard && l.break_after == LineBreak::HARD)
-         || (line && l.break_after == LineBreak::LINE)) sum += l.line_height;
+        if ((soft && (l.break_after == LineBreak::SOFT || l.break_after == LineBreak::WRAP))
+         || (hard &&  l.break_after == LineBreak::HARD)
+         || (line &&  l.break_after == LineBreak::LINE)) sum += l.line_height;
       }
       if (sum == 0) break;
       // how much do we need to add?
@@ -808,9 +957,9 @@ void TextViewer::alignParagraph(size_t start_line, size_t end_line, const vector
         Line& l = lines[li];
         l.top  += add;
         // adjust next line by..
-        if ((soft && l.break_after == LineBreak::SOFT)
-         || (hard && l.break_after == LineBreak::HARD)
-         || (line && l.break_after == LineBreak::LINE)) add += to_add * l.line_height;
+        if ((soft && (l.break_after == LineBreak::SOFT || l.break_after == LineBreak::WRAP))
+         || (hard &&  l.break_after == LineBreak::HARD)
+         || (line &&  l.break_after == LineBreak::LINE)) add += to_add * l.line_height;
       }
       height += add;
     }
@@ -827,15 +976,19 @@ void TextViewer::alignParagraph(size_t start_line, size_t end_line, const vector
     // amount to shift all characters horizontally
     l.alignHorizontal(chars, style, s);
   }
-  // TODO : work well with mask
+  // NOTE: unlike the alignment shift below (made mask-aware by the pre-pass in
+  // prepareLines()), this stretch-spacing still moves lines to positions that were
+  // never sampled in the mask -- fixing that would mean threading a per-line offset
+  // through prepareLinesAtScale, not just a single starting top. Not handled yet.
 }
 
 void TextViewer::Line::alignHorizontal(const vector<CharInfo>& chars, const TextStyle& style, const RealRect& s) {
-  double width = this->width() - margin_left;
-  double target_width = s.width - margin_left - margin_right;
+  double margin_bullet = bullet ? margin_left_before_bullet : margin_left_after_bullet;
+  double width = this->width() - margin_bullet;
+  double target_width = s.width - margin_bullet - margin_right;
   Alignment alignment = this->alignment.value_or(style.alignment);
   bool should_fill = (alignment & ALIGN_IF_OVERFLOW  ? width > target_width : true)
-                  && (alignment & ALIGN_IF_SOFTBREAK ? break_after == LineBreak::SOFT || !style.field().multi_line : true);
+                  && (alignment & ALIGN_IF_SOFTBREAK ? break_after == LineBreak::WRAP || break_after == LineBreak::SOFT || !style.field().multi_line : true);
   if ((alignment & ALIGN_JUSTIFY_ALL) && should_fill) {
     // justify text, by characters
     justifying = true;
@@ -866,7 +1019,19 @@ void TextViewer::Line::alignHorizontal(const vector<CharInfo>& chars, const Text
   } else {
     // simple alignment
     justifying = false;
+    // hug whatever the mask allows on this row
     double hdelta = s.x + align_delta_x(alignment, target_width, width);
+    if (alignment & (ALIGN_CENTER | ALIGN_RIGHT)) {
+      double min_left = mask_left + margin_bullet;
+      double max_left = mask_right - margin_right - width;
+      if (max_left >= min_left) {
+        // everything fits within the mask and margins, align according to alignment
+        double desired_left = margin_bullet + s.x + align_delta_x(alignment, target_width, width);
+        desired_left = max(min_left, min(max_left, desired_left));
+        hdelta = desired_left - positions.front();
+      }
+      // else: doesn't fit, let it overflow past the edges
+    }
     for (auto& c : positions) {
       c += hdelta;
     }

@@ -1,5 +1,5 @@
 //+----------------------------------------------------------------------------+
-//| Description:  Magic Set Editor - Program to make Magic (tm) cards          |
+//| Description:  Magic Set Editor - Program to make card games                |
 //| Copyright:    (C) Twan van Laarhoven and the other MSE developers          |
 //| License:      GNU General Public License 2 or later (see file COPYING)     |
 //+----------------------------------------------------------------------------+
@@ -45,22 +45,27 @@ public:
   Set(const StyleSheetP& stylesheet);
   ~Set();
 
-  GameP                    game;              ///< The game this set uses
-  StyleSheetP              stylesheet;        ///< The default stylesheet
+  GameP                           game;              ///< The game this set uses
+  StyleSheetP                     stylesheet;        ///< The default stylesheet
   /// The values on the fields of the set
   /** The indices should correspond to the set_fields in the Game */
-  IndexMap<FieldP, ValueP> data;
-  /// Extra values for specitic stylesheets, indexed by stylesheet name
+  IndexMap<FieldP, ValueP>        data;
+  /// Extra values for specific stylesheets, indexed by stylesheet name
   DelayedIndexMaps<FieldP,ValueP> styling_data;
-  vector<CardP>            cards;             ///< The cards in the set
-  vector<KeywordP>         keywords;          ///< Additional keywords used in this set
-  vector<PackTypeP>        pack_types;        ///< Additional/replacement pack types
-  String                   apprentice_code;   ///< Code to use for apprentice (Magic only)
-
-  ActionStack              actions;           ///< Actions performed on this set and the cards in it
-  KeywordDatabase          keyword_db;        ///< Database for matching keywords, must be cleared when keywords change
-  VCSP                     vcs;               ///< The version control system to use
+  vector<CardP>                   cards;             ///< The cards in the set
+  unordered_map<String, CardP>    card_uids;         ///< The uids of the cards in the set
+  vector<KeywordP>                keywords;          ///< Additional keywords used in this set
+  vector<PackTypeP>               pack_types;        ///< Additional/replacement pack types
+  String                          apprentice_code;   ///< Code to use for apprentice (magic only)
   
+  ActionStack                     actions;           ///< Actions performed on this set and the cards in it
+  KeywordDatabase                 keyword_db;        ///< Database for matching keywords, must be cleared when keywords change
+  VCSP                            vcs;               ///< The version control system to use
+  /// What version of the game was this set using when it was last saved?
+  Version                         game_version;
+  /// What version of the default stylesheet was this set using when it was last saved?
+  Version                         stylesheet_version;
+
   /// A context for performing scripts
   /** Should only be used from the main thread! */
   Context& getContext();
@@ -71,6 +76,12 @@ public:
   void updateStyles(const CardP& card, bool only_content_dependent);
   /// Update scripts that were delayed
   void updateDelayed();
+  /// Update scripts that depend on card links
+  void updateLinkScripts(const CardP& card);
+  /// Update cards by applying update_cards_scripts from the game/stylesheets
+  void updateCardsScripts();
+  /// Update uid map
+  void buildUIDMap();
   /// A context for performing scripts
   /** Should only be used from the thumbnail thread! */
   Context& getContextForThumbnails();
@@ -90,7 +101,12 @@ public:
   IndexMap<FieldP, ValueP>& stylingDataFor(const StyleSheet&);
   /// Styling information for a particular card
   IndexMap<FieldP, ValueP>& stylingDataFor(const CardP& card);
-  
+
+  /// Make sure the image and symbol files from
+  /// the ActionStack are saved so we can undo
+  void referenceActionStackFiles();
+  void referenceActionStackFiles(bool undo);
+
   /// Get the identification of this set, an identification is something like a name, title, etc.
   /** May return "" */
   String identification() const;
@@ -159,7 +175,7 @@ public:
   ~SetView();
   
   /// Get the set that is currently being viewed
-  //inline SetP getSet() const { return set; }
+  inline SetP getSet() const { return set; }
   /// Change the set that is being viewed
   void setSet(const SetP& set);
   

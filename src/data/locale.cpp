@@ -1,5 +1,5 @@
 //+----------------------------------------------------------------------------+
-//| Description:  Magic Set Editor - Program to make Magic (tm) cards          |
+//| Description:  Magic Set Editor - Program to make card games                |
 //| Copyright:    (C) Twan van Laarhoven and the other MSE developers          |
 //| License:      GNU General Public License 2 or later (see file COPYING)     |
 //+----------------------------------------------------------------------------+
@@ -116,6 +116,24 @@ String tr(const Package& pkg, const String& subcat, const String& key, DefaultLo
   SubLocaleP loc = the_locale->package_translations[pkg.relativeFilename()];
   if (!loc) {
     loc = find_wildcard_and_set(the_locale->package_translations, pkg.relativeFilename());
+  }
+  return loc->tr(subcat, key, def);
+}
+
+String tr(const String& pkg_relative_filename, const String& key, DefaultLocaleFun def) {
+  if (!the_locale) return def(key);
+  SubLocaleP loc = the_locale->package_translations[pkg_relative_filename];
+  if (!loc) {
+    loc = find_wildcard_and_set(the_locale->package_translations, pkg_relative_filename);
+  }
+  return loc->tr(key, def);
+}
+
+String tr(const String& pkg_relative_filename, const String& subcat, const String& key, DefaultLocaleFun def) {
+  if (!the_locale) return def(key);
+  SubLocaleP loc = the_locale->package_translations[pkg_relative_filename];
+  if (!loc) {
+    loc = find_wildcard_and_set(the_locale->package_translations, pkg_relative_filename);
   }
   return loc->tr(subcat, key, def);
 }

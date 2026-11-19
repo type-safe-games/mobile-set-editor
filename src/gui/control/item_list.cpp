@@ -1,5 +1,5 @@
 //+----------------------------------------------------------------------------+
-//| Description:  Magic Set Editor - Program to make Magic (tm) cards          |
+//| Description:  Magic Set Editor - Program to make card games                |
 //| Copyright:    (C) Twan van Laarhoven and the other MSE developers          |
 //| License:      GNU General Public License 2 or later (see file COPYING)     |
 //+----------------------------------------------------------------------------+
@@ -16,7 +16,7 @@
 ItemList::ItemList(Window* parent, int id, long additional_style, bool multi_sel)
   : wxListView(parent, id, wxDefaultPosition, wxDefaultSize, additional_style | wxLC_REPORT | wxLC_VIRTUAL | (multi_sel ? 0 : wxLC_SINGLE_SEL))
   , selected_item_pos(-1)
-  , sort_by_column(-1), sort_ascending(true)
+  , sort_by_column(-1), sort_by_column2(-1), sort_by_column3(-1), sort_ascending(true)
 {
   // create image list
   wxImageList* il = new wxImageList(18,14);
@@ -79,7 +79,7 @@ void ItemList::selectItem(const VoidP& item, bool focus, bool event) {
     focusNone();
   }
   selected_item = item;
-  if (event) sendEvent();
+  if (event) sendEvent(); // sending an event will trigger a UI update
   findSelectedItemPos();
   if (focus) focusSelectedItem();
 }
@@ -111,9 +111,18 @@ void ItemList::findSelectedItemPos() {
     }
   }
 }
+long ItemList::findGivenItemPos(const VoidP& item) {
+  long count = GetItemCount();
+  for (long pos = 0; pos < count; ++pos) {
+    if (getItem(pos) == item) {
+      return pos;
+    }
+  }
+  return -1;
+}
 void ItemList::focusSelectedItem(bool force_focus) {
   if (GetItemCount() > 0) {
-    if (selected_item_pos == -1 || (size_t)selected_item_pos > sorted_list.size()) {
+    if (selected_item_pos == -1 || (size_t)selected_item_pos >= sorted_list.size()) {
       // deselect currently selected item, if any
       long sel = GetFirstSelected();
       Select(sel, false);
@@ -181,14 +190,15 @@ void ItemList::refreshList(bool refresh_current_only) {
   // Note: Freeze/Thaw makes flicker worse
   long item_count = (long)sorted_list.size();
   SetItemCount(item_count);
-  // (re)select current item
-  findSelectedItemPos();
-  focusNone();
-  focusSelectedItem(true);
-  // refresh items
   if (item_count == 0) {
     Refresh();
   } else {
+    // (re)select current item
+    findSelectedItemPos();
+    focusNone();
+    focusSelectedItem(true);
+    // refresh items
+  
     RefreshItems(0, item_count - 1);
   }
 }
@@ -254,6 +264,8 @@ void ItemList::onColumnClick(wxListEvent& ev) {
       new_sort_by_column = -1;  // 3rd click on same column -> don't sort
     }
   } else {
+    sort_by_column3 = sort_by_column2;
+    sort_by_column2 = sort_by_column;
     sort_ascending = true;
   }
   sortBy(new_sort_by_column, sort_ascending);

@@ -1,5 +1,5 @@
 //+----------------------------------------------------------------------------+
-//| Description:  Magic Set Editor - Program to make Magic (tm) cards          |
+//| Description:  Magic Set Editor - Program to make card games                |
 //| Copyright:    (C) Twan van Laarhoven and the other MSE developers          |
 //| License:      GNU General Public License 2 or later (see file COPYING)     |
 //+----------------------------------------------------------------------------+
@@ -85,7 +85,6 @@ bool Keyword::contains(QuickFilterPart const& query) const {
 
 IMPLEMENT_REFLECTION(Keyword) {
   REFLECT(keyword);
-  if (handler.formatVersion() < 301) read_compat(handler, this);
   REFLECT(match);
   REFLECT(reminder);
   REFLECT(rules);

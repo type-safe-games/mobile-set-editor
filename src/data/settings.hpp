@@ -1,5 +1,5 @@
 //+----------------------------------------------------------------------------+
-//| Description:  Magic Set Editor - Program to make Magic (tm) cards          |
+//| Description:  Magic Set Editor - Program to make card games                |
 //| Copyright:    (C) Twan van Laarhoven and the other MSE developers          |
 //| License:      GNU General Public License 2 or later (see file COPYING)     |
 //+----------------------------------------------------------------------------+
@@ -24,16 +24,20 @@ DECLARE_POINTER_TYPE(Field);
 DECLARE_POINTER_TYPE(Value);
 DECLARE_POINTER_TYPE(AutoReplace);
 
-// For now, use the old style update checker
-#define USE_OLD_STYLE_UPDATE_CHECKER 1
-
 // ----------------------------------------------------------------------------- : Extra data structures
 
 /// When to check for updates?
 enum CheckUpdates
-{  CHECK_ALWAYS
-,  CHECK_IF_CONNECTED
+{  CHECK_7_DAYS
+,  CHECK_30_DAYS
 ,  CHECK_NEVER
+};
+
+/// What to check for updates?
+enum CheckUpdatesTargets
+{  CHECK_APP
+,  CHECK_GAMES
+,  CHECK_EVERYTHING
 };
 
 /// Where to install to?
@@ -85,7 +89,9 @@ public:
   map<String, int>            pack_amounts;
   bool                        pack_seed_random;
   int                         pack_seed;
-  
+  vector<Color>               custom_colors;
+  static constexpr size_t     max_custom_colors = 16; // store this many custom colors for the color picker
+
   DECLARE_REFLECTION();
 private:
   bool initialized;
@@ -97,13 +103,19 @@ public:
   StyleSheetSettings();
   
   // Rendering/display settings
-  Defaultable<double> card_zoom;
+  Defaultable<double>  card_zoom;
+  Defaultable<int>     export_scale_selection;
   Defaultable<Degrees> card_angle;
-  Defaultable<bool>   card_anti_alias;
-  Defaultable<bool>   card_borders;
-  Defaultable<bool>   card_draw_editing;
-  Defaultable<bool>   card_normal_export;
-  Defaultable<bool>   card_spellcheck_enabled;
+  Defaultable<bool>    card_anti_alias;
+  Defaultable<bool>    card_borders;
+  Defaultable<bool>    card_draw_editing;
+  Defaultable<bool>    card_normal_export;
+  Defaultable<bool>    card_bleed_export;
+  Defaultable<bool>    card_notes_export;
+  Defaultable<bool>    card_metaimage_export;
+  Defaultable<bool>    card_dfc_export;
+  Defaultable<bool>    card_spellcheck_enabled;
+  Defaultable<double>  list_hide_back_faces;
   
   /// Where the settings are the default, use the value from ss
   void useDefault(const StyleSheetSettings& ss);
@@ -113,10 +125,18 @@ public:
 
 // ----------------------------------------------------------------------------- : Printing settings
 
-enum PageLayoutType
-{  LAYOUT_NO_SPACE
-,  LAYOUT_EQUAL_SPACE
-//,  LAYOUT_CUSTOM
+enum CutterLinesType
+{  CUTTER_ALL
+,  CUTTER_NO_INTERSECTION
+,  CUTTER_NONE
+};
+
+// ----------------------------------------------------------------------------- : Dark mode settings
+
+enum DarkModeType
+{  DARKMODE_SYSTEM
+,  DARKMODE_NO
+,  DARKMODE_YES
 };
 
 // ----------------------------------------------------------------------------- : Settings
@@ -146,6 +166,7 @@ public:
   String default_image_dir;  ///< Where to look for images to import
   String default_symbol_dir; ///< Where to look for .mse-symbol files
   String default_export_dir; ///< Where to export to by default
+  String default_import_dir; ///< Where to import to by default
   
   // --------------------------------------------------- : Set window
   bool set_window_maximized;
@@ -163,14 +184,29 @@ public:
   String default_game;
   
   // --------------------------------------------------- : Game/stylesheet specific
-  
+
+  struct ExportSettings {
+    ExportSettings(double zoom, double angle_radians, double bleed_pixels, bool dfc_export): zoom(zoom), angle_radians(angle_radians), bleed_pixels(bleed_pixels), dfc_export(dfc_export) { }
+    ExportSettings(): zoom(1.0),angle_radians(0.0), bleed_pixels(0.0), dfc_export(false) { }
+    double zoom, angle_radians, bleed_pixels;
+    bool dfc_export;
+  };
+
   /// Get the settings object for a specific game
-  GameSettings&       gameSettingsFor      (const Game& game);
+  GameSettings&       gameSettingsFor          (const Game& game);
   /// Get the settings for a column for a specific field in a game
-  ColumnSettings&     columnSettingsFor    (const Game& game, const Field& field);
+  ColumnSettings&     columnSettingsFor        (const Game& game, const Field& field);
   /// Get the settings object for a specific stylesheet
-  StyleSheetSettings& stylesheetSettingsFor(const StyleSheet& stylesheet);
+  StyleSheetSettings& stylesheetSettingsFor    (const StyleSheet& stylesheet);
+  double              exportScaleSettingsFor   (const StyleSheet& stylesheet);
+  double              importScaleSettingsFor   (const StyleSheet& stylesheet);
+  double              clipboardScaleSettingsFor(const StyleSheet& stylesheet);
+  double              adaptiveScaleSettingsFor (const StyleSheet& stylesheet, double target_dpi, double leeway_dpi);
+  ExportSettings      exportSettingsFor        (const StyleSheet& stylesheet);
+  ExportSettings      clipboardSettingsFor     (const StyleSheet& stylesheet);
   
+  static const vector<int> scale_choices;
+
 private:
   map<String,GameSettingsP>       game_settings;
   map<String,StyleSheetSettingsP> stylesheet_settings;
@@ -186,23 +222,46 @@ public:
   IndexMap<FieldP,ValueP>& exportOptionsFor(const ExportTemplate& export_template);
   
   // --------------------------------------------------- : Printing
-  
-  PageLayoutType print_layout;
-  
+
+  double print_spacing;
+  double print_bleed;
+  CutterLinesType print_cutter_lines;
+
+  // --------------------------------------------------- : Dark Mode
+
+  DarkModeType dark_mode_type;
+  /// Is the app currently displayed in dark mode?
+  bool darkMode();
+  /// Prefix for resource files depending on dark mode
+  String darkModePrefix();
+  /// Background color for windows depending on dark mode
+  Color darkModeColor();
+
   // --------------------------------------------------- : Special game stuff
+
   String apprentice_location;
   
+  // --------------------------------------------------- : Internal settings
+
+  int import_scale_selection;
+  int clipboard_scale_selection;
+  bool card_dfc_copy;
+  bool allow_image_download;
+
   // --------------------------------------------------- : Update checking
-  #if USE_OLD_STYLE_UPDATE_CHECKER
-    String updates_url;
-  #endif
-  String package_versions_url; ///< latest package versions
-  String installer_list_url;   ///< available installers
-  CheckUpdates check_updates;
-  bool   check_updates_all; ///< Check updates of all packages, not just the program
+
+  String installer_list_url;    ///< available installers
+  CheckUpdatesTargets check_updates_what;
+  CheckUpdates check_updates_when;
+  int check_updates_last_check; ///< date of the last successful update check, as an integer in YYYYMMDD form (0 = never checked).
+
+  // --------------------------------------------------- : Help links
+
   String website_url;
+  String documentation_url;
   
   // --------------------------------------------------- : Installation settings
+
   InstallType install_type;
   
   // --------------------------------------------------- : The io

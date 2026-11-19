@@ -1,0 +1,18 @@
+Function: version_is_older
+
+--Usage--
+> version_is_older("version", than: "other version")
+
+Check if a version number is strictly older than another.
+
+Malformed version numbers, including nil, are treated as 0-0-0.
+
+--Parameters--
+! Parameter	Type			Description
+| @input@	[[type:string]]		Version we want to check.
+| @than@	[[type:string]]		Version we want to check against.
+
+--Examples--
+> version_is_older("2025-06-28", than: "2026-02-18")  ==  true
+> version_is_older("2026-02-18", than: "2026-02-18")  ==  false
+> version_is_older(nil, than: "0-0-1")  ==  true

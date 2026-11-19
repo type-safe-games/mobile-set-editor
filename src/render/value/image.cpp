@@ -1,5 +1,5 @@
 //+----------------------------------------------------------------------------+
-//| Description:  Magic Set Editor - Program to make Magic (tm) cards          |
+//| Description:  Magic Set Editor - Program to make card games                |
 //| Copyright:    (C) Twan van Laarhoven and the other MSE developers          |
 //| License:      GNU General Public License 2 or later (see file COPYING)     |
 //+----------------------------------------------------------------------------+
@@ -42,8 +42,8 @@ void ImageValueViewer::draw(RotatedDC& dc) {
     if (!image.Ok() && style().default_image.isReady()) {
       image = style().default_image.generate(GeneratedImage::Options(w, h, &getStylePackage(), &getLocalPackage()));
       is_default = true;
-      if (what & DRAW_EDITING) {
-        bitmap = imagePlaceholder(dc, w, h, image, what & DRAW_EDITING);
+      if ((what & DRAW_EDITING) && field().editable) {
+        bitmap = imagePlaceholder(dc, w, h, image, true);
         if (alpha_mask.isLoaded() || !is_rad0(a)) {
           image = bitmap.ConvertToImage(); // we need to convert back to an image
         } else {
@@ -54,7 +54,7 @@ void ImageValueViewer::draw(RotatedDC& dc) {
     // checkerboard placeholder
     if (!image.Ok() && !bitmap.Ok() && style().width > 40) {
       // placeholder bitmap
-      bitmap = imagePlaceholder(dc, w, h, wxNullImage, what & DRAW_EDITING);
+      bitmap = imagePlaceholder(dc, w, h, wxNullImage, (what & DRAW_EDITING) && field().editable);
       if (alpha_mask.isLoaded() || !is_rad0(a)) {
         // we need to convert back to an image
         image = bitmap.ConvertToImage();
@@ -99,34 +99,32 @@ bool very_light(const Image& image) {
   return total >= 210 * 3;
 }
 
-Bitmap ImageValueViewer::imagePlaceholder(const Rotation& rot, UInt w, UInt h, const Image& background, bool editing) {
+Bitmap ImageValueViewer::imagePlaceholder(const Rotation& rot, UInt w, UInt h, const Image& default_image, bool editing) {
   // Bitmap and memory dc
-  Bitmap bmp(w, h, 24);
+  Bitmap bmp(w, h, 32);
   wxMemoryDC mdc;
   mdc.SelectObject(bmp);
   RealRect rect(0,0,w,h);
   RotatedDC dc(mdc, 0, rect, 1.0, QUALITY_AA);
   // Draw (checker) background
-  if (!background.Ok() || background.HasAlpha()) {
+  if (!default_image.Ok()) {
     draw_checker(dc, rect);
   }
-  if (background.Ok()) {
-    dc.DrawImage(background, RealPoint(0,0));
+  else {
+    if (default_image.HasAlpha()) bmp.UseAlpha(true);
+    dc.DrawImage(default_image, RealPoint(0,0));
   }
   // Draw text
   if (editing) {
     // only when in editor mode
+    String label = _LABEL_("load image");
     for (UInt size = 12 ; size > 2 ; --size) {
       dc.SetFont(wxFont(size, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL));
-      RealSize rs = dc.GetTextExtent(_("double click to load image"));
+      RealSize rs = dc.GetTextExtent(label);
       if (rs.width <= w - 10 && rs.height < h - 10) {
         // text fits
         RealPoint pos = align_in_rect(ALIGN_MIDDLE_CENTER, rs, rect);
-        bool black_on_white = !background.Ok() || very_light(background);
-        dc.SetTextForeground(black_on_white ? *wxWHITE : *wxBLACK);
-        dc.DrawText(_("double click to load image"), pos, 2, 4); // blurred
-        dc.SetTextForeground(black_on_white ? *wxBLACK : *wxWHITE);
-        dc.DrawText(_("double click to load image"), pos);
+        dc.DrawText(label, pos, Color(255,255,255), 2, Color(0,0,0), 3); // stroked
         break;
       }
     }

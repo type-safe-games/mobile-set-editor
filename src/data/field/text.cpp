@@ -1,5 +1,5 @@
 //+----------------------------------------------------------------------------+
-//| Description:  Magic Set Editor - Program to make Magic (tm) cards          |
+//| Description:  Magic Set Editor - Program to make card games                |
 //| Copyright:    (C) Twan van Laarhoven and the other MSE developers          |
 //| License:      GNU General Public License 2 or later (see file COPYING)     |
 //+----------------------------------------------------------------------------+
@@ -38,16 +38,21 @@ IMPLEMENT_REFLECTION(TextField) {
 // ----------------------------------------------------------------------------- : TextStyle
 
 TextLayoutP dummy_layout() {
-  auto layout = make_intrusive<TextLayout>();
-  auto line = make_intrusive<LineLayout>(0, 0, 0, LineLayout::Type::LINE);
+  auto layout    = make_intrusive<TextLayout>();
+  auto line      = make_intrusive<LineLayout>(0, 0, 0, LineLayout::Type::LINE);
+  auto clause    = make_intrusive<LineLayout>(0, 0, 0, LineLayout::Type::CLAUSE);
   auto paragraph = make_intrusive<LineLayout>(0, 0, 0, LineLayout::Type::PARAGRAPH);
-  auto block = make_intrusive<LineLayout>(0, 0, 0, LineLayout::Type::BLOCK);
+  auto block     = make_intrusive<LineLayout>(0, 0, 0, LineLayout::Type::BLOCK);
+  clause   ->lines.push_back(line);
   paragraph->lines.push_back(line);
-  block->lines.push_back(line);
-  layout->lines.push_back(line);
-  block->paragraphs.push_back(paragraph);
-  layout->paragraphs.push_back(paragraph);
-  layout->blocks.push_back(block);
+  block    ->lines.push_back(line);
+  layout   ->lines.push_back(line);
+  paragraph->clauses.push_back(clause);
+  block    ->clauses.push_back(clause);
+  layout   ->clauses.push_back(clause);
+  block    ->paragraphs.push_back(paragraph);
+  layout   ->paragraphs.push_back(paragraph);
+  layout   ->blocks.push_back(block);
   return layout;
 }
 
@@ -85,6 +90,7 @@ int TextStyle::update(Context& ctx) {
   changes |= font       .update(ctx) * CHANGE_OTHER;
   changes |= symbol_font.update(ctx) * CHANGE_OTHER;
   changes |= alignment  .update(ctx) * CHANGE_OTHER;
+  changes |= direction  .update(ctx) * CHANGE_OTHER;
   changes |= padding_left        .update(ctx) * CHANGE_OTHER;
   changes |= padding_left_min    .update(ctx) * CHANGE_OTHER;
   changes |= padding_right       .update(ctx) * CHANGE_OTHER;
@@ -109,6 +115,7 @@ void TextStyle::initDependencies(Context& ctx, const Dependency& dep) const {
 void TextStyle::checkContentDependencies(Context& ctx, const Dependency& dep) const {
   Style   ::checkContentDependencies(ctx, dep);
   alignment.initDependencies(ctx, dep);
+  direction.initDependencies(ctx, dep);
 }
 
 template <typename T> void reflect_layout(T& handler,         const TextLayoutP& layout) {}
@@ -127,8 +134,9 @@ void LineLayout::reflect(GetMember& handler) const {
   REFLECT(top);
   REFLECT(height);
   REFLECT_N("bottom", bottom());
-  REFLECT_N("middle", top + height/2);
+  REFLECT_N("middle", middle());
   if (type > Type::LINE) REFLECT(lines);
+  if (type > Type::CLAUSE) REFLECT(clauses);
   if (type > Type::PARAGRAPH) REFLECT(paragraphs);
   if (type > Type::BLOCK) REFLECT(blocks);
 }
@@ -168,15 +176,38 @@ IMPLEMENT_REFLECTION(TextStyle) {
 
 // ----------------------------------------------------------------------------- : TextValue
 
+void TextValue::copyDataFrom(const Value& other) {
+  if (const TextValue* o = dynamic_cast<const TextValue*>(&other)) {
+    value = o->value;
+  }
+}
+
 String TextValue::toString() const {
   return untag_hide_sep(value());
 }
+
+bool TextValue::isDefault() {
+  return value.isDefault();
+}
+
+void TextValue::makeDefault(bool d) {
+  value.makeDefault(d);
+}
+
 bool TextValue::update(Context& ctx) {
   updateAge();
   WITH_DYNAMIC_ARG(last_update_age,     last_update.get());
   WITH_DYNAMIC_ARG(value_being_updated, this);
   bool change = field().default_script.invokeOnDefault(ctx, value)
               | field().        script.invokeOn(ctx, value);
+  // repair <soft-line> tags
+  String fixed;
+  if (fix_soft_lines(value(), fixed)) {
+    bool was_default = value.isDefault();
+    value.assign(fixed);
+    value.makeDefault(was_default);
+    change = true;
+  }
   if (change) last_update.update();
   updateSortValue(ctx);
   return change;
@@ -206,7 +237,7 @@ void FakeTextValue::retrieve() {
   if (underlying) {
     value.assign(untagged ? escape(*underlying) : *underlying);
   } else {
-    value.assign(wxEmptyString);
+    value.assign(_(""));
   }
 }
 

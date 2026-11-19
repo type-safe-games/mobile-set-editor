@@ -1,5 +1,5 @@
 //+----------------------------------------------------------------------------+
-//| Description:  Magic Set Editor - Program to make Magic (tm) cards          |
+//| Description:  Magic Set Editor - Program to make card games                |
 //| Copyright:    (C) Twan van Laarhoven and the other MSE developers          |
 //| License:      GNU General Public License 2 or later (see file COPYING)     |
 //+----------------------------------------------------------------------------+
@@ -38,6 +38,9 @@ private:
   static const int vspace      = 10;
   static const int label_margin = 10;
   int              label_width;
+  
+  int cached_thumb_pos = 0;
+  int cached_scroll = 0;
   
   DECLARE_EVENT_TABLE();
   

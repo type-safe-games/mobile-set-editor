@@ -1,5 +1,5 @@
 //+----------------------------------------------------------------------------+
-//| Description:  Magic Set Editor - Program to make Magic (tm) cards          |
+//| Description:  Magic Set Editor - Program to make card games                |
 //| Copyright:    (C) Twan van Laarhoven and the other MSE developers          |
 //| License:      GNU General Public License 2 or later (see file COPYING)     |
 //+----------------------------------------------------------------------------+
@@ -12,10 +12,12 @@
 #include <gui/control/item_list.hpp>
 #include <data/card.hpp>
 #include <data/set.hpp>
+#include <wx/dnd.h>
 
 DECLARE_POINTER_TYPE(ChoiceField);
 DECLARE_POINTER_TYPE(Field);
 class CardListBase;
+class CardListDropTarget;
 
 // ----------------------------------------------------------------------------- : Events
 
@@ -64,19 +66,46 @@ public:
   
   // --------------------------------------------------- : Selection
   
-  inline CardP getCard() const            { return static_pointer_cast<Card>(selected_item); }
-  inline void  setCard(const CardP& card) { selectItem(card, true, false); }
-    
-  // --------------------------------------------------- : Clipboard
+  inline CardP getCard() const                                { return static_pointer_cast<Card>(selected_item); }
+  inline void  setCard(const CardP& card, bool event = false) { selectItem(card, true, event); }
   
+  // --------------------------------------------------- : Clipboard and Drag'n'Drop
+
+  CardListDropTarget* drop_target;
+  wxTimer drop_timer;
+
   bool canCut()    const override;
   bool canCopy()   const override;
   bool canPaste()  const override;
   bool canDelete() const override;
   // Try to perform a clipboard operation, return success
   bool doCopy() override;
+  bool doCopyCardAndLinkedCards();
   bool doPaste() override;
   bool doDelete() override;
+
+  // Try to perform a bulk operation, return success
+  bool doAddCSV();
+  bool doAddJSON();
+
+  bool doBulkModification();
+
+  // Look for cards inside some given data
+  bool parseData(bool ignore_cards_from_own_card_list);
+  bool parseUrl  (String& url,              vector<CardP>& out);
+  bool parseFiles(wxArrayString& filenames, vector<CardP>& out);
+  bool parseText (String& text,             vector<CardP>& out);
+  bool parseImage(Image& image,             vector<CardP>& out);
+
+  /// Recreate the images for image fields from the metadata
+  void parseImageMetadata(CardP& card, const Image& image);
+  void parseImageMetadata(CardP& card);
+
+  // --------------------------------------------------- : Card linking
+  
+  bool canLink()    const;
+  bool doLink();
+  bool doUnlink(CardP linked_card);
   
   // --------------------------------------------------- : Set actions
   
@@ -90,10 +119,19 @@ public:
   inline CardP getCard(long pos) const { return static_pointer_cast<Card>(getItem(pos)); }
   /// Get a list of all focused cards
   void getSelection(vector<CardP>& out) const;
+  /// Can this card list hide back faces if the settings dictate it
+  bool allow_back_face_hidding = true;
+  /// Can cards be drag n dropped out of this list
+  bool allow_drag = true;
+  /// Number of cards hidden from the last getItems() call because they are back faces
+  int getHiddenBackFacesCount() const { return hidden_back_faces_count; }
 protected:
   /// Get a list of all cards
   void getItems(vector<VoidP>& out) const override;
-  
+
+  /// Remove cards that are back faces from the list, if settings.default_stylesheet_settings.hide_back_faces() is set
+  void filterOutBackFaces(vector<VoidP>& out) const;
+
   /// Rebuild the card list (clear all vectors and fill them again)
   void rebuild();
   /// Do some additional updating before rebuilding the list
@@ -105,7 +143,7 @@ protected:
   
   /// Send an 'item selected' event for the currently selected item (selected_item)
   void sendEvent() override { sendEvent(EVENT_CARD_SELECT); }
-  void sendEvent(int type = EVENT_CARD_SELECT);
+  void sendEvent(int type);
   /// Compare cards
   bool compareItems(void* a, void* b) const override;
   
@@ -126,8 +164,10 @@ private:
   vector<FieldP> column_fields; ///< The field to use for each column (by column index)
   FieldP alternate_sort_field;  ///< Second field to sort by, if the column doesn't suffice
   
-  mutable wxListItemAttr item_attr; // for OnGetItemAttr
-  
+  mutable wxListItemAttr item_attr; ///< for OnGetItemAttr
+
+  mutable int hidden_back_faces_count = 0;
+
 public:
   /// Open a dialog for selecting columns to be shown
   void selectColumns();
@@ -143,7 +183,25 @@ private:
   void onItemActivate    (wxListEvent&);
   void onSelectColumns   (wxCommandEvent&);
   void onChar            (wxKeyEvent&);
+  void onBeginDrag       (wxListEvent&);
+  void OnDragTimer       (wxTimerEvent&);
   void onDrag            (wxMouseEvent&);
   void onContextMenu     (wxContextMenuEvent&);
+};
+
+// ----------------------------------------------------------------------------- : Drag'n'Drop
+
+class CardListDropTarget : public wxDropTarget {
+public:
+  CardListDropTarget(CardListBase* card_list);
+  ~CardListDropTarget();
+
+  wxDragResult OnData(wxCoord x, wxCoord y, wxDragResult defaultDragResult) override;
+
+  wxDataObjectComposite* data_object; ///< the object that acquires the data from the Clipboard or a Drag'n'Drop
+
+  String                 ignored_id;  ///< the id of the transaction we need to ignore (the one coming from our own card_list)
+private:
+  CardListBase*          card_list;   ///< the card list we are the drop target of
 };
 

@@ -1,5 +1,5 @@
 //+----------------------------------------------------------------------------+
-//| Description:  Magic Set Editor - Program to make Magic (tm) cards          |
+//| Description:  Magic Set Editor - Program to make card games                |
 //| Copyright:    (C) Twan van Laarhoven and the other MSE developers          |
 //| License:      GNU General Public License 2 or later (see file COPYING)     |
 //+----------------------------------------------------------------------------+
@@ -44,7 +44,7 @@ public:
   PackageChoiceStyle(const PackageChoiceFieldP& field);
   DECLARE_STYLE_TYPE(PackageChoice);
   
-  Font font;  ///< Font to use for the text
+  FontRef font;  ///< Font to use for the text
   
   int update(Context&) override;
 };
@@ -56,12 +56,18 @@ class PackageChoiceValue : public Value {
 public:
   PackageChoiceValue(const PackageChoiceFieldP& field) : Value(field), package_name(field->initial) {}
   DECLARE_VALUE_TYPE(PackageChoice, String);
-  
+
+  void copyDataFrom(const Value& other) override;
+
   ValueType package_name;  ///< The selected package
   
   /// Get the package (if it is set), otherwise return nullptr
   PackagedP getPackage() const;
-  
+
+  bool isDefault() override;
+
+  void makeDefault(bool d = true) override;
+
   bool update(Context&) override;
 };
 

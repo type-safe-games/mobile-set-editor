@@ -1,5 +1,5 @@
 //+----------------------------------------------------------------------------+
-//| Description:  Magic Set Editor - Program to make Magic (tm) cards          |
+//| Description:  Magic Set Editor - Program to make card games                |
 //| Copyright:    (C) Twan van Laarhoven and the other MSE developers          |
 //| License:      GNU General Public License 2 or later (see file COPYING)     |
 //+----------------------------------------------------------------------------+
@@ -57,11 +57,8 @@ void GalleryList::select(size_t item, size_t subcolumn, bool event) {
   col.selection = item;
   changes |= col.selection != old_sel;
   // ensure visible
-  if (itemStart(col.selection) < visible_start) {
-    scrollTo(itemStart(col.selection));
-  } else if (itemEnd(col.selection) > visibleEnd()) {
-    scrollTo(itemEnd(col.selection) + visible_start - visibleEnd());
-  } else if (col.selection != old_sel) {
+  ensureVisible(col.selection);
+  if (col.selection != old_sel) {
     RefreshItem(old_sel);
     RefreshItem(col.selection);
   }
@@ -72,15 +69,6 @@ void GalleryList::select(size_t item, size_t subcolumn, bool event) {
 }
 
 void GalleryList::update() {
-  // ensure selection is visible
-  SubColumn col = subcolumns[active_subcolumn];
-  if (col.selection != NO_SELECTION) {
-    if (itemStart(col.selection) < visible_start) {
-      scrollTo(itemStart(col.selection), false);
-    } else if (itemEnd(col.selection) > visibleEnd()) {
-      scrollTo(itemEnd(col.selection) + visible_start - visibleEnd(), false);
-    }
-  }
   updateScrollbar();
   Refresh(false);
   InvalidateBestSize();
@@ -168,8 +156,24 @@ void GalleryList::onScroll(wxScrollWinEvent& ev) {
   }
 }
 
+void GalleryList::ensureVisible(size_t item) {
+  if (item >= itemCount()) return;
+  // Can't determine visibility until we've been laid out.
+  if (mainSize(GetClientSize()) == 0) return;
+
+  if (itemStart(item) < visible_start) {
+    scrollTo(itemStart(item));
+  } else if (itemEnd(item) > visibleEnd()) {
+    scrollTo(itemEnd(item) + visible_start - visibleEnd());
+  }
+}
+
 void GalleryList::onSize(wxSizeEvent& ev) {
   update();
+  const SubColumn& col = subcolumns[active_subcolumn];
+  if (col.selection != NO_SELECTION) {
+    ensureVisible(col.selection);
+  }
   ev.Skip();
 }
 

@@ -1,5 +1,5 @@
 //+----------------------------------------------------------------------------+
-//| Description:  Magic Set Editor - Program to make Magic (tm) cards          |
+//| Description:  Magic Set Editor - Program to make card games                |
 //| Copyright:    (C) Twan van Laarhoven and the other MSE developers          |
 //| License:      GNU General Public License 2 or later (see file COPYING)     |
 //+----------------------------------------------------------------------------+
@@ -16,6 +16,9 @@ DECLARE_POINTER_TYPE(Packaged);
 DECLARE_POINTER_TYPE(PackageVersion);
 DECLARE_POINTER_TYPE(InstallablePackage);
 class PackageDependency;
+
+/// Callback used to report progress while installing a package
+typedef std::function<void(int files_done, int files_total)> InstallProgressCallback;
 
 // ----------------------------------------------------------------------------- : PackageVersion
 
@@ -61,7 +64,9 @@ class PackageDirectory {
 public:
   void init(bool local);
   void init(const String& dir);
-  
+
+  void deleteEmptyFolders();
+
   bool valid() const { return !directory.empty(); }
   
   /// Name of a package in this directory
@@ -74,12 +79,15 @@ public:
   
   /// Find all packages that match a filename pattern (using wxFindFirst)
   String findFirstMatching(const String& pattern) const;
-  
+
+  /// Verify that a package contains its titular file
+  bool checkForPackageFile(const String& package_name);
+
   /// Get all installed packages
   void installedPackages(vector<InstallablePackageP>& packages);
   
   /// Install/uninstall a package
-  bool install(const InstallablePackage& package);
+  bool install(const InstallablePackage& package, const InstallProgressCallback& progress = nullptr);
   
   /// Bless a package
   void bless(const String& package_name);
@@ -95,7 +103,7 @@ private:
   
   String databaseFile();
   // Do the actual installation of a package
-  bool actual_install(const InstallablePackage& package, const String& install_dir);
+  bool actual_install(const InstallablePackage& package, const String& install_dir, const InstallProgressCallback& progress);
   
   DECLARE_REFLECTION();
 };
@@ -116,7 +124,9 @@ public:
   void destroy();
   /// Empty the list of packages, they will all be reloaded
   void reset();
-  
+  /// Clear a package from the list, it will be reloaded
+  void evictFromCache(const String& filename_or_name);
+
   // --------------------------------------------------- : Packages in memory
   
   /// Open a package with the specified name (including extension)
@@ -131,6 +141,10 @@ public:
     }
   }
   
+  /// Prepare a filename so that it can be used as a key in loaded_packages
+  String cleanFilename(const String& name);
+  String normalizeFilename(const String& name);
+
   /// Open a package with the specified name, the type of package is determined by its extension!
   /** @param if just_header is true, then the package is not fully parsed.
    */
@@ -139,7 +153,10 @@ public:
   /// Find all packages that match a filename pattern, store them in out
   /** Only reads the package headers */
   void findMatching(const String& pattern, vector<PackagedP>& out);
-  
+
+  /// Check if a file exists in a package
+  bool existsInPackage(const String& name);
+
   /// Open a file from a package, with a name encoded as "/package/file"
   /** If 'package' is set then:
    *    - tries to open a relative file from the package if the name is "file"
@@ -148,7 +165,7 @@ public:
    *  Returns the opened file and the package it is in
    */
   pair<unique_ptr<wxInputStream>,Packaged*> openFileFromPackage(Packaged* package, const String& name);
-  
+
   /// Get a filename to open from a package
   /** WARNING: this is a bit of a hack, since not all package types support names in this way.
    *  It is needed for third party libraries (i.e. hunspell) that load stuff from files.
@@ -167,8 +184,8 @@ public:
   void findAllInstalledPackages(vector<InstallablePackageP>& packages);
   
   /// Install/uninstall a package, returns success
-  bool install(const InstallablePackage& package);
-  
+  bool install(const InstallablePackage& package, const InstallProgressCallback& progress = nullptr);
+
   // --------------------------------------------------- : Other package like things
   
   /// Get the directory for dictionary files

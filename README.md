@@ -4,91 +4,110 @@ Magic Set Editor, or MSE for short, is a program with which you can design your 
 
 More information on https://magicseteditor.boards.net/
 
+Documentation on https://mseverse.miraheze.org/wiki/Category:MSE_Documentation
+
+
 ## Dependencies
 
 The code depends on
- * wxWidgets >= 3.0
+ * wxWidgets >= 3.3.3
  * boost
  * hunspell
 
-## Building on windows with Visual Studio
+
+## Building on Windows with Visual Studio
 
 On windows, the program can be compiled with Visual Studio (recommended) or with mingw-gcc.
-
- * Download and install [Visual Studio Community edition](https://visualstudio.microsoft.com/vs/community/)
+ * Visual Studio instructions up-to-date as of April 2024
+ * Download and install [Visual Studio Community Edition](https://visualstudio.microsoft.com/vs/community/)
  * Download and install [vcpkg](https://github.com/microsoft/vcpkg)
- * Use vcpkg to install wxwidgets, boost, hunspell
+ * Use vcpkg to install pkgconf, wxwidgets, boost, hunspell:
+
 ````
-vcpkg install wxwidgets
-vcpkg install boost-smart-ptr
-vcpkg install boost-regex
-vcpkg install boost-logic
-vcpkg install boost-pool
-vcpkg install hunspell
-vcpkg integrate install
+.\vcpkg install pkgconf wxwidgets[fonts] boost-smart-ptr boost-regex boost-logic boost-pool boost-iterator boost-json hunspell --triplet=x64-windows-static
 ````
- * Then just use "Open Folder" from inside visual studio to open the Magic Set Editor source code root folder.
- * Select the configuration that you want to build, and hit F7.
+and/or
+````
+.\vcpkg install pkgconf wxwidgets[fonts] boost-smart-ptr boost-regex boost-logic boost-pool boost-iterator boost-json hunspell --triplet=x86-windows-static
+````
+(these two lines differ only by the triplet at the end. Use x64 for 64 bit operating systems, and x86 for 32 bit.)
+
+then, regardless of your choice
+````
+.\vcpkg integrate install
+````
+
+ * Inside Visual Studio go to File menu > Open > Folder... > select the Magic Set Editor source code root folder.
+ * Select the configuration that you want to build (probably release x64-windows-static). Make sure you have installed all the packages with the corresponding triplet.
+
+![configuration](https://github.com/G-e-n-e-v-e-n-s-i-S/MagicSetEditor2/blob/main/resource/readme/configuration.png)
+
+ * Just to the right of that, select magicseteditor.exe. (These options sometimes get de-selected. If you suddenly can't build anymore, make sure to re-select these.)
+ * To build the app go to Build menu > build magicseteditor.exe
 
 Notes:
- * You may need to work around [this bug](https://github.com/microsoft/vcpkg/issues/4756) by replacing `$VCPATH\IDE\CommonExtensions\Microsoft\CMake\CMake\share\cmake-3.16\Modules\FindwxWidgets.cmake` with the file from  https://github.com/CaeruleusAqua/vcpkg-wx-find (`$VCPATH` is usually `C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\Common7`)
- * vcpkg by default installs 32 bit versions of libraries, use `vcpkg install PACKAGENAME:x64-windows` if you want to enable a 64 bit build.
- * Similarly, to use a static build, use `vcpkg install PACKAGENAME:x32-windows-static`.
- 
-For running tests you will also need to
- * Download and install perl (For example [Strawberry perl](http://strawberryperl.com/) or using [MSYS2](https://www.msys2.org/))
-The tests can be run from inside visual studio
+ * You will most likely get a message about being unable to open hunspell-1.7.lib because pkgconf forgets to add the actual path to HUNSPELL_LIBRARIES. If so, uncomment the noted line in CMakeLists.txt (line 31) and point it to the root vcpkg installation to find the correct hunspell-1.7.lib file.
 
-## Building on windows with GCC (MSYS2)
+![hunspell](https://github.com/G-e-n-e-v-e-n-s-i-S/MagicSetEditor2/blob/main/resource/readme/hunspell.png)
+
+ * For running tests you will also need to download and install perl (For example [Strawberry perl](http://strawberryperl.com/) or using [MSYS2](https://www.msys2.org/)). The tests can be run from inside visual studio
+
+
+## Building on Windows with GCC (MSYS2)
 
  * Download and install [msys2](https://www.msys2.org/)
  * Install a recent version of the gcc compiler, cmake, and wxWidgets libraries:
-````
+
+```
 pacman -S mingw32/mingw-w64-i686-gcc
 pacman -S mingw32/mingw-w64-i686-wxWidgets
 pacman -S mingw32/mingw-w64-i686-boost
 pacman -S mingw32/mingw-w64-i686-hunspell
 pacman -S cmake
-````
-   Use `mingw64/mingw-w64-x86_64-...` instead of for the 64bit build
+```
+
+   Use `mingw64/mingw-w64-x86_64-...` instead of for the 64bit build.
  * Build
-````
+
+```
 cmake -G "MSYS Makefiles" -H. -Bbuild -DCMAKE_BUILD_TYPE=Release
 cmake --build build
-````
+```
 
-## Building on linux
+ Use `CMAKE_BUILD_TYPE=Debug` for a debug build.
 
-Install the dependencies, for example on a debian based system
-````
-sudo apt install g++
-sudo apt install libboost-dev libwxgtk3.0-gtk3-dev libhunspell-dev
-````
-Then use cmake to build
-````
-cmake build -DCMAKE_BUILD_TYPE=Release
-cmake --build build
-````
-Use `CMAKE_BUILD_TYPE=Debug` for a debug build
 
-## Building on Mac
+## Building on Linux / FreeBSD
 
-Install the dependencies, for example using Homebrew
-````
-brew install boost wxwidgets hunspell
-````
-Note: Tested with boost 1.72.0_3, wxmac (wxwidgets) 3.0.5.1_1, hunspell 1.7.0_2
-Then use cmake to build
-````
+Refer to this script:
+https://gist.github.com/ebbit1q/2b72433ef5aea4934235e8188e238346#file-update_mse-sh
+
+
+## Building on Mac OS
+
+ * Install the dependencies; for example, using Homebrew: (Note: Tested with boost 1.92.0, wxmac (wxwidgets) 3.3.3, hunspell 1.7.3, cmake 4.4.2, dylibbundler 1.0.5.)
+
+```
+brew install boost wxwidgets hunspell cmake dylibbundler pkg-config
+```
+
+ * Then use cmake to build:
+
+```
 mkdir build && cd build
-cmake -DCMAKE_BUILD_TYPE=Release ..
-cmake --build ..
-````
-Use `CMAKE_BUILD_TYPE=Debug` for a debug build
+cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_APPLE_BUNDLE=1 ..
+cmake --build .
+```
 
-Finally, copy the resources to a SharedSupport directory and run the executable
-````
-mkdir SharedSupport && cd SharedSupport
-cp -r ../resource SharedSupport/
-./magicseteditor
-````
+ Use `CMAKE_BUILD_TYPE=Debug` for a debug build.
+ * Finally, run the application bundle:
+
+```
+open ./magicseteditor.app
+```
+
+### Installing resources
+When you launch the app, it should tell you where to put your templates. Typically that's `$HOME/Library/Application Support/magicseteditor` (copy the `data/` folder there).
+
+### Autoupdater support
+The auto-updater isn't working on macOS just yet, so you'll have to continue sourcing app and template updates the old-fashioned way.

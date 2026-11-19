@@ -1,5 +1,5 @@
 //+----------------------------------------------------------------------------+
-//| Description:  Magic Set Editor - Program to make Magic (tm) cards          |
+//| Description:  Magic Set Editor - Program to make card games                |
 //| Copyright:    (C) Twan van Laarhoven and the other MSE developers          |
 //| License:      GNU General Public License 2 or later (see file COPYING)     |
 //+----------------------------------------------------------------------------+
@@ -60,13 +60,30 @@ public:
     }
     return true;
   }
-  /// Initialize this map with cloned values from another list
+  /// Initialize this map with cloned values from another map
   void cloneFrom(const IndexMap<Key,Value>& values) {
     if (this->size() == values.size()) return;
     this->reserve(values.size());
     for(size_t index = size() ; index < values.size() ; ++index) {
       const Value& value = values[index];
       vector<Value>::push_back(value ? value->clone() : value);
+    }
+  }
+  /// Merge in data from another IndexMap by matching keys by name, not by position.
+  /** Unlike cloneFrom, copyDataFrom does not assume the two maps share the same key domain.
+  *  For each value in `this`, look up a value with the same key name in `other`;
+  *  if found, copy its payload (not its key) into the value in `this` using
+  *  Value::copyDataFrom. Entries with no match, or a match of an incompatible
+  *  type, are left as-is (typically their freshly init()'d default).
+  *  `this` should already be init()'d with the desired (destination) key domain.
+  */
+  void copyDataFrom(const IndexMap<Key,Value>& other) {
+    for (typename vector<Value>::iterator it = begin() ; it != end() ; ++it) {
+      if (!*it) continue;
+      typename vector<Value>::const_iterator other_it = other.find(get_key_name(*it));
+      if (other_it != other.end() && *other_it) {
+        (*it)->copyDataFrom(**other_it);
+      }
     }
   }
   /// Change this map by adding an additional key and value
@@ -147,10 +164,12 @@ class DelayedIndexMaps {
 public:
   /// Get the data for a specific name. Initialize the map with init_with (if it is not alread initialized)
   IndexMap<Key,Value>& get(const String& name, const vector<Key>& init_with);
+  /// Initialize this map with cloned values from another map
+  void cloneFrom(const DelayedIndexMaps<Key,Value>& values);
   /// Clear the delayed index map
   void clear();
-private:
   map<String, intrusive_ptr<DelayedIndexMapsData<Key,Value>>> data;
+private:
   friend class Reader;
   friend class Writer;
   friend class GetDefaultMember;

@@ -1,5 +1,5 @@
 //+----------------------------------------------------------------------------+
-//| Description:  Magic Set Editor - Program to make Magic (tm) cards          |
+//| Description:  Magic Set Editor - Program to make card games                |
 //| Copyright:    (C) Twan van Laarhoven and the other MSE developers          |
 //| License:      GNU General Public License 2 or later (see file COPYING)     |
 //+----------------------------------------------------------------------------+
@@ -51,10 +51,14 @@ String tr(LocaleCategory cat, const String& key, DefaultLocaleFun def = warn_and
 /// Translate 'key' in the for a Package using the current locale
 [[deprecated]]
 String tr(const Package&, const String& key, DefaultLocaleFun def);
+[[deprecated]]
+String tr(const String&, const String& key, DefaultLocaleFun def);
 
 /// Translate 'key' in the for a Package using the current locale
 [[deprecated]]
 String tr(const Package&, const String& subcat, const String& key, DefaultLocaleFun def);
+[[deprecated]]
+String tr(const String&, const String& subcat, const String& key, DefaultLocaleFun def);
 
 /// A localized string for menus
 #define _MENU_(s)    tr(LOCALE_CAT_MENU,      _(s))
@@ -72,41 +76,55 @@ String tr(const Package&, const String& subcat, const String& key, DefaultLocale
 #define _TITLE_(s)   tr(LOCALE_CAT_TITLE,     _(s))
 /// A localized string for type names in scripts
 #define _TYPE_(s)    tr(LOCALE_CAT_TYPE,      _(s))
+#define _TYPE_V_(s)  tr(LOCALE_CAT_TYPE,        s )
 /// A localized string for action names
 #define _ACTION_(s)  tr(LOCALE_CAT_ACTION,    _(s))
 /// A localized string for error messages
 #define _ERROR_(s)   tr(LOCALE_CAT_ERROR,     _(s))
 
 /// A localized string for menus, with 1 argument (printf style)
-#define _MENU_1_(s,a)    format_string(_MENU_(s),    a)
+#define _MENU_1_(s,a)        format_string(_MENU_(s),    a)
 
 /// A localized string for tooltip text, with 1 argument (printf style)
-#define _HELP_1_(s,a)    format_string(_HELP_(s),    a)
-
-/// A localized string for tooltip text, with 1 argument (printf style)
-#define _TOOLTIP_1_(s,a)  format_string(_TOOLTIP_(s), a)
+#define _HELP_1_(s,a)        format_string(_HELP_(s),    a)
 
 /// A localized string for tooltip labels, with 1 argument (printf style)
-#define _LABEL_1_(s,a)    format_string(_LABEL_(s),   a)
+#define _TOOL_1_(s,a)        format_string(_TOOL_(s),    a)
+/// A localized string for tooltip labels, with 2 argument (printf style)
+#define _TOOL_2_(s,a,b)      format_string(_TOOL_(s),    a, b)
+/// A localized string for tooltip labels, with 3 argument (printf style)
+#define _TOOL_3_(s,a,b,c)    format_string(_TOOL_(s),    a, b, c)
+/// A localized string for tooltip labels, with 3 argument (printf style)
+#define _TOOL_4_(s,a,b,c,d)  format_string(_TOOL_(s),    a, b, c, d)
+
+/// A localized string for tooltip text, with 1 argument (printf style)
+#define _TOOLTIP_1_(s,a)     format_string(_TOOLTIP_(s), a)
+
+/// A localized string for tooltip labels, with 1 argument (printf style)
+#define _LABEL_1_(s,a)       format_string(_LABEL_(s),   a)
+/// A localized string for tooltip labels, with 2 argument (printf style)
+#define _LABEL_2_(s,a,b)     format_string(_LABEL_(s),   a, b)
+/// A localized string for tooltip labels, with 3 argument (printf style)
+#define _LABEL_3_(s,a,b,c)   format_string(_LABEL_(s),   a, b, c)
 
 /// A localized string for button text, with 1 argument (printf style)
-#define _BUTTON_1_(s,a)    format_string(_BUTTON_(s), a)
+#define _BUTTON_1_(s,a)      format_string(_BUTTON_(s),  a)
 
 /// A localized string for window titles, with 1 argument (printf style)
-#define _TITLE_1_(s,a)    format_string(_TITLE_(s), a)
+#define _TITLE_1_(s,a)       format_string(_TITLE_(s),   a)
 
 /// A localized string for type names in scripts, with 1 argument (printf style)
-#define _TYPE_1_(s,a)    format_string(_TYPE_(s), a)
+#define _TYPE_1_(s,a)        format_string(_TYPE_(s),    a)
 
 /// A localized string for action names, with 1 argument (printf style)
-#define _ACTION_1_(s,a)    format_string(_ACTION_(s), a)
+#define _ACTION_1_(s,a)      format_string(_ACTION_(s),  a)
 
 /// A localized string for error messages, with 1 argument (printf style)
-#define _ERROR_1_(s,a)    format_string(_ERROR_(s),   a)
+#define _ERROR_1_(s,a)       format_string(_ERROR_(s),   a)
 /// A localized string for error messages, with 2 argument (printf style)
-#define _ERROR_2_(s,a,b)  format_string(_ERROR_(s),   a, b)
+#define _ERROR_2_(s,a,b)     format_string(_ERROR_(s),   a, b)
 /// A localized string for error messages, with 3 argument (printf style)
-#define _ERROR_3_(s,a,b,c)  format_string(_ERROR_(s),   a, b, c)
+#define _ERROR_3_(s,a,b,c)   format_string(_ERROR_(s),   a, b, c)
 /// A localized string for error messages, with 4 argument (printf style)
 #define _ERROR_4_(s,a,b,c,d) format_string(_ERROR_(s),   a, b, c, d)
 
@@ -116,7 +134,7 @@ String tr(const Package&, const String& subcat, const String& key, DefaultLocale
 inline String format_string(const String& format, ...) {
   va_list args;
   va_start(args, format);
-  String res = String::Format(format, args);
+  String res = String::FormatV(format, args);
   va_end(args);
   return res;
 }

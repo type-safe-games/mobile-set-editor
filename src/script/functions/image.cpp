@@ -1,5 +1,5 @@
 //+----------------------------------------------------------------------------+
-//| Description:  Magic Set Editor - Program to make Magic (tm) cards          |
+//| Description:  Magic Set Editor - Program to make card games                |
 //| Copyright:    (C) Twan van Laarhoven and the other MSE developers          |
 //| License:      GNU General Public License 2 or later (see file COPYING)     |
 //+----------------------------------------------------------------------------+
@@ -16,6 +16,7 @@
 #include <data/stylesheet.hpp>
 #include <data/symbol.hpp>
 #include <data/field/symbol.hpp>
+#include <data/format/formats.hpp>
 #include <gfx/generated_image.hpp>
 #include <render/symbol/filter.hpp>
 
@@ -28,7 +29,105 @@ SCRIPT_FUNCTION(to_image) {
   return input;
 }
 
+SCRIPT_FUNCTION(to_card_image) {
+  SCRIPT_PARAM(Set*, set);
+  SCRIPT_PARAM(CardP, input);
+  SCRIPT_PARAM_DEFAULT(double, zoom, 100.0);
+  SCRIPT_PARAM_DEFAULT(Degrees, angle, 0.0);
+  SCRIPT_PARAM_DEFAULT(double, bleed, 0.0);
+  SCRIPT_PARAM_DEFAULT(bool, dfc, false);
+  SCRIPT_PARAM_DEFAULT(bool, use_user_settings, false);
+  if (use_user_settings) {
+    // Use the User's Preferences for Export Zoom, Angle, Bleed and DFC settings.
+    Settings::ExportSettings card_settings = settings.exportSettingsFor(set->stylesheetFor(input));
+    zoom =  card_settings.zoom;
+    angle = card_settings.angle_radians;
+    bleed = card_settings.bleed_pixels;
+    dfc = card_settings.dfc_export;
+  } else {
+    // Use the provided (or defaulted) Zoom, Angle, Bleed and DFC.
+    zoom = zoom / 100.0;
+    angle = deg_to_rad(angle);
+  }
+  return make_intrusive<ArbitraryImage>(export_image(set, input, true, Settings::ExportSettings{zoom, angle, bleed, dfc}));
+}
+
+SCRIPT_FUNCTION(import_image) {
+  SCRIPT_PARAM(Set*, set);
+  SCRIPT_PARAM_C(ScriptValueP, input);
+  try {
+    if (input->type() == SCRIPT_IMAGE) {
+      return make_intrusive<ScriptedImage>(set, input->toImage());
+    }
+    else if (input->type() == SCRIPT_STRING) {
+      return make_intrusive<ImportedImage>(set, input->toString());
+    }
+    throw ScriptErrorConversion(input->typeName(), _TYPE_("image"));
+  } catch (const ScriptError& e) {
+    return delay_error(e);
+  }
+}
+
+SCRIPT_FUNCTION(download_image) {
+  if (!settings.allow_image_download) return script_nil;
+  SCRIPT_PARAM(Set*, set);
+  SCRIPT_PARAM(String, input);
+  try {
+    return make_intrusive<DownloadedImage>(set, input);
+  } catch (const ScriptError& e) {
+    return delay_error(e);
+  }
+}
+
 // ----------------------------------------------------------------------------- : Image functions
+
+SCRIPT_FUNCTION(get_metadata) {
+  SCRIPT_PARAM(Set*, set);
+  SCRIPT_PARAM(GeneratedImageP, input);
+  Image image = input->generate(GeneratedImage::Options(0, 0, set, set));
+  SCRIPT_RETURN(image.GetOption(wxIMAGE_OPTION_PNG_DESCRIPTION));
+}
+
+SCRIPT_FUNCTION(set_metadata) {
+  SCRIPT_PARAM(Set*, set);
+  SCRIPT_PARAM(GeneratedImageP, input);
+  SCRIPT_PARAM(String, metadata);
+  return make_intrusive<SetMetadataImage>(input, metadata);
+}
+
+SCRIPT_FUNCTION(width_of) {
+  SCRIPT_PARAM(Set*, set);
+  SCRIPT_PARAM(GeneratedImageP, input);
+  Image image = input->generate(GeneratedImage::Options(0, 0, set, set));
+  SCRIPT_RETURN(image.GetWidth());
+}
+
+SCRIPT_FUNCTION(height_of) {
+  SCRIPT_PARAM(Set*, set);
+  SCRIPT_PARAM(GeneratedImageP, input);
+  Image image = input->generate(GeneratedImage::Options(0, 0, set, set));
+  SCRIPT_RETURN(image.GetHeight());
+}
+
+SCRIPT_FUNCTION(dimensions_of) {
+  SCRIPT_PARAM(Set*, set);
+  SCRIPT_PARAM(GeneratedImageP, input);
+  Image image = input->generate(GeneratedImage::Options(0, 0, set, set));
+  ScriptCustomCollectionP ret(new ScriptCustomCollection());
+  ret->value.push_back(to_script(image.GetWidth()));
+  ret->value.push_back(to_script(image.GetHeight()));
+  return ret;
+}
+
+SCRIPT_FUNCTION(insert_image) {
+  SCRIPT_PARAM(GeneratedImageP, base_image);
+  SCRIPT_PARAM(GeneratedImageP, inserted_image);
+  SCRIPT_PARAM(int, offset_x);
+  SCRIPT_PARAM(int, offset_y);
+  SCRIPT_PARAM_DEFAULT(bool, widen, true);
+  SCRIPT_OPTIONAL_PARAM_(Color, background_color);
+  return make_intrusive<InsertedImage>(base_image, inserted_image, offset_x, offset_y, widen, background_color);
+}
 
 SCRIPT_FUNCTION(linear_blend) {
   SCRIPT_PARAM(GeneratedImageP, image1);
@@ -60,6 +159,13 @@ SCRIPT_FUNCTION(set_mask) {
   return make_intrusive<SetMaskImage>(image, mask);
 }
 
+SCRIPT_FUNCTION(visibility_mask) {
+  SCRIPT_PARAM_C(GeneratedImageP, input);
+  SCRIPT_PARAM_DEFAULT(int, threshold, 254);
+  SCRIPT_PARAM_DEFAULT(int, radius, 1);
+  return make_intrusive<VisibilityMaskImage>(input, threshold, radius);
+}
+
 SCRIPT_FUNCTION(set_alpha) {
   SCRIPT_PARAM_C(GeneratedImageP, input);
   SCRIPT_PARAM(double, alpha);
@@ -74,10 +180,22 @@ SCRIPT_FUNCTION(set_combine) {
   return make_intrusive<SetCombineImage>(input, image_combine);
 }
 
+SCRIPT_FUNCTION(fill_image) {
+  SCRIPT_PARAM_C(GeneratedImageP, input);
+  SCRIPT_PARAM(Color, color);
+  return make_intrusive<FillImage>(input,color);
+}
+
 SCRIPT_FUNCTION(saturate) {
   SCRIPT_PARAM_C(GeneratedImageP, input);
   SCRIPT_PARAM(double, amount);
   return make_intrusive<SaturateImage>(input, amount);
+}
+
+SCRIPT_FUNCTION(brighten_image) {
+  SCRIPT_PARAM_C(GeneratedImageP, input);
+  SCRIPT_PARAM(double, amount);
+  return make_intrusive<BrightenImage>(input, amount);
 }
 
 SCRIPT_FUNCTION(invert_image) {
@@ -104,13 +222,49 @@ SCRIPT_FUNCTION(enlarge) {
   return make_intrusive<EnlargeImage>(input, border_size);
 }
 
+SCRIPT_FUNCTION(add_stroke_effect) {
+  SCRIPT_PARAM_C(GeneratedImageP, input);
+  SCRIPT_PARAM(Color, color);
+  SCRIPT_PARAM(int, radius);
+  SCRIPT_PARAM_DEFAULT(int, blur, 0);
+  SCRIPT_PARAM_DEFAULT(bool, include_image, true);
+  return make_intrusive<StrokeImage>(input, radius, blur, color, include_image);
+}
+
+SCRIPT_FUNCTION(add_bleed_edge) {
+  SCRIPT_PARAM_C(GeneratedImageP, input);
+  SCRIPT_PARAM_DEFAULT(double, horizontal_size, -1.0);
+  SCRIPT_PARAM_DEFAULT(double, vertical_size, -1.0);
+  SCRIPT_OPTIONAL_PARAM_(Color, background_color);
+  return make_intrusive<BleedEdgedImage>(input, horizontal_size, vertical_size, background_color);
+}
+
+SCRIPT_FUNCTION(resize_image) {
+  SCRIPT_PARAM_C(GeneratedImageP, input);
+  SCRIPT_PARAM(int, width);
+  SCRIPT_PARAM(int, height);
+  return make_intrusive<ResizeImage>(input, width, height);
+}
+
+SCRIPT_FUNCTION(nine_slice_image) {
+  SCRIPT_PARAM_C(GeneratedImageP, input);
+  SCRIPT_PARAM(int, width);
+  SCRIPT_PARAM(int, height);
+  SCRIPT_PARAM_DEFAULT(int, left, 0);
+  SCRIPT_PARAM_DEFAULT(int, right, 0);
+  SCRIPT_PARAM_DEFAULT(int, top, 0);
+  SCRIPT_PARAM_DEFAULT(int, bottom, 0);
+  return make_intrusive<NineSliceImage>(input, width, height, left, right, top, bottom);
+}
+
 SCRIPT_FUNCTION(crop) {
   SCRIPT_PARAM_C(GeneratedImageP, input);
   SCRIPT_PARAM(int, width);
   SCRIPT_PARAM(int, height);
   SCRIPT_PARAM(double, offset_x);
   SCRIPT_PARAM(double, offset_y);
-  return make_intrusive<CropImage>(input, width, height, offset_x, offset_y);
+  SCRIPT_PARAM_DEFAULT(Color, background_color, Color(0,0,0,0));
+  return make_intrusive<CropImage>(input, width, height, offset_x, offset_y, background_color);
 }
 
 SCRIPT_FUNCTION(flip_horizontal) {
@@ -121,6 +275,13 @@ SCRIPT_FUNCTION(flip_horizontal) {
 SCRIPT_FUNCTION(flip_vertical) {
   SCRIPT_PARAM_C(GeneratedImageP, input);
   return make_intrusive<FlipImageVertical>(input);
+}
+
+SCRIPT_FUNCTION(flip_image) {
+  SCRIPT_PARAM_C(GeneratedImageP, input);
+  SCRIPT_PARAM(bool, horizontal);
+  if (horizontal) return make_intrusive<FlipImageHorizontal>(input);
+  else            return make_intrusive<FlipImageVertical>(input);
 }
 
 SCRIPT_FUNCTION(rotate) {
@@ -197,6 +358,8 @@ SCRIPT_FUNCTION(symbol_variation) {
     } else {
       throw ScriptError(_("Unknown fill type for symbol_variation: ") + fill_type);
     }
+    SCRIPT_PARAM_DEFAULT(Color, accent_color, Color(255,255,255));
+    var->filter->accent_color = accent_color;
     return make_intrusive<SymbolToImage>(value, filename, value ? value->last_update : Age(0), var);
   }
 }
@@ -210,22 +373,43 @@ SCRIPT_FUNCTION(built_in_image) {
 
 void init_script_image_functions(Context& ctx) {
   ctx.setVariable(_("to_image"),         script_to_image);
+  ctx.setVariable(_("to_card_image"),    script_to_card_image);
+  ctx.setVariable(_("set_metadata"),     script_set_metadata);
+  ctx.setVariable(_("get_metadata"),     script_get_metadata);
+  ctx.setVariable(_("width_of"),         script_width_of);
+  ctx.setVariable(_("height_of"),        script_height_of);
+  ctx.setVariable(_("dimensions_of"),    script_dimensions_of);
   ctx.setVariable(_("linear_blend"),     script_linear_blend);
   ctx.setVariable(_("masked_blend"),     script_masked_blend);
   ctx.setVariable(_("combine_blend"),    script_combine_blend);
+  ctx.setVariable(_("insert_image"),     script_insert_image);
   ctx.setVariable(_("set_mask"),         script_set_mask);
+  ctx.setVariable(_("visibility_mask"),  script_visibility_mask);
   ctx.setVariable(_("set_alpha"),        script_set_alpha);
   ctx.setVariable(_("set_combine"),      script_set_combine);
+  ctx.setVariable(_("fill_image"),       script_fill_image);
   ctx.setVariable(_("saturate"),         script_saturate);
+  ctx.setVariable(_("saturate_image"),   script_saturate);
+  ctx.setVariable(_("brighten_image"),   script_brighten_image);
   ctx.setVariable(_("invert_image"),     script_invert_image);
   ctx.setVariable(_("recolor_image"),    script_recolor_image);
   ctx.setVariable(_("enlarge"),          script_enlarge);
+  ctx.setVariable(_("enlarge_image"),    script_enlarge);
+  ctx.setVariable(_("add_stroke_effect"),script_add_stroke_effect);
+  ctx.setVariable(_("add_bleed_edge"),   script_add_bleed_edge);
+  ctx.setVariable(_("resize_image"),     script_resize_image);
+  ctx.setVariable(_("nine_slice_image"), script_nine_slice_image);
   ctx.setVariable(_("crop"),             script_crop);
+  ctx.setVariable(_("crop_image"),       script_crop);
   ctx.setVariable(_("flip_horizontal"),  script_flip_horizontal);
   ctx.setVariable(_("flip_vertical"),    script_flip_vertical);
+  ctx.setVariable(_("flip_image"),       script_flip_image);
   ctx.setVariable(_("rotate"),           script_rotate);
   ctx.setVariable(_("rotate_image"),     script_rotate);
   ctx.setVariable(_("drop_shadow"),      script_drop_shadow);
+  ctx.setVariable(_("add_drop_shadow"),  script_drop_shadow);
   ctx.setVariable(_("symbol_variation"), script_symbol_variation);
   ctx.setVariable(_("built_in_image"),   script_built_in_image);
+  ctx.setVariable(_("import_image"),     script_import_image);
+  ctx.setVariable(_("download_image"),   script_download_image);
 }

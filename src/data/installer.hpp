@@ -1,5 +1,5 @@
 //+----------------------------------------------------------------------------+
-//| Description:  Magic Set Editor - Program to make Magic (tm) cards          |
+//| Description:  Magic Set Editor - Program to make card games                |
 //| Copyright:    (C) Twan van Laarhoven and the other MSE developers          |
 //| License:      GNU General Public License 2 or later (see file COPYING)     |
 //+----------------------------------------------------------------------------+
@@ -60,16 +60,18 @@ public:
   PackageDescription();
   PackageDescription(const Packaged& package);
   
-  String name;        ///< Filename of the package
-  Version version;      ///< Version number of this package
-  String short_name;      ///< Short name of this package
-  String full_name;      ///< Name of this package, for menus etc.
-  String icon_url;      ///< Filename or URL of icon to use in package lists
-  Image  icon;        ///< Icon for the package
-  String installer_group;    ///< Where to put this package in the installer
-  int    position_hint;    ///< A hint for the package list
-  String description;      ///< Changelog/description
-  vector<PackageDependencyP> dependencies;  ///< Dependencies of this package
+  String name;                             ///< Filename of the package
+  Version version;                         ///< Version number of this package
+  String short_name;                       ///< Short name of this package
+  String full_name;                        ///< Name of this package, for menus etc.
+  String icon_url;                         ///< Filename or URL of icon to use in package lists
+  String dark_icon_url;                    ///< Filename or URL of icon to use in package lists
+  Image  icon;                             ///< Icon for the package
+  String installer_group;                  ///< Where to put this package in the installer
+  int    position_hint;                    ///< A hint for the package list
+  String description;                      ///< Changelog/description
+  vector<PackageDependencyP> dependencies; ///< Dependencies of this package
+  vector<String> read_only_files;          ///< Filenames/wildcard patterns of files not managed by the package
   
   /// Merge two descriptions a package. This package takes precedence
   /** Usually one of the descriptions will refer to the locally installed one, the other to the new one */
@@ -131,6 +133,9 @@ enum PackageAction
 inline PackageAction operator | (PackageAction a, PackageAction b) { return (PackageAction)((int)a | (int) b); }
 inline bool flag(int flags, int flag) { return (flags & flag) == flag; }
 
+/// Callback used to report progress while downloading an installer
+typedef std::function<bool(long long bytes_received, long long bytes_total)> DownloadProgressCallback;
+
 /// A package that can be installed, or is already installed
 class InstallablePackage : public IntrusivePtrVirtualBase {
 public:
@@ -151,7 +156,10 @@ public:
   int           old_automatic;
   
   void determineStatus();
-  
+
+  /// Download the installer for this package, if needed
+  bool ensureIsDownloaded(const DownloadProgressCallback& progress = nullptr);
+
   /// After the action, will the package be installed?
   bool willBeInstalled() const;
   
@@ -190,7 +198,7 @@ bool set_package_action(InstallablePackages& packages, const InstallablePackageP
 
 // ----------------------------------------------------------------------------- : Program package
 
-/// The "magicseteditor.exe" package is special, it refers to the program
+/// The "Magic Set Editor" package is special, it refers to the program
 extern String mse_package;
 
 InstallablePackageP mse_installable_package();

@@ -1,5 +1,5 @@
 //+----------------------------------------------------------------------------+
-//| Description:  Magic Set Editor - Program to make Magic (tm) cards          |
+//| Description:  Magic Set Editor - Program to make card games                |
 //| Copyright:    (C) Twan van Laarhoven and the other MSE developers          |
 //| License:      GNU General Public License 2 or later (see file COPYING)     |
 //+----------------------------------------------------------------------------+
@@ -7,6 +7,7 @@
 // ----------------------------------------------------------------------------- : Includes
 
 #include <util/prec.hpp>
+#include <data/format/image_encoding.hpp>
 #include <gfx/gfx.hpp>
 #include <util/error.hpp>
 
@@ -18,7 +19,7 @@ template <typename T> inline T sqr(T x) { return x * x; }
 void linear_blend(Image& img1, const Image& img2, double x1,double y1, double x2,double y2) {
   int width = img1.GetWidth(), height = img1.GetHeight();
   if (img2.GetWidth() != width || img2.GetHeight() != height) {
-    throw Error(_ERROR_("images used for blending must have the same size"));
+    throw Error(_ERROR_3_("blending different sizes", "linear_blend", String()<<width<<_("x")<<height, String()<<img2.GetWidth()<<_("x")<<img2.GetHeight()));
   }
   
   const int fixed = 1<<16; // fixed point multiplier
@@ -56,22 +57,58 @@ void linear_blend(Image& img1, const Image& img2, double x1,double y1, double x2
       data2 += 3;
     }
   }
+
+  // Blend Alpha for the two images.
+  if (img1.HasAlpha() && img2.HasAlpha()) {
+    Byte *alpha1 = img1.GetAlpha(), *alpha2 = img2.GetAlpha();
+    for (int y = 0; y < height; ++y) {
+      for (int x = 0; x < width; ++x) {
+        int mult = x * xm + y * ym + d;
+        if (mult < 0)      mult = 0;
+        if (mult > fixed)  mult = fixed;
+        alpha1[0] = alpha1[0] + mult * (alpha2[0] - alpha1[0]) / fixed;
+        alpha1 += 1;
+        alpha2 += 1;
+      }
+    }
+  }
+
+  //transfer metadata
+  img1.SetOption(wxIMAGE_OPTION_PNG_DESCRIPTION, metadata_merge(img1, img2));
 }
 
 // ----------------------------------------------------------------------------- : Mask Blend
 
-void mask_blend(Image& img1, const Image& img2, const Image& mask) {
-  if (img2.GetWidth() != img1.GetWidth() || img2.GetHeight() != img1.GetHeight()
-   || mask.GetWidth() != img1.GetWidth() || mask.GetHeight() != img1.GetHeight()) {
-    throw Error(_("Images used for blending must have the same size"));
+void mask_blend(Image& light, const Image& dark, const Image& mask) {
+  int width = light.GetWidth(), height = light.GetHeight();
+  if (dark.GetWidth() != width || dark.GetHeight() != height) {
+    throw Error(_ERROR_3_("blending different sizes", "masked_blend", String()<<width<<_("x")<<height, String()<<dark.GetWidth()<<_("x")<<dark.GetHeight()));
   }
-  
-  UInt size = img1.GetWidth() * img1.GetHeight() * 3;
-  Byte *data1 = img1.GetData(), *data2 = img2.GetData(), *dataM = mask.GetData();
+  if (mask.GetWidth() != width || mask.GetHeight() != height) {
+    throw Error(_ERROR_3_("blending different mask", "masked_blend", String()<<width<<_("x")<<height, String()<<mask.GetWidth()<<_("x")<<mask.GetHeight()));
+  }
+
+  UInt size = width * height;
+  // these have the following structure:
+  // [pixel1red, pixel1green, pixel1blue, pixel2red, pixel2green, pixel2blue, pixel3red, etc...]
+  Byte *data1 = light.GetData(), *data2 = dark.GetData(), *dataM = mask.GetData();
   // for each subpixel...
-  for (UInt i = 0 ; i < size ; ++i) {
+  for (UInt i = 0; i < (size * 3); ++i) {
     data1[i] = (data1[i] * dataM[i] + data2[i] * (255 - dataM[i])) / 255;
   }
+
+  if (light.HasAlpha() && dark.HasAlpha()) {
+    // these have the following structure:
+    // [pixel1alpha, pixel2alpha, pixel3alpha, etc...]
+    Byte *alphaLight = light.GetAlpha(), *alphaDark = dark.GetAlpha();
+    for (UInt i = 0; i < size; ++i) {
+      // use mask's red channel to blend alpha (all mask channels should be identical since it's grey scale)
+      alphaLight[i] = (alphaLight[i] * dataM[i * 3] + alphaDark[i] * (255 - dataM[i * 3])) / 255;
+    }
+  }
+
+  //transfer metadata
+  light.SetOption(wxIMAGE_OPTION_PNG_DESCRIPTION, metadata_merge(light, dark));
 }
 
 // ----------------------------------------------------------------------------- : Alpha
@@ -87,17 +124,18 @@ void set_alpha(Image& img, const Image& img_alpha) {
 }
 
 void set_alpha(Image& img, Byte* al, const wxSize& alpha_size) {
-  if (img.GetWidth() != alpha_size.GetWidth() || img.GetHeight() != alpha_size.GetHeight()) {
-    throw Error(_("Image must have same size as mask"));
+  int width = img.GetWidth(), height = img.GetHeight();
+  if (width != alpha_size.GetWidth() || height != alpha_size.GetHeight()) {
+    throw Error(_ERROR_3_("blending different mask", "set_alpha", String()<<width<<_("x")<<height, String()<<alpha_size.GetWidth()<<_("x")<<alpha_size.GetHeight()));
   }
   if (!img.HasAlpha()) {
     // copy
     img.InitAlpha();
-    memcpy(img.GetAlpha(), al, img.GetWidth() * img.GetHeight());
+    memcpy(img.GetAlpha(), al, width * height);
   } else{
     // merge
     Byte *im = img.GetAlpha();
-    size_t size = img.GetWidth() * img.GetHeight();
+    size_t size = width * height;
     for (size_t i = 0 ; i < size ; ++i) {
       im[i] = (im[i] * al[i]) / 255;
     }
@@ -105,15 +143,32 @@ void set_alpha(Image& img, Byte* al, const wxSize& alpha_size) {
 }
 
 void set_alpha(Image& img, double alpha) {
-  Byte b_alpha = Byte(alpha * 255);
-  if (!img.HasAlpha()) {
-    img.InitAlpha();
-    memset(img.GetAlpha(), b_alpha, img.GetWidth() * img.GetHeight());
-  } else {
-    Byte *im = img.GetAlpha();
-    size_t size = img.GetWidth() * img.GetHeight();
-    for (size_t i = 0 ; i < size ; ++i) {
-      im[i] = (im[i] * b_alpha) / 255;
+  size_t size = img.GetWidth() * img.GetHeight();
+  if (alpha <= 0.0) {
+    if (!img.HasAlpha()) img.InitAlpha();
+    memset(img.GetAlpha(), Byte(0), size);
+  }
+  else if (alpha > 1.0) {
+    if (!img.HasAlpha()) {
+      img.InitAlpha();
+      memset(img.GetAlpha(), Byte(255), size);
+    } else {
+      Byte *im = img.GetAlpha();
+      for (size_t i = 0 ; i < size ; ++i) {
+        im[i] = Byte(min(im[i] * alpha, 255.0));
+      }
+    }
+  }
+  else {
+    Byte b_alpha = Byte(alpha * 255);
+    if (!img.HasAlpha()) {
+      img.InitAlpha();
+      memset(img.GetAlpha(), b_alpha, size);
+    } else {
+      Byte *im = img.GetAlpha();
+      for (size_t i = 0 ; i < size ; ++i) {
+        im[i] = (im[i] * b_alpha) / 255;
+      }
     }
   }
 }
