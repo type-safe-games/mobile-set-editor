@@ -64,3 +64,16 @@ _Avoid_: Font manager, system fonts
 **Shared font store**:
 The fonts a Template import found outside any Template (e.g. the core Magic fonts a pack ships loose), kept so every Style can use them.
 _Avoid_: System fonts
+
+**Golden corpus**:
+The Cards whose Golden images the port is checked against: one generated Card per Style (broad tier) plus hand-authored Sets for core Styles (deep tier).
+_Avoid_: Test set, reference set
+
+**Layout dump**:
+The core's printed account of a rendered Card's layout (field regions, text line breaks and positions), compared exactly against a Golden image's.
+_Avoid_: Layout snapshot
+
+**Unsupported style**:
+A Style that fails its Golden image check in this version of the app; it still installs, but is flagged in the style picker.
+_Avoid_: Broken style, disabled style
+
