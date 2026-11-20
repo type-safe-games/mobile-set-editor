@@ -88,6 +88,17 @@ add_library(mse_core OBJECT ${core_sources})
 target_link_libraries(mse_core PUBLIC wxWidgets::wxWidgets Boost::regex Boost::json MINIZIP::minizip ${HUNSPELL_LIBRARIES})
 target_precompile_headers(mse_core PRIVATE src/util/prec.hpp)
 
+# On wxGTK the shared font store's files are given to fontconfig with wxFont::AddPrivateFont, and
+# Pango has to be told to reread the configuration afterwards (gfx/wx_canvas.cpp)
+if(UNIX AND NOT APPLE AND PkgConfig_FOUND)
+  pkg_check_modules(PANGOFC IMPORTED_TARGET pangocairo pangofc)
+  if(PANGOFC_FOUND)
+    set_source_files_properties(src/gfx/wx_canvas.cpp PROPERTIES
+      INCLUDE_DIRECTORIES "${PANGOFC_INCLUDE_DIRS}" COMPILE_DEFINITIONS MSE_HAVE_PANGOFC)
+    target_link_libraries(mse_core PUBLIC PkgConfig::PANGOFC)
+  endif()
+endif()
+
 # The wx-free facade over the core (ADR 0006, ADR 0009). Its public header uses only std types;
 # a host (the desktop test host below, later Android) installs the drawing and image backends.
 

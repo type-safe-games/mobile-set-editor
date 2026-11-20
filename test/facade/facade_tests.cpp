@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Usage: facade_tests <fixture dir> <work dir> [<fixture goldens dir>]
+//        facade_tests --import <zip> <template store> <font store>
 //
 // Runs the facade (ADR 0009) against the Test fixture (ADR 0008) with the wx backends of the
 // desktop host. GTK needs a display: run under xvfb-run, as ctest does. When the private fixture
@@ -9,10 +10,14 @@
 // with them; otherwise only with the core's own export.
 //
 // The tests talk to the facade only; core headers are used just to decode PNGs and build a zip.
+//
+// With --import, it only imports a zip into a template store and font store through the facade, as
+// the app would (e.g. to check the goldens against an imported Template pack).
 
 #include <util/prec.hpp>
 #include <facade/facade.hpp>
 #include <facade/desktop/desktop_host.hpp>
+#include <facade/template_import.hpp>
 #include <data/text_editing.hpp>
 #include <gfx/image_codec.hpp>
 #include <util/io/zip.hpp>
@@ -630,7 +635,7 @@ TEST(template_import) {
   CHECK(read_text(templates_dir / "imported-symbols.mse-symbol-font" / "symbol-font").find("2026-12-01") != std::string::npos);
   // for a newer program: refused
   r = import_on_thread(make_pack("pack4.zip", "2027-01-01", "99.0.0"));
-  CHECK(r.packages.size() == 1 && r.packages[0].outcome == F::ImportedPackage::Outcome::Failed);
+  CHECK(r.packages.size() == 1 && r.packages[0].outcome == F::ImportedPackage::Outcome::Refused);
   // no temporary directories left behind
   for (auto& e : fs::directory_iterator(templates_dir)) CHECK(e.path().filename().string()[0] != '.');
   CHECK_OK(F::refreshTemplates());
@@ -638,9 +643,395 @@ TEST(template_import) {
   CHECK_EQ(import_on_thread(work_dir / "junk.mse-set").status, F::Status::InvalidArgument);
 }
 
+// Synthetic Templates made from the fixture's symbol font, with their own names, versions and
+// dependencies
+
+static std::string symbol_font_data(const std::string& version, const std::string& extra = "", const std::string& mse_version = "2.6.0") {
+  std::string font = read_text(fixture_dir / "data" / "fixture-symbols.mse-symbol-font" / "symbol-font");
+  font.replace(font.find("version: 2026-11-19"), 19, "version: " + version);
+  font.replace(font.find("mse version: 2.6.0"), 18, "mse version: " + mse_version);
+  return font + extra;
+}
+
+static std::string depends_on(const std::string& package, const std::string& version) {
+  return "depends on:\n\tpackage: " + package + "\n\tversion: " + version + "\n";
+}
+
+/// The entries of a zip to write
+struct ZipBuilder {
+  std::vector<std::pair<std::string, std::string>> entries;
+
+  void add(const std::string& name, const std::string& data) { entries.emplace_back(name, data); }
+  /// A symbol font package directory at prefix (which ends in '/' or is empty)
+  void package(const std::string& prefix, const std::string& name, const std::string& data_file) {
+    fs::path src = fixture_dir / "data" / "fixture-symbols.mse-symbol-font";
+    add(prefix + name + "/symbol-font", data_file);
+    add(prefix + name + "/red.png", read_text(src / "red.png"));
+    add(prefix + name + "/blue.png", read_text(src / "blue.png"));
+  }
+  fs::path write(const std::string& name) const {
+    fs::path path = work_dir / "zips" / name;
+    fs::create_directories(path.parent_path());
+    ZipWriter zip(decode_utf8(path.string()));
+    for (auto& e : entries) write_zip_entry(zip, e.first, e.second);
+    zip.close();
+    return path;
+  }
+  std::string bytes(const std::string& name) const { return read_text(write(name)); }
+};
+
+/// The size of a symbol font package with this data file, when extracted
+static std::uint64_t symbol_font_size(const std::string& data_file) {
+  fs::path src = fixture_dir / "data" / "fixture-symbols.mse-symbol-font";
+  return data_file.size() + fs::file_size(src / "red.png") + fs::file_size(src / "blue.png");
+}
+
+static const F::ScannedPackage* find_scanned(const F::ImportScan& scan, const std::string& name) {
+  for (const F::ScannedPackage& p : scan.packages) if (p.name == name) return &p;
+  return nullptr;
+}
+
+static const F::ImportedPackage* find_imported(const F::ImportResult& r, const std::string& name) {
+  for (const F::ImportedPackage& p : r.packages) if (p.name == name) return &p;
+  return nullptr;
+}
+
+/// No temporary files left in the template store or the font store
+static bool no_temp_files() {
+  for (const fs::path& dir : {templates_dir, font_store_dir}) {
+    if (!fs::exists(dir)) continue;
+    for (auto& e : fs::directory_iterator(dir)) {
+      if (e.path().filename().string()[0] == '.') return false;
+    }
+  }
+  return true;
+}
+
+static std::string installed_version(const std::string& name) {
+  std::string data = read_text(templates_dir / name / "symbol-font");
+  size_t pos = data.find("\nversion: ");
+  return pos == std::string::npos ? "" : data.substr(pos + 10, data.find('\n', pos + 1) - pos - 10);
+}
+
+/// The zip of the scan and install tests: packages at depth, in an installer, zipped, with
+/// dependencies, refused ones, a duplicate, loose fonts and things to ignore
+static fs::path scan_test_zip() {
+  ZipBuilder installer;
+  installer.add("installer", "mse version: 2.6.0\n");
+  installer.package("", "t1-f.mse-symbol-font", symbol_font_data("2026-02-01"));
+  ZipBuilder zipped; // a package as a zip file: its files at the root
+  fs::path src = fixture_dir / "data" / "fixture-symbols.mse-symbol-font";
+  zipped.add("symbol-font", symbol_font_data("2026-01-01"));
+  zipped.add("red.png", read_text(src / "red.png"));
+  zipped.add("blue.png", read_text(src / "blue.png"));
+  ZipBuilder z;
+  z.package("Pack-main/data/deep/er/", "t1-a.mse-symbol-font", symbol_font_data("2026-01-01"));
+  z.package("Pack-main/data/", "t1-b.mse-symbol-font", symbol_font_data("2026-01-01",
+    "installer group: tests/b\n" + depends_on("t1-a.mse-symbol-font", "2026-01-01") + depends_on("Magic Set Editor", "2.0.0")));
+  z.package("Pack-main/data/", "t1-c.mse-symbol-font", symbol_font_data("2026-01-01", depends_on("missing.mse-game", "2026-01-01")));
+  z.package("Pack-main/data/", "t1-d.mse-symbol-font", symbol_font_data("2026-01-01", "", "99.0.0"));
+  z.package("Pack-main/data/", "t1-e.mse-symbol-font", symbol_font_data("2026-01-01", depends_on("t1-d.mse-symbol-font", "2026-01-01")));
+  z.package("Pack-main/data/", "t1-f.mse-symbol-font", symbol_font_data("2026-01-01")); // older than the one in the installer
+  z.package("Pack-main/data/", "fixture-symbols.mse-symbol-font", symbol_font_data("2026-11-19")); // as installed
+  z.add("Pack-main/installers/t1.mse-installer", installer.bytes("t1.mse-installer"));
+  z.add("Pack-main/zipped/t1-g.mse-symbol-font", zipped.bytes("t1-g.zip"));
+  z.add("Pack-main/Magic - Fonts/sub dir/LooseA.ttf", read_text(fixture_dir / "fonts" / "DejaVuSans.ttf"));
+  z.add("Pack-main/Magic - Fonts/LooseB.OTF", read_text(fixture_dir / "fonts" / "DejaVuSans-Bold.ttf"));
+  z.add("Pack-main/sets/sample.mse-set/set", "ignored");
+  z.add("Pack-main/sets/sample.mse-set/font.ttf", "ignored: inside a Set");
+  z.add("Pack-main/data/t1-a.mse-symbol-font-notes.txt", "ignored");
+  z.add("Pack-main/README.md", "ignored");
+  z.add("Pack-main/data/dictionaries/xx_TEST.dic", "1\nword\n");
+  z.add("Pack-main/data/dictionaries/xx_TEST.aff", "SET UTF-8\n");
+  z.add("Pack-main/data/other/yy_TEST.dic", "ignored: not in a dictionaries directory");
+  return z.write("scan-test.zip");
+}
+
+TEST(template_import_scan) {
+  using V = F::ScannedPackage::Verdict;
+  fs::path zip = scan_test_zip();
+  int fd = ::open(zip.c_str(), O_RDONLY);
+  CHECK(fd >= 0);
+  F::ImportScan scan;
+  std::thread([&] { scan = F::scanTemplates(fd); }).join(); // off the core thread
+  REQUIRE_OK(scan);
+  CHECK_EQ(lseek(fd, 0, SEEK_CUR), (off_t)0); // the descriptor's position is not used
+  ::close(fd);
+  CHECK_EQ(scan.packages.size(), (size_t)8);
+  // at depth
+  const F::ScannedPackage* a = find_scanned(scan, "t1-a.mse-symbol-font");
+  CHECK(a != nullptr);
+  if (a) {
+    CHECK_EQ(a->type, "symbol-font");
+    CHECK_EQ(a->version, "2026-01-01");
+    CHECK_EQ(a->full_name, "Fixture symbols");
+    CHECK_EQ(a->installer_group, "unclassified/t1/Fixture symbols"); // as MSE's installer derives it
+    CHECK_EQ(a->size, symbol_font_size(symbol_font_data("2026-01-01")));
+    CHECK(a->verdict == V::Install);
+    CHECK(a->installed_version.empty());
+  }
+  const F::ScannedPackage* b = find_scanned(scan, "t1-b.mse-symbol-font");
+  CHECK(b != nullptr);
+  if (b) {
+    CHECK_EQ(b->installer_group, "tests/b");
+    CHECK_EQ(b->dependencies.size(), (size_t)2);
+    if (b->dependencies.size() == 2) {
+      CHECK_EQ(b->dependencies[0].package, "t1-a.mse-symbol-font");
+      CHECK_EQ(b->dependencies[0].version, "2026-01-01");
+      CHECK_EQ(b->dependencies[1].package, "Magic Set Editor"); // the program itself
+    }
+    CHECK(b->verdict == V::Install);
+  }
+  // refused: missing dependency, too new, depends on a refused one
+  const F::ScannedPackage* c = find_scanned(scan, "t1-c.mse-symbol-font");
+  CHECK(c && c->verdict == V::Refuse && c->reason.find("missing.mse-game") != std::string::npos);
+  const F::ScannedPackage* d = find_scanned(scan, "t1-d.mse-symbol-font");
+  CHECK(d && d->verdict == V::Refuse && d->reason.find("mse version 99.0.0") != std::string::npos);
+  const F::ScannedPackage* e = find_scanned(scan, "t1-e.mse-symbol-font");
+  CHECK(e && e->verdict == V::Refuse && e->reason.find("t1-d.mse-symbol-font") != std::string::npos);
+  // in a nested installer, and newer than the copy elsewhere in the zip: one version per package
+  const F::ScannedPackage* f = find_scanned(scan, "t1-f.mse-symbol-font");
+  CHECK(f && f->version == "2026-02-01" && f->verdict == V::Install);
+  // a zipped package
+  const F::ScannedPackage* g = find_scanned(scan, "t1-g.mse-symbol-font");
+  CHECK(g && g->verdict == V::Install && g->size == symbol_font_size(symbol_font_data("2026-01-01")));
+  // already installed
+  const F::ScannedPackage* same = find_scanned(scan, "fixture-symbols.mse-symbol-font");
+  CHECK(same && same->verdict == V::SkipNotNewer && same->installed_version == "2026-11-19");
+  // loose fonts, not the one in a Set
+  CHECK_EQ(scan.fonts.size(), (size_t)2);
+  CHECK(contains(scan.fonts, "LooseA.ttf") && contains(scan.fonts, "LooseB.OTF"));
+  CHECK(scan.fonts_size > 0);
+  // spelling dictionaries
+  CHECK_EQ(scan.dictionaries.size(), (size_t)2);
+  // scanning installs nothing
+  CHECK(!fs::exists(templates_dir / "t1-a.mse-symbol-font"));
+  CHECK(!fs::exists(font_store_dir / "LooseA.ttf"));
+  CHECK(no_temp_files());
+  // the path variant, and things that aren't zips
+  CHECK_EQ(F::scanTemplates(zip.string()).packages.size(), (size_t)8);
+  CHECK_EQ(F::scanTemplates(-1).status, F::Status::InvalidArgument);
+  CHECK_EQ(F::scanTemplates((work_dir / "junk.mse-set").string()).status, F::Status::InvalidArgument);
+}
+
+TEST(template_import_install) {
+  using O = F::ImportedPackage::Outcome;
+  fs::path zip = scan_test_zip();
+  int fd = ::open(zip.c_str(), O_RDONLY);
+  CHECK(fd >= 0);
+  // a dependency in the zip is selected with the package that needs it, and installed first
+  F::ImportSelection sel;
+  sel.packages = {"t1-b.mse-symbol-font"};
+  F::ImportResult r;
+  std::thread([&] { r = F::installTemplates(fd, sel); }).join();
+  REQUIRE_OK(r);
+  CHECK_EQ(r.packages.size(), (size_t)2);
+  if (r.packages.size() == 2) {
+    CHECK_EQ(r.packages[0].name, "t1-a.mse-symbol-font");
+    CHECK(r.packages[0].outcome == O::Installed && r.packages[0].dependency);
+    CHECK_EQ(r.packages[1].name, "t1-b.mse-symbol-font");
+    CHECK(r.packages[1].outcome == O::Installed && !r.packages[1].dependency);
+  }
+  CHECK(fs::exists(templates_dir / "t1-a.mse-symbol-font" / "red.png"));
+  CHECK(fs::exists(templates_dir / "t1-b.mse-symbol-font" / "symbol-font"));
+  CHECK(!fs::exists(templates_dir / "t1-f.mse-symbol-font"));
+  // the loose fonts, from any depth
+  CHECK_EQ(r.fonts.size(), (size_t)2);
+  CHECK(fs::exists(font_store_dir / "LooseA.ttf"));
+  CHECK(fs::exists(font_store_dir / "LooseB.OTF"));
+  CHECK_EQ(r.dictionaries.size(), (size_t)2);
+  CHECK_EQ(read_text(templates_dir / "dictionaries" / "xx_TEST.dic"), "1\nword\n");
+  CHECK(!fs::exists(templates_dir / "dictionaries" / "yy_TEST.dic"));
+  // the rest
+  sel.packages = {"t1-c.mse-symbol-font", "t1-e.mse-symbol-font", "t1-f.mse-symbol-font", "t1-g.mse-symbol-font",
+                  "fixture-symbols.mse-symbol-font", "nope.mse-style", "t1-b.mse-symbol-font"};
+  sel.fonts = false;
+  r = F::installTemplates(fd, sel);
+  CHECK(r.dictionaries.empty()); // already there
+  ::close(fd);
+  REQUIRE_OK(r);
+  CHECK_EQ(r.packages.size(), (size_t)7);
+  const F::ImportedPackage* p;
+  CHECK((p = find_imported(r, "t1-c.mse-symbol-font")) && p->outcome == O::Refused && !p->error.empty());
+  CHECK((p = find_imported(r, "t1-e.mse-symbol-font")) && p->outcome == O::Refused);
+  CHECK((p = find_imported(r, "t1-f.mse-symbol-font")) && p->outcome == O::Installed && p->version == "2026-02-01");
+  CHECK((p = find_imported(r, "t1-g.mse-symbol-font")) && p->outcome == O::Installed);
+  CHECK((p = find_imported(r, "fixture-symbols.mse-symbol-font")) && p->outcome == O::SkippedNotNewer);
+  CHECK((p = find_imported(r, "nope.mse-style")) && p->outcome == O::Failed);
+  CHECK((p = find_imported(r, "t1-b.mse-symbol-font")) && p->outcome == O::SkippedNotNewer);
+  CHECK(!fs::exists(templates_dir / "t1-c.mse-symbol-font"));
+  CHECK(!fs::exists(templates_dir / "t1-d.mse-symbol-font"));
+  CHECK_EQ(installed_version("t1-f.mse-symbol-font"), "2026-02-01");
+  CHECK(fs::exists(templates_dir / "t1-g.mse-symbol-font" / "blue.png"));
+  CHECK(r.fonts.empty());
+  CHECK(no_temp_files());
+  // the installed Templates load
+  CHECK_OK(F::refreshTemplates());
+}
+
+TEST(template_import_installer_file) {
+  // a standalone .mse-installer as the input
+  ZipBuilder z;
+  z.add("installer", "mse version: 2.6.0\n");
+  z.package("", "t2-a.mse-symbol-font", symbol_font_data("2026-03-01"));
+  fs::path path = z.write("t2.mse-installer");
+  F::ImportScan scan = F::scanTemplates(path.string());
+  REQUIRE_OK(scan);
+  CHECK(scan.packages.size() == 1 && scan.packages[0].name == "t2-a.mse-symbol-font");
+  F::ImportSelection sel;
+  sel.packages = {"t2-a.mse-symbol-font"};
+  F::ImportResult r = F::installTemplates(path.string(), sel);
+  REQUIRE_OK(r);
+  CHECK(r.packages.size() == 1 && r.packages[0].outcome == F::ImportedPackage::Outcome::Installed);
+  CHECK(fs::exists(templates_dir / "t2-a.mse-symbol-font" / "red.png"));
+}
+
+TEST(template_import_dependency_versions) {
+  using O = F::ImportedPackage::Outcome;
+  using V = F::ScannedPackage::Verdict;
+  // the installed t1-a (2026-01-01) is enough
+  ZipBuilder z1;
+  z1.package("", "t3-b.mse-symbol-font", symbol_font_data("2026-01-01", depends_on("t1-a.mse-symbol-font", "2025-06-01")));
+  F::ImportScan scan = F::scanTemplates(z1.write("t3-1.zip").string());
+  CHECK(scan.packages.size() == 1 && scan.packages[0].verdict == V::Install);
+  // the installed t1-a is too old, and there is no newer one in the zip
+  ZipBuilder z2;
+  z2.package("", "t3-c.mse-symbol-font", symbol_font_data("2026-01-01", depends_on("t1-a.mse-symbol-font", "2027-01-01")));
+  scan = F::scanTemplates(z2.write("t3-2.zip").string());
+  CHECK(scan.packages.size() == 1 && scan.packages[0].verdict == V::Refuse);
+  // ... there is: it is selected too, and replaces the installed one
+  z2.package("", "t1-a.mse-symbol-font", symbol_font_data("2027-01-01"));
+  fs::path zip = z2.write("t3-3.zip");
+  scan = F::scanTemplates(zip.string());
+  const F::ScannedPackage* a = find_scanned(scan, "t1-a.mse-symbol-font");
+  CHECK(a && a->verdict == V::Replace && a->installed_version == "2026-01-01");
+  CHECK(find_scanned(scan, "t3-c.mse-symbol-font") && find_scanned(scan, "t3-c.mse-symbol-font")->verdict == V::Install);
+  F::ImportSelection sel;
+  sel.packages = {"t3-c.mse-symbol-font"};
+  F::ImportResult r = F::installTemplates(zip.string(), sel);
+  REQUIRE_OK(r);
+  CHECK(r.packages.size() == 2 && r.packages[0].name == "t1-a.mse-symbol-font" && r.packages[0].outcome == O::Replaced && r.packages[0].dependency);
+  CHECK_EQ(installed_version("t1-a.mse-symbol-font"), "2027-01-01");
+  // no downgrade
+  ZipBuilder z3;
+  z3.package("", "t1-a.mse-symbol-font", symbol_font_data("2026-01-01"));
+  r = F::importTemplates(z3.write("t3-4.zip").string());
+  CHECK(r.packages.size() == 1 && r.packages[0].outcome == O::SkippedNotNewer);
+  CHECK_EQ(installed_version("t1-a.mse-symbol-font"), "2027-01-01");
+}
+
+TEST(template_import_failure) {
+  using O = F::ImportedPackage::Outcome;
+  // t4-a is new, t4-b needs it, t1-a replaces the installed one; the 2nd file written fails
+  ZipBuilder z;
+  z.package("", "t1-a.mse-symbol-font", symbol_font_data("2028-01-01"));
+  z.package("", "t4-a.mse-symbol-font", symbol_font_data("2026-01-01"));
+  z.package("", "t4-b.mse-symbol-font", symbol_font_data("2026-01-01", depends_on("t4-a.mse-symbol-font", "2026-01-01")));
+  z.add("fonts/Failing.ttf", read_text(fixture_dir / "fonts" / "DejaVuSans.ttf"));
+  fs::path zip = z.write("t4.zip");
+  std::map<std::string, int> writes;
+  F::import_write_hook = [&](const std::string& path) {
+    // the second file of t1-a and of t4-a, and every font
+    for (const char* failing : {"t1-a.mse-symbol-font", "t4-a.mse-symbol-font"}) {
+      if (path.find(failing) != std::string::npos && ++writes[failing] == 2) return false;
+    }
+    return path.find("Failing") == std::string::npos;
+  };
+  F::ImportResult r = F::importTemplates(zip.string());
+  F::import_write_hook = nullptr;
+  REQUIRE_OK(r);
+  CHECK_EQ(r.packages.size(), (size_t)3);
+  for (const char* name : {"t1-a.mse-symbol-font", "t4-a.mse-symbol-font"}) {
+    const F::ImportedPackage* p = find_imported(r, name);
+    CHECK(p && p->outcome == O::Failed && p->error.find("could not extract") != std::string::npos);
+  }
+  const F::ImportedPackage* needs = find_imported(r, "t4-b.mse-symbol-font");
+  CHECK(needs && needs->outcome == O::Failed && needs->error.find("t4-a.mse-symbol-font") != std::string::npos);
+  CHECK(no_temp_files());
+  CHECK(r.fonts.empty() && !r.messages.empty());
+  CHECK(!fs::exists(font_store_dir / "Failing.ttf"));
+  // the replaced package is still the old version, whole
+  CHECK_EQ(installed_version("t1-a.mse-symbol-font"), "2027-01-01");
+  CHECK(fs::exists(templates_dir / "t1-a.mse-symbol-font" / "red.png"));
+  CHECK(fs::exists(templates_dir / "t1-a.mse-symbol-font" / "blue.png"));
+  // the new one is not there at all, nor what needs it
+  CHECK(!fs::exists(templates_dir / "t4-a.mse-symbol-font"));
+  CHECK(!fs::exists(templates_dir / "t4-b.mse-symbol-font"));
+  // a read-only store
+  fs::permissions(templates_dir, fs::perms::owner_write, fs::perm_options::remove);
+  r = F::importTemplates(zip.string());
+  fs::permissions(templates_dir, fs::perms::owner_write, fs::perm_options::add);
+  CHECK(!r.ok() || (find_imported(r, "t4-a.mse-symbol-font") && find_imported(r, "t4-a.mse-symbol-font")->outcome == O::Failed));
+  CHECK(!fs::exists(templates_dir / "t4-a.mse-symbol-font"));
+  CHECK(no_temp_files());
+  // and then it works
+  r = F::importTemplates(zip.string());
+  REQUIRE_OK(r);
+  CHECK(find_imported(r, "t4-b.mse-symbol-font") && find_imported(r, "t4-b.mse-symbol-font")->outcome == O::Installed);
+  CHECK_EQ(installed_version("t1-a.mse-symbol-font"), "2028-01-01");
+  CHECK(fs::exists(font_store_dir / "Failing.ttf"));
+  CHECK(no_temp_files());
+}
+
 // ----------------------------------------------------------------------------- : Main
 
+/// facade_tests --import <zip> <template store> <font store>
+static int import_main(int argc, char** argv) {
+  fs::create_directories(argv[3]);
+  if (!mse::facade::desktop::start_host(argc, argv)) {
+    std::fprintf(stderr, "could not start the desktop host (no display? run under xvfb-run)\n");
+    return 1;
+  }
+  F::InitOptions options;
+  options.template_dir   = argv[3];
+  options.font_store_dir = argv[4];
+  F::Result init = F::init(options);
+  if (!init.ok()) {
+    std::fprintf(stderr, "init failed: %s\n", init.error.c_str());
+    return 1;
+  }
+  // as the app does: scan the picked file, then install everything that can be
+  int fd = ::open(argv[2], O_RDONLY);
+  if (fd < 0) {
+    std::fprintf(stderr, "can't open %s\n", argv[2]);
+    return 1;
+  }
+  F::ImportScan scan;
+  F::ImportResult r;
+  std::thread([&] {
+    scan = F::scanTemplates(fd);
+    F::ImportSelection all;
+    for (const F::ScannedPackage& p : scan.packages) all.packages.push_back(p.name);
+    if (scan.ok()) r = F::installTemplates(fd, all);
+  }).join();
+  ::close(fd);
+  if (!scan.ok()) {
+    std::fprintf(stderr, "scan failed: %s\n", scan.error.c_str());
+    return 1;
+  }
+  if (!r.ok()) {
+    std::fprintf(stderr, "import failed: %s\n", r.error.c_str());
+    return 1;
+  }
+  const char* names[] = {"installed", "replaced", "skipped", "refused", "failed"};
+  int counts[5] = {};
+  for (const F::ImportedPackage& p : r.packages) {
+    ++counts[(int)p.outcome];
+    if (p.outcome == F::ImportedPackage::Outcome::Refused || p.outcome == F::ImportedPackage::Outcome::Failed) {
+      std::printf("%s %s: %s\n", names[(int)p.outcome], p.name.c_str(), p.error.c_str());
+    }
+  }
+  for (const F::Message& m : r.messages) std::printf("message: %s\n", m.text.c_str());
+  for (int i = 0 ; i < 5 ; ++i) std::printf("%s: %d\n", names[i], counts[i]);
+  std::printf("fonts: %zu\n", r.fonts.size());
+  std::printf("dictionaries: %zu\n", r.dictionaries.size());
+  F::shutdown();
+  mse::facade::desktop::stop_host();
+  return counts[4] == 0 && r.messages.empty() ? 0 : 1;
+}
+
 int main(int argc, char** argv) {
+  if (argc == 5 && std::string(argv[1]) == "--import") return import_main(argc, argv);
   if (argc < 3) {
     std::fprintf(stderr, "usage: %s <fixture dir> <work dir> [<fixture goldens dir>]\n", argv[0]);
     return 2;

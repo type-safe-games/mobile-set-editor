@@ -6,7 +6,9 @@
 
 Corpora: Tier 1 and Tier 2 Sets (under <goldens>, from generate_tier1.py and tier2_sets.py)
 and the public Test fixture (test/fixture). `--fixture-only` uses just the fixture, for CI
-without the private pack (ADR 0008).
+without the private pack (ADR 0008). `--templates DIR --font-store DIR` renders the Tier 1/2
+Sets with a Template store and shared font store made by Template import instead of the pack
+(fontconfig then has no pack fonts); its run and report get an `-imported` suffix.
 
 The Layout dump is the gate: `check` exits 1 if any card's dump differs from its golden (or a
 golden card no longer renders). The pixel comparison (SSIM) is advisory and only goes into the
@@ -90,9 +92,13 @@ def collect(args) -> list[GoldenSet]:
     for p in sorted((FIXTURE / "sets").glob("*.mse-set")):
         sets.append(GoldenSet("fixture", p.name.removesuffix(".mse-set"), p, "fixture-" + set_style(p), fixture_env(args.goldens)))
     if not args.fixture_only:
-        if not (args.pack / "data").is_dir():
+        templates = getattr(args, "templates", None)
+        if templates:
+            env = mse_env(args.pack, args.goldens, templates, getattr(args, "font_store", None))
+        elif not (args.pack / "data").is_dir():
             sys.exit(f"no template pack at {args.pack}; use --fixture-only")
-        env = mse_env(args.pack, args.goldens)
+        else:
+            env = mse_env(args.pack, args.goldens)
         for corpus in ("tier1", "tier2"):
             for p in sorted((args.goldens / corpus / "sets").glob("*.mse-set")):
                 style = "magic-" + set_style(p)
@@ -216,12 +222,19 @@ def main() -> int:
     ap.add_argument("--jobs", type=int, default=8)
     ap.add_argument("--timeout", type=float, default=180)
     ap.add_argument("--fixture-only", action="store_true", help="only the public Test fixture (no pack needed)")
+    ap.add_argument("--templates", type=Path, help="an imported Template store to use instead of the pack's data/")
+    ap.add_argument("--font-store", type=Path, help="with --templates: its shared font store")
     ap.add_argument("only", nargs="*", help="limit to these Sets, Styles or corpus/set keys")
     args = ap.parse_args()
+    if args.templates and args.mode == "capture":
+        ap.error("--templates is only for check: goldens are captured from the pack")
+    if args.font_store and not args.templates:
+        ap.error("--font-store needs --templates")
 
     sets = collect(args)
     images = args.goldens / "images"
-    run_root = images if args.mode == "capture" else args.goldens / "check-run"
+    imported = "-imported" if args.templates else ""
+    run_root = images if args.mode == "capture" else args.goldens / f"check-run{imported}"
 
     def work(gs: GoldenSet) -> SetResult:
         res = render(gs, run_root / gs.corpus / gs.name, args.mse, args.timeout)
@@ -236,7 +249,7 @@ def main() -> int:
             mark = "" if args.mode == "capture" else ("  dump ok" if res.dump_ok else "  DUMP DIFFERS")
             print(f"[{n}/{len(sets)}] {res.render_status:8} {res.gs.key}{mark}", flush=True)
 
-    suffix = "-fixture" if args.fixture_only else ""
+    suffix = "-fixture" if args.fixture_only else imported
     write_report(args.goldens / f"report-{args.mode}{suffix}.md", results, args.mode)
     write_styles(args.goldens / f"styles{suffix}.tsv", results, args.mode)
     print(f"report: {args.goldens / f'report-{args.mode}{suffix}.md'}")

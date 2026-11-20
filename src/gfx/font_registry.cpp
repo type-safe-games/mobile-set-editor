@@ -236,19 +236,25 @@ void FontRegistry::scanPending() {
   cache.clear();
 }
 
-void FontRegistry::scanDirectory(const String& dir, FontSource source) {
-  vector<String> names;
+vector<String> list_font_files(const String& dir) {
+  vector<String> out, names;
   list_directory(dir, names, LIST_FILES);
   sort(names.begin(), names.end());
   for (const String& name : names) {
-    if (is_font_file_name(name)) scanFile(join_path(dir, name), source);
+    if (is_font_file_name(name)) out.push_back(join_path(dir, name));
   }
   names.clear();
   list_directory(dir, names, LIST_DIRS);
   sort(names.begin(), names.end());
   for (const String& name : names) {
-    scanDirectory(join_path(dir, name), source);
+    vector<String> sub = list_font_files(join_path(dir, name));
+    out.insert(out.end(), sub.begin(), sub.end());
   }
+  return out;
+}
+
+void FontRegistry::scanDirectory(const String& dir, FontSource source) {
+  for (const String& path : list_font_files(dir)) scanFile(path, source);
 }
 
 void FontRegistry::scanFile(const String& path, FontSource source) {

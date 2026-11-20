@@ -11,6 +11,11 @@
 #include <gfx/wx_image_adapter.hpp>
 #include <util/rotation.hpp>
 #include <util/error.hpp>
+#include <wx/fontenum.h>
+#if defined(__WXGTK__) && defined(MSE_HAVE_PANGOFC)
+  #include <pango/pangocairo.h>
+  #include <pango/pangofc-fontmap.h>
+#endif
 
 // ----------------------------------------------------------------------------- : Conversion
 
@@ -297,6 +302,31 @@ OffscreenCanvasP WxCanvasFactory::create(const Image& image) {
   wxBitmap bmp = to_bitmap(image);
   if (!bmp.IsOk()) throw InternalError(_("Unable to create bitmap"));
   return make_unique<WxOffscreenCanvas>(bmp);
+}
+
+bool WxCanvasFactory::addFontFiles(const vector<String>& paths) {
+  return add_wx_font_files(paths);
+}
+
+bool add_wx_font_files(const vector<String>& paths) {
+  if (paths.empty()) return true;
+  bool ok = true;
+  #if wxUSE_PRIVATE_FONTS
+    // fontconfig then finds the files' families by name, as it does for a <dir> in its configuration
+    for (const String& path : paths) {
+      if (!wxFont::AddPrivateFont(path)) ok = false;
+    }
+    #if defined(__WXGTK__) && defined(MSE_HAVE_PANGOFC)
+      // wxGTK 3.2 gives Pango its fontconfig configuration when the first file is added, and Pango
+      // doesn't notice the files added to it after that
+      PangoFontMap* font_map = pango_cairo_font_map_get_default();
+      if (PANGO_IS_FC_FONT_MAP(font_map)) pango_fc_font_map_config_changed(PANGO_FC_FONT_MAP(font_map));
+      wxFontEnumerator::InvalidateCache();
+    #endif
+  #else
+    ok = false;
+  #endif
+  return ok;
 }
 
 // ----------------------------------------------------------------------------- : Helpers

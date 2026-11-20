@@ -25,6 +25,7 @@ struct ZipEntry {
   String  name;     ///< Name in the zip: '/' separated, without leading '/' or "./", directories end in '/'
   int64_t cd_pos;   ///< Position of the entry in the zip's central directory
   time_t  modified; ///< Last modification time
+  int64_t size = 0; ///< Uncompressed size in bytes
 };
 
 // ----------------------------------------------------------------------------- : ZipReader
@@ -34,6 +35,10 @@ struct ZipEntry {
 class ZipReader {
 public:
   explicit ZipReader(const String& filename);
+  /// Read the zip file open as a file descriptor (not on Windows).
+  /** The descriptor must stay open while the reader and the streams it opened are used; it is
+   *  never closed or moved (reads don't use its file position). */
+  explicit ZipReader(int fd);
   ~ZipReader();
   ZipReader(const ZipReader&) = delete;
   ZipReader& operator = (const ZipReader&) = delete;
@@ -50,10 +55,12 @@ public:
   unique_ptr<InputStream> openEntry(const ZipEntry& entry) const;
 
 private:
-  String zip_filename;
-  void* file_stream = nullptr; ///< mz_stream_os
+  String zip_filename;         ///< for a descriptor: only a name for messages
+  int    zip_fd = -1;
+  void* file_stream = nullptr; ///< mz_stream_os, or a stream over zip_fd
   void* zip = nullptr;         ///< mz_zip handle
   vector<ZipEntry> the_entries;
+  void read();
   std::string the_comment;
   friend class ZipWriter;
 };
@@ -62,7 +69,8 @@ private:
 class ZipEntryInputStream : public InputStream {
 public:
   /// Open the entry at position cd_pos in the central directory (see ZipEntry) of the given zip file
-  ZipEntryInputStream(const String& zip_filename, int64_t cd_pos);
+  /// (or, if fd >= 0, of the zip file open as that descriptor)
+  ZipEntryInputStream(const String& zip_filename, int64_t cd_pos, int fd = -1);
   ~ZipEntryInputStream() override;
 protected:
   size_t doRead(void* buffer, size_t size) override;

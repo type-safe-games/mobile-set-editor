@@ -21,6 +21,7 @@ void install_desktop_hooks();
 /// Load the fonts (.ttf or .otf) in all directories in the app directory that contain "fonts" in their names,
 /// and optionally their subdirectories, so wx can use them; returns true if there were errors.
 /** These directories, and the ones in the MSE_FONT_STORE environment variable (separated like PATH),
- *  are the desktop's shared font store for the font registry.
+ *  are the desktop's shared font store for the font registry. The font files in MSE_FONT_STORE
+ *  (.ttf, .otf, .ttc, in subdirectories too) are also loaded for wx.
  */
 bool preload_resource_fonts(bool recursive);

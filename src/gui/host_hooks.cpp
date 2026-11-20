@@ -126,24 +126,32 @@ static void tally_resource_fonts(String fontsDirectoryPath, vector<String>& font
 }
 
 bool preload_resource_fonts(bool recursive) {
-  // the font store directories from the environment (only for the font registry, wx finds these
-  // through fontconfig or the system's installed fonts)
+  vector<String> wxFontFilePaths; // all added at the end
+  // the font store directories from the environment: for the font registry, and for wx, which
+  // selects fonts by family name (an imported Template pack's loose fonts are only found there)
   if (const char* store = std::getenv("MSE_FONT_STORE")) {
     String dirs = decode_utf8_or_latin1(store, strlen(store));
     size_t start = 0;
     while (start <= dirs.size()) {
       size_t end = dirs.find(wxPATH_SEP[0], start);
       if (end == String::npos) end = dirs.size();
-      if (end > start) font_registry().addDirectory(dirs.substr(start, end - start), FontSource::FONT_STORE);
+      if (end > start) {
+        String dir = dirs.substr(start, end - start);
+        font_registry().addDirectory(dir, FontSource::FONT_STORE);
+        vector<String> paths = list_font_files(dir);
+        wxFontFilePaths.insert(wxFontFilePaths.end(), paths.begin(), paths.end());
+      }
       start = end + 1;
     }
   }
   String pathSeparator(1, path_separator());
   String appPath(path_only(executable_path()));
   vector<String> folders;
-  if (!list_directory(appPath, folders, LIST_DIRS)) return true;
+  if (!list_directory(appPath, folders, LIST_DIRS)) {
+    add_wx_font_files(wxFontFilePaths);
+    return true;
+  }
 
-  bool preloadHadErrors = false;
   for (const String& folder : folders)
   {
     if (contains(to_lower(folder), _("fonts"))) {
@@ -156,16 +164,12 @@ bool preload_resource_fonts(bool recursive) {
       // load fonts
       for (const String& fontFilePath : fontFilePaths) {
         font_registry().addFile(fontFilePath, FontSource::FONT_STORE);
-        #if wxUSE_PRIVATE_FONTS
-          if (!wxFont::AddPrivateFont(fontFilePath)) {
-            preloadHadErrors = true;
-          }
-        #endif
+        wxFontFilePaths.push_back(fontFilePath);
       }
     }
   }
 
-  return preloadHadErrors;
+  return !add_wx_font_files(wxFontFilePaths);
 }
 
 void install_desktop_hooks() {

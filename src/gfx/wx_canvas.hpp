@@ -76,12 +76,16 @@ class WxCanvasFactory : public CanvasFactory {
 public:
   OffscreenCanvasP create(int width, int height, CanvasFormat format) override;
   OffscreenCanvasP create(const Image& image) override;
+  bool addFontFiles(const vector<String>& paths) override;
 };
 
 // ----------------------------------------------------------------------------- : Helpers for the GUI
 
 /// The wx font for a canvas font
 wxFont to_wx_font(const CanvasFont& font);
+
+/// Make font files available to wx by family name (wxFont::AddPrivateFont); false if any failed
+bool add_wx_font_files(const vector<String>& paths);
 
 /// The wxDC under a canvas, which must be a WxCanvas
 wxDC& wx_dc(Canvas& canvas);

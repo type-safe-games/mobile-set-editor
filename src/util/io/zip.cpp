@@ -15,6 +15,11 @@
 #include <mz_strm.h>
 #include <mz_strm_os.h>
 #include <mz_zip.h>
+#ifndef _WIN32
+  #include <cerrno>
+  #include <sys/stat.h>
+  #include <unistd.h>
+#endif
 
 // ----------------------------------------------------------------------------- : Utility
 
@@ -27,19 +32,90 @@ static std::string minizip_path(const String& filename) {
   #endif
 }
 
-// Open a zip file for reading, returns the mz_zip handle (or nullptr)
-static void* open_zip_for_reading(const String& filename, void*& file_stream) {
-  file_stream = mz_stream_os_create();
-  if (!file_stream) return nullptr;
-  if (mz_stream_os_open(file_stream, minizip_path(filename).c_str(), MZ_OPEN_MODE_READ) != MZ_OK) {
-    mz_stream_os_delete(&file_stream);
-    return nullptr;
+#ifndef _WIN32
+// A read-only minizip stream over a file descriptor the caller owns (Android hands out picked files
+// as descriptors). It keeps its own position and reads with pread, so several streams can share
+// one descriptor.
+struct FdStream {
+  mz_stream stream;
+  int       fd    = -1;
+  int64_t   pos   = 0;
+  int32_t   error = 0;
+};
+static int32_t fd_stream_open(void*, const char*, int32_t) { return MZ_SUPPORT_ERROR; }
+static int32_t fd_stream_is_open(void* s) { return ((FdStream*)s)->fd >= 0 ? MZ_OK : MZ_OPEN_ERROR; }
+static int32_t fd_stream_read(void* s, void* buf, int32_t size) {
+  FdStream* f = (FdStream*)s;
+  ssize_t n;
+  do {
+    n = pread(f->fd, buf, (size_t)size, (off_t)f->pos);
+  } while (n < 0 && errno == EINTR);
+  if (n < 0) {
+    f->error = errno;
+    return MZ_READ_ERROR;
+  }
+  f->pos += n;
+  return (int32_t)n;
+}
+static int32_t fd_stream_write(void*, const void*, int32_t) { return MZ_WRITE_ERROR; }
+static int64_t fd_stream_tell(void* s) { return ((FdStream*)s)->pos; }
+static int32_t fd_stream_seek(void* s, int64_t offset, int32_t origin) {
+  FdStream* f = (FdStream*)s;
+  int64_t base = 0;
+  if (origin == MZ_SEEK_CUR) {
+    base = f->pos;
+  } else if (origin == MZ_SEEK_END) {
+    struct stat st;
+    if (fstat(f->fd, &st) != 0) return MZ_SEEK_ERROR;
+    base = st.st_size;
+  } else if (origin != MZ_SEEK_SET) {
+    return MZ_SEEK_ERROR;
+  }
+  if (base + offset < 0) return MZ_SEEK_ERROR;
+  f->pos = base + offset;
+  return MZ_OK;
+}
+static int32_t fd_stream_close(void* s) { ((FdStream*)s)->fd = -1; return MZ_OK; } // the caller closes the descriptor
+static int32_t fd_stream_error(void* s) { return ((FdStream*)s)->error; }
+static void* fd_stream_create();
+static void fd_stream_delete(void** s) {
+  delete (FdStream*)*s;
+  *s = nullptr;
+}
+static mz_stream_vtbl fd_stream_vtbl = {
+  fd_stream_open, fd_stream_is_open, fd_stream_read, fd_stream_write, fd_stream_tell, fd_stream_seek,
+  fd_stream_close, fd_stream_error, fd_stream_create, fd_stream_delete, nullptr, nullptr
+};
+static void* fd_stream_create() {
+  FdStream* f = new FdStream();
+  f->stream.vtbl = &fd_stream_vtbl;
+  f->stream.base = nullptr;
+  return f;
+}
+#endif
+
+// Open a zip file (or, if fd >= 0, the zip file open as that descriptor) for reading, returns the mz_zip handle (or nullptr)
+static void* open_zip_for_reading(const String& filename, int fd, void*& file_stream) {
+  if (fd >= 0) {
+    #ifndef _WIN32
+      file_stream = fd_stream_create();
+      ((FdStream*)file_stream)->fd = fd;
+    #else
+      return nullptr;
+    #endif
+  } else {
+    file_stream = mz_stream_os_create();
+    if (!file_stream) return nullptr;
+    if (mz_stream_os_open(file_stream, minizip_path(filename).c_str(), MZ_OPEN_MODE_READ) != MZ_OK) {
+      mz_stream_delete(&file_stream);
+      return nullptr;
+    }
   }
   void* zip = mz_zip_create();
   if (!zip || mz_zip_open(zip, file_stream, MZ_OPEN_MODE_READ) != MZ_OK) {
     if (zip) mz_zip_delete(&zip);
-    mz_stream_os_close(file_stream);
-    mz_stream_os_delete(&file_stream);
+    mz_stream_close(file_stream);
+    mz_stream_delete(&file_stream);
     return nullptr;
   }
   return zip;
@@ -51,8 +127,8 @@ static void close_zip(void*& zip, void*& file_stream) {
     mz_zip_delete(&zip);
   }
   if (file_stream) {
-    mz_stream_os_close(file_stream);
-    mz_stream_os_delete(&file_stream);
+    mz_stream_close(file_stream);
+    mz_stream_delete(&file_stream);
   }
   zip = file_stream = nullptr;
 }
@@ -88,7 +164,18 @@ static String zip_entry_name(const mz_zip_file& info) {
 ZipReader::ZipReader(const String& filename)
   : zip_filename(filename)
 {
-  zip = open_zip_for_reading(filename, file_stream);
+  read();
+}
+
+ZipReader::ZipReader(int fd)
+  : zip_filename(_("descriptor ") + int_to_string(fd))
+  , zip_fd(fd)
+{
+  if (fd >= 0) read();
+}
+
+void ZipReader::read() {
+  zip = open_zip_for_reading(zip_filename, zip_fd, file_stream);
   if (!zip) return;
   // comment
   const char* comment = nullptr;
@@ -98,7 +185,7 @@ ZipReader::ZipReader(const String& filename)
   while (err == MZ_OK) {
     mz_zip_file* info = nullptr;
     if (mz_zip_entry_get_info(zip, &info) != MZ_OK || !info) break;
-    the_entries.push_back(ZipEntry{zip_entry_name(*info), mz_zip_get_entry(zip), info->modified_date});
+    the_entries.push_back(ZipEntry{zip_entry_name(*info), mz_zip_get_entry(zip), info->modified_date, info->uncompressed_size});
     err = mz_zip_goto_next_entry(zip);
   }
   if (err != MZ_OK && err != MZ_END_OF_LIST) {
@@ -113,13 +200,13 @@ ZipReader::~ZipReader() {
 }
 
 unique_ptr<InputStream> ZipReader::openEntry(const ZipEntry& entry) const {
-  return make_unique<ZipEntryInputStream>(zip_filename, entry.cd_pos);
+  return make_unique<ZipEntryInputStream>(zip_filename, entry.cd_pos, zip_fd);
 }
 
 // ----------------------------------------------------------------------------- : ZipEntryInputStream
 
-ZipEntryInputStream::ZipEntryInputStream(const String& zip_filename, int64_t cd_pos) {
-  zip = open_zip_for_reading(zip_filename, file_stream);
+ZipEntryInputStream::ZipEntryInputStream(const String& zip_filename, int64_t cd_pos, int fd) {
+  zip = open_zip_for_reading(zip_filename, fd, file_stream);
   if (zip && mz_zip_goto_entry(zip, cd_pos) == MZ_OK && mz_zip_entry_read_open(zip, 0, nullptr) == MZ_OK) {
     entry_open = true;
   } else {

@@ -104,3 +104,6 @@ FontRegistry& font_registry();
 
 /// Is this the name of a font file (.ttf, .otf, .ttc)?
 bool is_font_file_name(const String& name);
+
+/// The font files in a directory and its subdirectories, in the order the registry scans them
+vector<String> list_font_files(const String& dir);

@@ -71,20 +71,21 @@ def block_value(block: str, key: str) -> str | None:
     return m.group(1).strip() if m else None
 
 
-def fontconfig_file(pack: Path, out_dir: Path) -> Path:
+def fontconfig_file(pack: Path | None, out_dir: Path) -> Path:
     """A fontconfig file that adds the pack's fonts to the system ones, written into out_dir.
 
     The pack's Magic fonts are not installed system-wide; without them text falls back to
-    another font and the layout changes.
+    another font and the layout changes. With no pack: the system fonts only.
     """
     out_dir.mkdir(parents=True, exist_ok=True)
     conf = out_dir / "fonts.conf"
+    pack_dir = f"  <dir>{pack / 'Magic - Fonts'}</dir>\n" if pack else ""
     conf.write_text(
         '<?xml version="1.0"?>\n'
         '<!DOCTYPE fontconfig SYSTEM "urn:fontconfig:fonts.dtd">\n'
         "<fontconfig>\n"
         '  <include ignore_missing="yes">/etc/fonts/fonts.conf</include>\n'
-        f"  <dir>{pack / 'Magic - Fonts'}</dir>\n"
+        f"{pack_dir}"
         f"  <cachedir>{out_dir / 'fontconfig-cache'}</cachedir>\n"
         "</fontconfig>\n",
         encoding="utf-8",
@@ -92,11 +93,26 @@ def fontconfig_file(pack: Path, out_dir: Path) -> Path:
     return conf
 
 
-def mse_env(pack: Path, out_dir: Path) -> dict[str, str]:
+def mse_env(pack: Path, out_dir: Path, templates: Path | None = None, font_store: Path | None = None) -> dict[str, str]:
+    """The environment for MSE with the pack's Templates and fonts.
+
+    With `templates` (and `font_store`): a Template store made by Template import instead. Then
+    fontconfig knows only the system fonts, and the Magic fonts are found only because MSE loads
+    the files in the shared font store (MSE_FONT_STORE) itself.
+    """
     env = dict(os.environ)
+    if templates is not None:
+        env["MSE_TEMPLATES_DIR"] = str(templates)
+        env["FONTCONFIG_FILE"] = str(fontconfig_file(None, out_dir / "imported-fontconfig"))
+        if font_store is not None:
+            env["MSE_FONT_STORE"] = str(font_store)
+        else:
+            env.pop("MSE_FONT_STORE", None)
+        return env
     env["MSE_TEMPLATES_DIR"] = str(pack / "data")
     env["FONTCONFIG_FILE"] = str(fontconfig_file(pack, out_dir))
-    # the same directory as the font registry's shared font store (it doesn't change what wx draws)
+    # the same directory as the font registry's shared font store; MSE also loads its files for wx,
+    # which finds them through the <dir> above anyway
     env["MSE_FONT_STORE"] = str(pack / "Magic - Fonts")
     return env
 

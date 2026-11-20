@@ -240,7 +240,22 @@ static void with_action(Session& s, ActionResult& r, F&& body) {
 
 // ----------------------------------------------------------------------------- : Initialisation
 
-static std::string template_dir_, font_store_dir_; // read by importTemplates, set before it may run
+static std::string template_dir_, font_store_dir_;
+
+/// Add the shared font store to the font registry, and give the Canvas backend its new files
+static void add_font_store() {
+  if (font_store_dir_.empty()) return;
+  String dir = from_utf8(font_store_dir_);
+  font_registry().addDirectory(dir, FontSource::FONT_STORE);
+  static set<String> given;
+  vector<String> paths;
+  for (const String& path : list_font_files(dir)) {
+    if (given.insert(path).second) paths.push_back(path);
+  }
+  if (!canvas_factory().addFontFiles(paths)) {
+    queue_message(MESSAGE_WARNING, _("Could not load all fonts in the font store ") + dir);
+  }
+}
 
 Result init(const InitOptions& options) {
   // the calling thread becomes the core thread
@@ -253,12 +268,10 @@ Result init(const InitOptions& options) {
     }
     if (options.template_dir.empty()) fail(Status::InvalidArgument, "no template directory");
     package_manager.init(from_utf8(options.template_dir), from_utf8(options.program_data_dir));
-    if (!options.font_store_dir.empty()) {
-      font_registry().addDirectory(from_utf8(options.font_store_dir), FontSource::FONT_STORE);
-    }
     the_locale = options.locale.empty() ? LocaleP() : Locale::byName(from_utf8(options.locale));
     template_dir_   = options.template_dir;
     font_store_dir_ = options.font_store_dir;
+    add_font_store();
     set_template_store(options.template_dir, options.font_store_dir);
     initialized = true;
   });
@@ -275,8 +288,8 @@ Result shutdown() {
 Result refreshTemplates() {
   return guarded<Result>("", "", [&](Result&) {
     package_manager.reset();
-    if (!template_dir_.empty())   font_registry().addTemplateDirectory(from_utf8(template_dir_));
-    if (!font_store_dir_.empty()) font_registry().addDirectory(from_utf8(font_store_dir_), FontSource::FONT_STORE);
+    if (!template_dir_.empty()) font_registry().addTemplateDirectory(from_utf8(template_dir_));
+    add_font_store();
   });
 }
 
@@ -771,11 +784,15 @@ BytesResult exportCardImage(SessionHandle h, const std::string& card_uid, const 
 
 // ----------------------------------------------------------------------------- : Template import
 
-ImportResult importTemplates(const std::string& zip_path) {
-  ImportResult r;
+/// Run an import call, which may be on any thread: no exception leaves it
+template <typename R, typename F>
+static R import_call(F&& body) {
+  R r;
   try {
-    // wait while a session is loading packages
-    import_templates(zip_path, loading_mutex, r);
+    body(r);
+  } catch (const FacadeError& e) {
+    r.status = e.status;
+    r.error = e.message;
   } catch (const Error& e) {
     r.status = Status::Failed;
     r.error = to_utf8(e.what());
@@ -787,6 +804,36 @@ ImportResult importTemplates(const std::string& zip_path) {
     r.error = "an unexpected exception occurred";
   }
   return r;
+}
+
+ImportScan scanTemplates(int fd) {
+  return import_call<ImportScan>([&](ImportScan& r) {
+    if (fd < 0) fail(Status::InvalidArgument, "not a file descriptor");
+    scan_templates(ImportInput{fd, std::string()}, r);
+  });
+}
+
+ImportScan scanTemplates(const std::string& zip_path) {
+  return import_call<ImportScan>([&](ImportScan& r) { scan_templates(ImportInput{-1, zip_path}, r); });
+}
+
+ImportResult installTemplates(int fd, const ImportSelection& selection) {
+  return import_call<ImportResult>([&](ImportResult& r) {
+    if (fd < 0) fail(Status::InvalidArgument, "not a file descriptor");
+    install_templates(ImportInput{fd, std::string()}, selection, false, loading_mutex, r);
+  });
+}
+
+ImportResult installTemplates(const std::string& zip_path, const ImportSelection& selection) {
+  return import_call<ImportResult>([&](ImportResult& r) {
+    install_templates(ImportInput{-1, zip_path}, selection, false, loading_mutex, r);
+  });
+}
+
+ImportResult importTemplates(const std::string& zip_path) {
+  return import_call<ImportResult>([&](ImportResult& r) {
+    install_templates(ImportInput{-1, zip_path}, ImportSelection(), true, loading_mutex, r);
+  });
 }
 
 } // namespace mse::facade

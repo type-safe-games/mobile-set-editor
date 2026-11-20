@@ -10,8 +10,9 @@
  *  It speaks only plain types: UTF-8 strings, integers, pixel buffers and region rectangles.
  *
  *  Threading: the core is single threaded. The host owns one core thread and makes every call on
- *  it, starting with init(). The facade has no locks; the one exception is importTemplates(), which
- *  may run on any thread (it only writes the template store, and waits while a session is loading).
+ *  it, starting with init(). The facade has no locks; the one exception is Template import
+ *  (scanTemplates, installTemplates, importTemplates), which may run on any thread (it only writes
+ *  the template store and the font store, and waits while a session is loading).
  *
  *  Errors: no C++ exception leaves a facade call. Every call returns a Result with the messages
  *  the core queued while it ran; a failed call has ok() == false and says why in `error`.
@@ -312,27 +313,103 @@ BytesResult exportCardImage(SessionHandle session, const std::string& card_uid, 
 
 // ----------------------------------------------------------------------------- : Template import
 
+// Template import (ADR 0005) installs the Templates (*.mse-<type> directories, at any depth) and
+// the loose .ttf/.otf fonts in a zip the user picked. `.mse-installer` files, as the zip itself
+// or inside it, and zipped packages inside it are opened and scanned too. Spelling dictionaries
+// (.dic/.aff files in a `dictionaries` directory, as in MSE's data directory and the Full Magic
+// Pack) go into the template store's `dictionaries` directory, where the core looks for them.
+//
+// The import calls are the facade's exception to the core thread: they may run on any thread
+// (they only read the zip and the template store, and write the store). Scan first, let the user
+// pick, then install. Each package is extracted into a temporary directory in the store and
+// renamed into place (while no session is loading), so a failure never leaves a half-installed
+// Template. Sessions opened afterwards see the new Templates once refreshTemplates() has run on
+// the core thread.
+//
+// The rules (ADR 0005): one version per package; a newer version replaces the installed one, the
+// same or an older one is skipped (no downgrade). A package is refused if it declares a newer
+// `mse version` than this program's, or if a package it depends on is neither installed nor in
+// the zip in a recent enough version (or is itself refused). Installing a package also installs
+// the packages in the zip it depends on, when the installed ones don't do.
+
+/// A package another one needs
+struct ImportDependency {
+  std::string package; ///< e.g. "magic.mse-game"; "Magic Set Editor" is the program itself
+  std::string version; ///< the oldest version that will do, may be empty
+};
+
+/// A Template found in a zip
+struct ScannedPackage {
+  std::string name;              ///< e.g. "magic-m15.mse-style"
+  std::string type;              ///< e.g. "style"
+  std::string full_name;         ///< for the picker (the short name if there is no full name)
+  std::string version;           ///< as declared by the package, may be empty
+  std::string installed_version; ///< of the installed package of that name, empty if there is none
+  std::string installer_group;   ///< the picker group, e.g. "magic/frames/m15"; derived from the name as MSE's installer does when the package declares none
+  std::vector<ImportDependency> dependencies;
+  std::uint64_t size = 0;        ///< bytes when extracted
+  enum class Verdict {
+    Install,      ///< not installed yet
+    Replace,      ///< newer than the installed version
+    SkipNotNewer, ///< the same as or older than the installed version
+    Refuse,       ///< can't be installed, see `reason`
+  } verdict = Verdict::Install;
+  std::string reason;            ///< why it is refused
+};
+
+struct ImportScan : Result {
+  std::vector<ScannedPackage> packages; ///< one per package name, by installer group and name
+  std::vector<std::string> fonts;       ///< the loose font files (file names) for the font store
+  std::uint64_t fonts_size = 0;         ///< their bytes
+  std::vector<std::string> dictionaries; ///< spelling dictionary files (file names)
+};
+
+/// List the Templates and loose fonts in a zip, and what installing each would do.
+/** The descriptor (opened for reading by the host, e.g. from a picked document) is not closed and
+ *  its file position is not used. */
+ImportScan scanTemplates(int fd);
+/// The same for a zip file
+ImportScan scanTemplates(const std::string& zip_path);
+
+/// What to install from a zip
+struct ImportSelection {
+  std::vector<std::string> packages; ///< package names from the scan; the packages in the zip they depend on are added
+  bool fonts = true;                 ///< also copy the loose fonts into the font store
+  bool dictionaries = true;          ///< also copy the spelling dictionaries
+};
+
 struct ImportedPackage {
   std::string name;    ///< e.g. "magic-m15.mse-style"
   std::string version; ///< as declared by the package, may be empty
-  enum class Outcome { Installed, Replaced, SkippedNotNewer, Failed } outcome = Outcome::Installed;
-  std::string error;   ///< for Failed
+  enum class Outcome {
+    Installed,
+    Replaced,
+    SkippedNotNewer,
+    Refused, ///< see `error`
+    Failed,  ///< could not be installed (not in the zip, the zip is damaged, the disk is full, ...), see `error`
+  } outcome = Outcome::Installed;
+  bool dependency = false; ///< not selected, but added because a selected package needs it
+  std::string error;   ///< for Refused and Failed
 };
 
 struct ImportResult : Result {
-  std::vector<ImportedPackage> packages;
-  std::vector<std::string> fonts; ///< loose font files copied into the font store
+  std::vector<ImportedPackage> packages; ///< the selected packages and the dependencies added, dependencies first
+  std::vector<std::string> fonts;        ///< loose font files copied into the font store
+  std::vector<std::string> dictionaries; ///< spelling dictionary files copied (new or changed)
 };
 
-/// Install the Templates found in a zip (at any depth) into the template store, and its loose
-/// .ttf/.otf fonts into the font store (ADR 0005).
-/** May be called from any thread. Each package is extracted to a temporary directory and renamed
- *  into place. A package replaces an installed one only if its version is newer. Sessions opened
- *  afterwards see the new Templates (call refreshTemplates() on the core thread first). */
+/// Install the selected Templates (and their dependencies) and the loose fonts from a zip.
+/** The zip is scanned again, so the outcomes follow the rules above even if the store changed
+ *  since scanTemplates. The descriptor is not closed. */
+ImportResult installTemplates(int fd, const ImportSelection& selection);
+/// The same for a zip file
+ImportResult installTemplates(const std::string& zip_path, const ImportSelection& selection);
+
+/// Install everything in a zip file that scanTemplates says can be installed, its loose fonts and dictionaries
 ImportResult importTemplates(const std::string& zip_path);
 
-/// On the core thread, after importTemplates: forget cached packages so new sessions load the
-/// imported versions, and register their fonts.
+/// On the core thread, after installing Templates: forget cached packages so new sessions load the
+/// imported versions, and register their fonts and the font store's new files.
 Result refreshTemplates();
 
 } // namespace mse::facade

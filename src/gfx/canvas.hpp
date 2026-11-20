@@ -229,6 +229,10 @@ public:
   virtual OffscreenCanvasP create(int width, int height, CanvasFormat format) = 0;
   /// A new canvas that starts out with the given image (including its alpha channel)
   virtual OffscreenCanvasP create(const Image& image) = 0;
+  /// New font files of the shared font store (ADR 0005). A backend that selects fonts by family
+  /// name through the platform (the wx Canvas, through fontconfig) registers them there; one that
+  /// is handed the font registry's resolved faces ignores them. Returns false if any failed.
+  virtual bool addFontFiles(const vector<String>& paths) { return true; }
 };
 
 /// The installed factory; throws an InternalError if there is none
