@@ -1,0 +1,37 @@
+# Golden check on every push (ADR 0010): build the desktop host and compare its
+# Layout dumps with the frozen Golden images, Tier 1 and Tier 2 plus the fixture.
+#
+# Runs on the self-hosted `mse` runner only: the pack and the goldens are private
+# (ADR 0008) and are mounted into the job read-only at /pack and /goldens-ro. The
+# job image matches the machine the goldens were captured on (libraries and
+# fonts), so layout is comparable. Public CI uses the fixture only (#52).
+name: goldens
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: mse
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo
+          cmake --build build -j"$(nproc)"
+
+      - name: Golden check
+        run: |
+          # check writes its run and reports into the goldens dir, which is read-only.
+          mkdir -p "$RUNNER_TEMP/goldens"
+          cp -a /goldens-ro/images /goldens-ro/tier1 /goldens-ro/tier2 /goldens-ro/styles.tsv "$RUNNER_TEMP/goldens/"
+          # GTK needs a display even for --cli rendering.
+          xvfb-run -a python tools/goldens/goldens.py check \
+            --pack /pack --goldens "$RUNNER_TEMP/goldens" --jobs "$(nproc)"
+
+      - name: Report
+        if: always()
+        run: cat "$RUNNER_TEMP/goldens/report-check.md" || true
