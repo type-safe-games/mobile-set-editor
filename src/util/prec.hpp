@@ -29,7 +29,6 @@
 #include <wx/wx.h>
 #include <wx/image.h>
 #include <wx/datetime.h>
-#include <wx/regex.h> // TODO : remove, see regex.hpp
 
 #if defined(__WXMSW__)
   // MSW uses the RGB define, fix it before it's undefined 

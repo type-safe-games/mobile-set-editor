@@ -7,6 +7,7 @@
 // ----------------------------------------------------------------------------- : Includes
 
 #include <util/prec.hpp>
+#include <util/thread.hpp>
 #include <data/set.hpp>
 #include <data/game.hpp>
 #include <data/stylesheet.hpp>
@@ -54,11 +55,11 @@ Set::~Set() {}
 
 
 Context& Set::getContext() {
-  assert(wxThread::IsMain());
+  assert(is_core_thread());
   return script_manager->getContext(CardP());
 }
 Context& Set::getContext(const CardP& card) {
-  assert(wxThread::IsMain());
+  assert(is_core_thread());
   return script_manager->getContext(card);
 }
 void Set::updateStyles(const CardP& card, bool only_content_dependent) {
@@ -136,21 +137,21 @@ void Set::buildUIDMap() {
 }
 
 Context& Set::getContextForThumbnails() {
-  assert(!wxThread::IsMain());
+  assert(!is_core_thread());
   if (!thumbnail_script_context) {
     thumbnail_script_context.reset(new SetScriptContext(*this));
   }
   return thumbnail_script_context->getContext(CardP());
 }
 Context& Set::getContextForThumbnails(const CardP& card) {
-  assert(!wxThread::IsMain());
+  assert(!is_core_thread());
   if (!thumbnail_script_context) {
     thumbnail_script_context.reset(new SetScriptContext(*this));
   }
   return thumbnail_script_context->getContext(card);
 }
 Context& Set::getContextForThumbnails(const StyleSheetP& stylesheet) {
-  assert(!wxThread::IsMain());
+  assert(!is_core_thread());
   if (!thumbnail_script_context) {
     thumbnail_script_context.reset(new SetScriptContext(*this));
   }

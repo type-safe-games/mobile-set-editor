@@ -15,7 +15,8 @@
 // ----------------------------------------------------------------------------- : Includes
 
 #include <util/prec.hpp>
-#include <wx/thread.h>
+#include <mutex>
+#include <thread>
 
 // ----------------------------------------------------------------------------- : Dynamic argument
 
@@ -73,26 +74,26 @@
 #else
 
   template <typename T> struct ThreadLocalObject {
-    map<int,T*> objects;
+    map<std::thread::id,T*> objects;
     T def;
-    wxCriticalSection container_access;
+    std::mutex container_access;
 
     inline T operator () () {
-      wxCriticalSectionLocker lock(container_access);
-      T*& p = objects[wxThread::GetCurrentId()];
+      std::lock_guard<std::mutex> lock(container_access);
+      T*& p = objects[std::this_thread::get_id()];
       if (!p) {
         p = new T(def);
       }
-      return *objects[wxThread::GetCurrentId()];
+      return *objects[std::this_thread::get_id()];
     }
 
     inline void store (T value) {
-      wxCriticalSectionLocker lock(container_access);
-      T*& p = objects[wxThread::GetCurrentId()];
+      std::lock_guard<std::mutex> lock(container_access);
+      T*& p = objects[std::this_thread::get_id()];
       if (!p) {
         p = new T(def);
       }
-      *objects[wxThread::GetCurrentId()] = value;
+      *objects[std::this_thread::get_id()] = value;
     }
 
     ThreadLocalObject (T def)

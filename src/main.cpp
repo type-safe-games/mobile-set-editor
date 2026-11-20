@@ -23,10 +23,7 @@
 #include <gui/set/window.hpp>
 #include <gui/symbol/window.hpp>
 #include <gui/thumbnail_thread.hpp>
-#include <gui/web_request_window.hpp>
-#include <gui/new_window.hpp>
-#include <data/stylesheet.hpp>
-#include <gfx/generated_image.hpp>
+#include <gui/host_hooks.hpp>
 #include <wx/fs_inet.h>
 #include <wx/wfstream.h>
 #include <wx/txtstrm.h>
@@ -95,39 +92,7 @@ int MSE::OnRun() {
     wxFileSystem::AddHandler(new wxInternetFSHandler); // needed for update checker
     wxSocketBase::Initialize();
     init_script_variables();
-    error_sink = [](MessageType type, String const& msg) {
-      if (cli.haveConsole()) {
-        // always write to stderr if possible
-        cli.show_message(type, msg);
-        return true; // TODO: is this the right thing to do?
-      }
-      if (type == MESSAGE_FATAL_ERROR) {
-        // bring this to the user's attention right now!
-        wxMessageBox(msg, _("Error"), wxOK | wxICON_ERROR);
-      }
-      return false;
-    };
-    settings.dark_mode_hook = [] { return wxSystemSettings::GetAppearance().IsDark(); };
-    ui_color_hook = [](UIColor which) -> Color {
-      switch (which) {
-        case UIColor::WINDOW:        return wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW);
-        case UIColor::WINDOW_TEXT:   return wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOWTEXT);
-        case UIColor::GRAY_TEXT:     return wxSystemSettings::GetColour(wxSYS_COLOUR_GRAYTEXT);
-        case UIColor::APP_WORKSPACE: return wxSystemSettings::GetColour(wxSYS_COLOUR_APPWORKSPACE);
-      }
-      return Color();
-    };
-    settings.on_recent_sets_changed = SetWindow::updateRecentSetsInAllWindows;
-    StyleSheet::select_alternative = [](const Game& game, const String& failed_name, const String& failed_dep) {
-      return select_stylesheet(game, failed_name, failed_dep);
-    };
-    download_image_hook = [](const String& url, ImageDownload& out) {
-      WebRequestWindow wnd(url);
-      if (wnd.ShowModal() != wxID_OK) return false;
-      out.content_type = wnd.content_type;
-      out.image = wnd.image_out;
-      return true;
-    };
+    install_desktop_hooks();
     init_file_formats();
     cli.init();
     package_manager.init();

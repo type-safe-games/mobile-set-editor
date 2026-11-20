@@ -12,7 +12,9 @@
 // ----------------------------------------------------------------------------- : SVN File Manipulation
 
 bool run_svn(const Char** arguments) {
-  switch (wxExecute(const_cast<Char**>(arguments), wxEXEC_SYNC)) { // Yuck, const_cast
+  vector<String> args;
+  for (const Char** a = arguments; *a; ++a) args.push_back(*a);
+  switch (run_command(args, true)) {
     // Success
     case 0:
       return true;

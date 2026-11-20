@@ -98,7 +98,7 @@ public:
   bool keyword(const Char* kw) {
     if (value == kw[0]) {
       if (is_substr(spec, pos, kw + 1)) {
-        pos += wxStrlen(kw + 1);
+        pos += wcslen(kw + 1);
         return true;
       }
     }

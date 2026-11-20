@@ -7,6 +7,7 @@
 // ----------------------------------------------------------------------------- : Includes
 
 #include <util/prec.hpp>
+#include <util/thread.hpp>
 #include <script/script_manager.hpp>
 #include <script/to_value.hpp>
 #include <script/functions/functions.hpp>
@@ -100,7 +101,7 @@ SetScriptManager::~SetScriptManager() {
 }
 
 void SetScriptManager::onInit(const StyleSheetP& stylesheet, Context& ctx) {
-  assert(wxThread::IsMain());
+  assert(is_core_thread());
   // initialize dependencies
   try {
     // find script dependencies
@@ -192,11 +193,11 @@ void SetScriptManager::onAction(const Action& action, bool undone) {
   }
   TYPE_CASE_(action, CardListAction) {
     #ifdef LOG_UPDATES
-      wxLogDebug(_("Card dependencies"));
+      log_debug(_("Card dependencies"));
     #endif
     updateAllDependend(set.game->dependent_scripts_cards);
     #ifdef LOG_UPDATES
-      wxLogDebug(_("-------------------------------\n"));
+      log_debug(_("-------------------------------\n"));
     #endif
   }
   TYPE_CASE_(action, KeywordListAction) {
@@ -277,19 +278,19 @@ void SetScriptManager::updateValue(Value& value, const CardP& card) {
   // execute script for initial changed value
   value.update(getContext(card));
   #ifdef LOG_UPDATES
-    wxLogDebug(_("Start:     %s"), value.fieldP->name);
+    log_debug(String::Format(_("Start:     %s"), value.fieldP->name));
   #endif
   // update dependent scripts
   alsoUpdate(to_update, value.fieldP->dependent_scripts, card);
   updateRecursive(to_update, starting_age);
   #ifdef LOG_UPDATES
-    wxLogDebug(_("-------------------------------\n"));
+    log_debug(_("-------------------------------\n"));
   #endif
 }
 
 void SetScriptManager::updateAll() {
   #ifdef LOG_UPDATES
-    wxLogDebug(_("Update all"));
+    log_debug(_("Update all"));
   #endif
   // update set data
   Context& ctx = getContext(set.stylesheet);
@@ -319,7 +320,7 @@ void SetScriptManager::updateAll() {
   // update things that depend on the card list
   updateAllDependend(set.game->dependent_scripts_cards);
   #ifdef LOG_UPDATES
-    wxLogDebug(_("-------------------------------\n"));
+    log_debug(_("-------------------------------\n"));
   #endif
 }
 
@@ -356,12 +357,12 @@ void SetScriptManager::updateToUpdate(const ToUpdate& u, deque<ToUpdate>& to_upd
     // u.value has changed, also update values with a dependency on u.value
     alsoUpdate(to_update, u.value->fieldP->dependent_scripts, u.card);
   #ifdef LOG_UPDATES
-    wxLogDebug(_("Changed: %s"), u.value->fieldP->name);
+    log_debug(String::Format(_("Changed: %s"), u.value->fieldP->name));
   #endif
   }
   #ifdef LOG_UPDATES
   else
-    wxLogDebug(_("Same:    %s"), u.value->fieldP->name);
+    log_debug(String::Format(_("Same:    %s"), u.value->fieldP->name));
   #endif
 }
 

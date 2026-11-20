@@ -7,6 +7,7 @@
 // ----------------------------------------------------------------------------- : Includes
 
 #include <util/prec.hpp>
+#include <util/thread.hpp>
 #include <util/io/package.hpp>
 #include <util/io/package_manager.hpp>
 #include <util/error.hpp>
@@ -266,7 +267,7 @@ unique_ptr<wxOutputStream> Package::openOut(const String& file) {
 }
 
 String Package::nameOut(const String& file) {
-  assert(wxThread::IsMain()); // Writing should only be done from the main thread
+  assert(is_core_thread()); // Writing should only be done from the main thread
   String name = normalize_internal_filename(file);
   if (isIgnoredOnSave(name)) {
     throw PackageError(_ERROR_1_("write to read only", name));
@@ -290,7 +291,7 @@ String Package::nameOut(const String& file) {
 }
 
 LocalFileName Package::newFileName(const String& prefix, const String& suffix) {
-  assert(wxThread::IsMain()); // Writing should only be done from the main thread
+  assert(is_core_thread()); // Writing should only be done from the main thread
   String name;
   UInt infix = 0;
   while (true) {
@@ -320,7 +321,7 @@ void Package::referenceFile(const String& file) {
 // ----------------------------------------------------------------------------- : LocalFileNames and absolute file references
 
 String Package::absoluteName(const LocalFileName& file) {
-  assert(wxThread::IsMain());
+  assert(is_core_thread());
   FileInfos::iterator it = files.find(normalize_internal_filename(file.fn));
   if (it == files.end()) {
     throw FileNotFoundError(file.fn, filename);

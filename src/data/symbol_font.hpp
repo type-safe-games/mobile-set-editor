@@ -13,7 +13,6 @@
 #include <util/io/package.hpp>
 #include <data/localized_string.hpp>
 #include <data/font.hpp>
-#include <wx/regex.h>
 
 DECLARE_POINTER_TYPE(FontRef);
 DECLARE_POINTER_TYPE(SymbolFont);

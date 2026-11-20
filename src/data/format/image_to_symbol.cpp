@@ -233,8 +233,7 @@ void fill_alpha(Image& img, int w, int h) {
       Byte first_pixel = pixels[0];
       for (int j = 1; j < 3 * w * h; ++j) {
         if (pixels[j] != first_pixel) {
-          wxMessageDialog dial = wxMessageDialog(nullptr, _ERROR_("symbol image has alpha"));
-          dial.ShowModal();
+          queue_message(MESSAGE_WARNING, _ERROR_("symbol image has alpha"));
           break;
         }
       }

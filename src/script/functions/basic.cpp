@@ -49,7 +49,7 @@ SCRIPT_FUNCTION(get_mse_dark_mode) {
 SCRIPT_FUNCTION(trace) {
   SCRIPT_PARAM_C(String, input);
   #if defined(_DEBUG) && 0
-    wxLogDebug(_("Trace:\t") + input);
+    log_debug(_("Trace:\t") + input);
   #else
     queue_message(MESSAGE_INFO, _("Trace: ") + input);
   #endif

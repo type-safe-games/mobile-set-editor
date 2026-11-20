@@ -7,10 +7,9 @@
 // ----------------------------------------------------------------------------- : Includes
 
 #include <util/prec.hpp>
+#include <mutex>
+#include <util/thread.hpp>
 #include <util/error.hpp>
-#if wxUSE_STACKWALKER
-  #include <wx/stackwalk.h>
-#endif
 #include <queue>
 
 // ----------------------------------------------------------------------------- : Debug utilities
@@ -46,65 +45,21 @@ String Error::what() const {
 
 
 
-// Stolen from wx/appbase.cpp
-// we can't just call it, because of static linkage
-#if wxUSE_STACKWALKER
-  String get_stack_trace() {
-    wxString stackTrace;
+function<int(const vector<String>& arguments, bool wait)> run_command_hook;
 
-    class StackDumper : public wxStackWalker {
-    public:
-      StackDumper() {}
+int run_command(const vector<String>& arguments, bool wait) {
+  return run_command_hook ? run_command_hook(arguments, wait) : -1;
+}
 
-      const wxString& GetStackTrace() const { return m_stackTrace; }
+void log_debug(const String& msg) {
+  #ifndef NDEBUG
+    fprintf(stderr, "%s\n", msg.utf8_str().data());
+  #endif
+}
 
-    protected:
-      void OnStackFrame(const wxStackFrame& frame) override {
-        m_stackTrace << wxString::Format(_("[%02d] "), frame.GetLevel());
-
-        wxString name = frame.GetName();
-        if ( !name.empty() ) {
-          m_stackTrace << wxString::Format(_("%-40s"), name.c_str());
-        } else {
-          m_stackTrace << wxString::Format(
-                              _("%p"),
-                              (void*)frame.GetAddress()
-                          );
-        }
-
-        if ( frame.HasSourceLocation() ) {
-            m_stackTrace << _('\t')
-                          << frame.GetFileName()
-                          << _(':')
-                          << (unsigned int)frame.GetLine();
-        }
-
-        m_stackTrace << _('\n');
-      }
-
-    private:
-      wxString m_stackTrace;
-    };
-
-    StackDumper dump;
-    dump.Walk(2); // don't show InternalError() call itself
-    stackTrace = dump.GetStackTrace();
-
-    // don't show more than maxLines or we could get a dialog too tall to be
-    // shown on screen: 20 should be ok everywhere as even with 15 pixel high
-    // characters it is still only 300 pixels...
-    static const int maxLines = 20;
-    const int count = stackTrace.Freq(wxT('\n'));
-    for ( int i = 0; i < count - maxLines; i++ )
-        stackTrace = stackTrace.BeforeLast(wxT('\n'));
-
-    return stackTrace;
-  }
-#else
-  String get_stack_trace() {
-    return _(""); // not supported
-  }
-#endif // wxUSE_STACKWALKER
+String get_stack_trace() {
+  return _(""); // not supported
+}
 
 InternalError::InternalError(const String& str)
   : Error(
@@ -158,17 +113,17 @@ ScriptParseErrors::ScriptParseErrors(const vector<ScriptParseError>& errors)
 // ----------------------------------------------------------------------------- : Error handling
 
 // messages can be posted from other threads, this mutex protects the message list
-wxMutex crit_error_handling;
+std::mutex crit_error_handling;
 typedef pair<MessageType,String> Message;
 deque<Message> message_queue;
 ErrorSink error_sink;
 
 void queue_message(MessageType type, String const& msg) {
-  if (error_sink && wxThread::IsMain() && error_sink(type, msg)) {
+  if (error_sink && is_core_thread() && error_sink(type, msg)) {
     return;
   }
   // Thread safety
-  wxMutexLocker lock(crit_error_handling);
+  std::lock_guard<std::mutex> lock(crit_error_handling);
   // Only show errors in the main thread
   message_queue.push_front(make_pair(type,msg));
 }
@@ -185,12 +140,12 @@ void handle_error_now(const Error& e) {
 }
 
 bool have_queued_message() {
-  wxMutexLocker lock(crit_error_handling);
+  std::lock_guard<std::mutex> lock(crit_error_handling);
   return !message_queue.empty();
 }
 
 bool get_queued_message(MessageType& type, String& msg) {
-  wxMutexLocker lock(crit_error_handling);
+  std::lock_guard<std::mutex> lock(crit_error_handling);
   if (message_queue.empty()) {
     return false;
   } else {

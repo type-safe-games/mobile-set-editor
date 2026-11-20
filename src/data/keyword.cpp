@@ -7,6 +7,7 @@
 // ----------------------------------------------------------------------------- : Includes
 
 #include <util/prec.hpp>
+#include <util/error.hpp>
 #include <data/keyword.hpp>
 #include <util/tagged_string.hpp>
 #include <unordered_map>
@@ -346,11 +347,11 @@ void KeywordDatabase::prepare_parameters(const vector<KeywordParamP>& ps, const 
 #ifdef _DEBUG
 void dump(int i, const KeywordTrie* t) {
   FOR_EACH(c, t->children) {
-    wxLogDebug(String(i, _(' ')) + c.first + _("     ") + String::Format(_("%p"), c.second.get()));
+    log_debug(String(i, _(' ')) + c.first + _("     ") + String::Format(_("%p"), c.second.get()));
     dump(i + 2, c.second.get());
   }
   if (t->on_any_star) {
-    wxLogDebug(String(i, _(' ')) + _(".*") + _("     ") + String::Format(_("%p"), t->on_any_star));
+    log_debug(String(i, _(' ')) + _(".*") + _("     ") + String::Format(_("%p"), t->on_any_star));
     if (t->on_any_star != t) dump(i + 2, t->on_any_star);
   }
 }

@@ -45,8 +45,7 @@
   #endif
 
   /// Our own regular expression wrapper
-  /** Suppors both boost::regex and wxRegEx.
-   *  Has an interface like boost::regex, but compatible with wxStrings.
+  /** Has an interface like boost::regex, but compatible with wxStrings.
    */
   class Regex {
   public:
@@ -87,86 +86,6 @@
     
   private:
     boost::basic_regex<Char> regex; ///< The regular expression
-  };
-
-// ----------------------------------------------------------------------------- : Wx implementation
-#else
-  /// Our own regular expression wrapper
-  /** Suppors both boost::regex and wxRegEx.
-   *  Has an interface like boost::regex.
-   */
-  class Regex 
-  public:
-    // Interface for compatability with boost::regex
-    class Results {
-    public:
-      typedef pair<const Char*,const Char*> value_type; // (begin,end)
-      typedef value_type const_reference;
-      /// Number of submatches (+1 for the total match)
-      inline size_t size() const { return regex->GetMatchCount(); }
-      /// Get a submatch
-      inline value_type operator [] (int sub) const {
-        size_t pos, length;
-        bool ok = regex->GetMatch(&pos, &length, sub);
-        assert(ok);
-        return make_pair(begin + pos, begin + pos + length);
-      }
-      inline size_t position(int sub = 0) const {
-        size_t pos, length;
-        bool ok = regex->GetMatch(&pos, &length, sub);
-        assert(ok);
-        return pos;
-      }
-      inline size_t length(int sub = 0) const {
-        size_t pos, length;
-        bool ok = regex->GetMatch(&pos, &length, sub);
-        assert(ok);
-        return length;
-      }
-      /// Get a sub match
-      inline String str(int sub = 0) const {
-        const_reference v = (*this)[sub];
-        return String(v.first, v.second);
-      }
-      /// Format a replacement string
-      inline String format(const String& format) const {
-        const_reference v = (*this)[0];
-        String inside(v.first, v.second);
-        regex->ReplaceFirst(&inside, format);
-        return inside;
-      }
-    private:
-      wxRegEx*    regex;
-      const Char* begin;
-      friend class ScriptRegex;
-    };
-    
-    inline Regex() {}
-    inline Regex(const String& code) { assign(code); }
-    
-    void assign(const String& code);
-    inline bool matches(const String& str) const {
-      return regex.Matches(str);
-    }
-    inline bool matches(Results& results, const String& str) const {
-      results.regex = &regex;
-      results.begin = str.begin();
-      return regex.Matches(str);
-    }
-    inline bool matches(Results& results, const Char* begin, const Char* end) const {
-      results.regex = &regex;
-      results.begin = begin;
-      return regex.Matches(begin, 0, end - begin);
-    }
-    inline void replace_all(String* input, const String& format) {
-      regex.Replace(input, format);
-    }
-    inline bool empty() const {
-      return !regex.IsValid();
-    }
-    
-  private:
-    wxRegEx regex; ///< The regular expression
   };
 
 #endif

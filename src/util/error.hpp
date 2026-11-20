@@ -173,6 +173,15 @@ bool have_queued_message();
 bool get_queued_message(MessageType& type, String& msg);
 
 
+/// Runs an external program (arguments[0]) and returns its exit code, or -1 if it can't be run.
+/** Without waiting, returns 0 once the program has started.
+ *  Installed by the host; without one, programs can't be run. */
+extern function<int(const vector<String>& arguments, bool wait)> run_command_hook;
+int run_command(const vector<String>& arguments, bool wait);
+
+/// Write a debugging message to stderr (debug builds only)
+void log_debug(const String& msg);
+
 /// Make a stack trace for use in InternalErrors
 String get_stack_trace();
 

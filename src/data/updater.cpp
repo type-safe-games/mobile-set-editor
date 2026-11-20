@@ -16,7 +16,15 @@ void Updater::updateApplication(String argv) {
   String path = absoluteFilename() + wxFileName::GetPathSeparator() + updater_name;
   path = path + _(".exe");
   if (wxFileExists(path)) {
-    wxExecute(path + _(" ") + argv, wxEXEC_ASYNC);
+    vector<String> args = {path};
+    size_t start = 0;
+    while (start <= argv.size()) {
+      size_t end = argv.find(_(' '), start);
+      if (end == String::npos) end = argv.size();
+      if (end > start) args.push_back(argv.substr(start, end - start));
+      start = end + 1;
+    }
+    run_command(args, false);
   }
   else {
     queue_message(MESSAGE_ERROR, _("Executable file '" + path + "' not found!"));

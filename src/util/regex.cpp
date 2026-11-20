@@ -28,16 +28,5 @@ String Regex::replace_all(const String& input, const String& format) const {
   return regex_replace(toStdString(input), regex, toStdString(format), boost::format_sed);
 }
 
-#else // USE_BOOST_REGEX
-// ----------------------------------------------------------------------------- : Regex : wx
-
-void Regex::assign(const String& code) {
-  // compile string
-  if (!regex.Compile(code, wxRE_ADVANCED)) {
-    throw ScriptError(_("Error while compiling regular expression: '") + code + _("'"));
-  }
-  assert(regex.IsValid());
-}
-
 #endif // USE_BOOST_REGEX
 // ----------------------------------------------------------------------------- : Regex : common

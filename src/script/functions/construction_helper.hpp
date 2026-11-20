@@ -65,7 +65,7 @@ inline static bool looks_like_local_path(const String& s) {
   // windows UNC / extended-length path:   \\server\share\... or \\?\C:\...
   if (s.starts_with(_("\\\\"))) return true;
   // windows absolute path
-  if (s.size() >= 3 && wxIsalpha(s[0]) && s[1] == _(':') && (s[2] == _('\\') || s[2] == _('/'))) return true;
+  if (s.size() >= 3 && iswalpha(s[0]) && s[1] == _(':') && (s[2] == _('\\') || s[2] == _('/'))) return true;
   return false;
 }
 

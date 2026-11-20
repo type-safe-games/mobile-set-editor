@@ -9,6 +9,8 @@
 // ----------------------------------------------------------------------------- : Includes
 
 #include <util/prec.hpp>
+#include <chrono>
+#include <thread>
 #include <data/settings.hpp>
 class wxFileName;
 
@@ -70,7 +72,7 @@ bool retry_io(Op op, RetryOptions const& opts = RetryOptions()) {
     } catch (...) {
       if (last_attempt) throw;
     }
-    wxMilliSleep(delay);
+    std::this_thread::sleep_for(std::chrono::milliseconds(delay));
     delay = std::min(delay * 2, opts.max_delay_ms);
   }
   return false; // unreachable
