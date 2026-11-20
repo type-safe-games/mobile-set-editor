@@ -507,6 +507,34 @@ SCRIPT_FUNCTION(write_set_file) {
   
 }
 
+// ----------------------------------------------------------------------------- : Layout dump
+
+// The layout of a rendered card (ADR 0010): field regions and laid-out text lines, as JSON text
+SCRIPT_FUNCTION(card_layout) {
+  SCRIPT_PARAM(Set*, set);
+  SCRIPT_PARAM_C(CardP, input);
+  SCRIPT_RETURN(card_layout_dump(set, input));
+}
+
+// Write the layout of a rendered card to a file, as UTF-8 without a byte order mark
+SCRIPT_FUNCTION(write_layout_file) {
+  SCRIPT_PARAM(Set*, set);
+  SCRIPT_PARAM_C(CardP, input);
+  SCRIPT_PARAM(String, file);
+  String out_path = get_export_full_path(file);
+  ensure_dir_valid(out_path);
+  std::string bytes = card_layout_dump(set, input).ToStdString(wxConvUTF8);
+  unique_ptr<wxFileOutputStream> out;
+  retry_io([&]{
+    out = make_unique<wxFileOutputStream>(out_path);
+    return out->Ok();
+  });
+  if (!out->Ok()) throw Error(_("Unable to open file '") + out_path + _("' for output"));
+  out->Write(bytes.data(), bytes.size());
+  if (!out->Ok()) throw Error(_("Unable to write file '") + out_path + _("'"));
+  SCRIPT_RETURN(file);
+}
+
 SCRIPT_FUNCTION(sanitize) {
   SCRIPT_PARAM_C(String, input);
   //TODO
@@ -523,5 +551,7 @@ void init_script_export_functions(Context& ctx) {
   ctx.setVariable(_("write_text_file"),  script_write_text_file);
   ctx.setVariable(_("write_image_file"), script_write_image_file);
   ctx.setVariable(_("write_set_file"),   script_write_set_file);
+  ctx.setVariable(_("card_layout"),      script_card_layout);
+  ctx.setVariable(_("write_layout_file"), script_write_layout_file);
   ctx.setVariable(_("sanitize"),         script_sanitize);
 }

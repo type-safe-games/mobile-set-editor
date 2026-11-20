@@ -1,0 +1,4 @@
+for each c in set.cards do assert(card_layout(c) == card_layout(c))
+assert(contains(card_layout(set.cards[0]), match: "rules"))
+assert(contains(card_layout(set.cards[0]), match: "start"))
+for each c in set.cards do write_layout_file(c, file: "layout-dump/" + c.uid + ".json")

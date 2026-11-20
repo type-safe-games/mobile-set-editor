@@ -103,6 +103,10 @@ Image export_image(const SetP& set, const vector<CardP>& cards, int padding = 2,
 void export_image(const SetP& set, const CardP& card, const String& filename);
 void export_image(const SetP& set, const vector<CardP>& cards, const String& path, const String& filename_template, FilenameConflicts conflicts);
 
+/// Render a card the way export_image does (zoom 1, no rotation or bleed) and describe its layout:
+/// each field's region, and each laid-out text line. Deterministic, for exact comparison (ADR 0010).
+String card_layout_dump(const SetP& set, const CardP& card);
+
 /// Write the metadata for a card
 // Assuming first the zoom is applied, then the rotation, then the offset.
 // This means that width and height need to be already scaled by a factor of zoom, but not already rotated

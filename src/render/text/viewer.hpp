@@ -116,6 +116,19 @@ public:
   /// Set exact scroll position
   void setExactScrollPosition(double pos);
   
+  // --------------------------------------------------- : Layout dump
+  
+  /// Where one laid-out line ended up, as read back from the last prepare()
+  struct LineGeometry {
+    size_t start, end;           ///< Character range [start, end) in the source text
+    double left, top;            ///< Origin of the line: x of its first character, y of its top
+    double width, height;        ///< Width up to the last non-soft character, and line height
+  };
+  /// The lines as laid out by the last prepare(), for the layout dump (ADR 0010)
+  vector<LineGeometry> lineGeometry() const;
+  /// The text scale chosen by the last prepare() (below 1 when text was shrunk to fit)
+  double getScale() const { return scale; }
+  
 private:
   /// Scroll all lines a given amount
   void scrollBy(double delta);

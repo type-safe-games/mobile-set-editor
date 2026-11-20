@@ -302,6 +302,15 @@ double TextViewer::heightOfLastLine() const {
 size_t TextViewer::lineCount() const {
   return lines.size();
 }
+
+vector<TextViewer::LineGeometry> TextViewer::lineGeometry() const {
+  vector<LineGeometry> out;
+  out.reserve(lines.size());
+  for (const Line& l : lines) {
+    out.push_back(LineGeometry{l.start, l.end(), l.positions.front(), l.top, l.width(), l.line_height});
+  }
+  return out;
+}
 size_t TextViewer::visibleLineCount(double height) const {
   size_t count = 0;
   FOR_EACH_CONST(l, lines) {

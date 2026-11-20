@@ -37,3 +37,12 @@ add_test(
           -P ${test_dir}/run_cli.cmake
 )
 set_tests_properties(fixture-render PROPERTIES ENVIRONMENT "${fixture_env}")
+
+# Layout dump (ADR 0010): deterministic, and read from the drawing pass
+add_test(
+  NAME layout-dump
+  COMMAND ${CMAKE_COMMAND} -DMSE=$<TARGET_FILE:magicseteditor> -DSET=${fixture_set}
+          -DCOMMANDS=${test_dir}/layout/layout-dump.mse-cli -DWORKDIR=${PROJECT_BINARY_DIR}/test-output
+          -P ${test_dir}/run_cli.cmake
+)
+set_tests_properties(layout-dump PROPERTIES ENVIRONMENT "${fixture_env}")

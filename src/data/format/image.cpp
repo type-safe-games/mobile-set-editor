@@ -19,6 +19,7 @@
 #include <script/functions/json.hpp>
 #include <gui/util.hpp>
 #include <render/card/viewer.hpp>
+#include <render/value/text.hpp>
 
 static const int DEFAULT_FACE_PADDING = 2;
 
@@ -112,6 +113,96 @@ static Image render_face(const SetP& set, const ExportPart& part) {
   // add print bleed edge (reports an error and leaves the image as is if it is too small)
   mirror_bleed_edge(img, bleed, bleed);
   return img;
+}
+
+// ----------------------------------------------------------------------------- : Layout dump
+
+/// A number with exactly three decimals, independent of the C locale's decimal point; never "-0.000"
+static String layout_number(double x) {
+  long long milli = llround(x * 1000.0);
+  String sign = milli < 0 ? _("-") : _("");
+  if (milli < 0) milli = -milli;
+  return sign + String::Format(_("%lld.%03lld"), milli / 1000, milli % 1000);
+}
+
+/// A JSON string literal
+static String layout_string(const String& s) {
+  String out = _("\"");
+  for (wxUniChar c : s) {
+    if      (c == '"')  out += _("\\\"");
+    else if (c == '\\') out += _("\\\\");
+    else if (c == '\n') out += _("\\n");
+    else if (c == '\t') out += _("\\t");
+    else if (c < 0x20)  out += String::Format(_("\\u%04x"), (int)c.GetValue());
+    else                out += c;
+  }
+  return out + _("\"");
+}
+
+/// The export viewer, with access to its value viewers after drawing
+class LayoutDumpDataViewer : public ZoomedUnrotatedDataViewer {
+public:
+  LayoutDumpDataViewer() : ZoomedUnrotatedDataViewer(1.0) {}
+  const vector<ValueViewerP>& getViewers() const { return viewers; }
+};
+
+String card_layout_dump(const SetP& set, const CardP& card) {
+  if (!set) throw Error(_("no set"));
+  if (!card) throw Error(_("no card"));
+  // Draw exactly like render_face at the default export settings, so the layout read back
+  // below is the one that produced the pixels, not a re-measurement.
+  LayoutDumpDataViewer viewer;
+  viewer.setSet(set);
+  viewer.setCard(card);
+  RealSize size = viewer.getRotation().getExternalSize();
+  Bitmap bitmap((int)size.width, (int)size.height);
+  if (!bitmap.Ok()) throw InternalError(_("Unable to create bitmap"));
+  wxMemoryDC dc;
+  dc.SelectObject(bitmap);
+  viewer.draw(dc);
+  dc.SelectObject(wxNullBitmap);
+  // Fixed key order and number format; fields in drawing (z) order, one text line per output line.
+  String out = _("{\n");
+  out += _("  \"fields\": [");
+  bool first_field = true;
+  for (const ValueViewerP& v : viewer.getViewers()) {
+    const Style& style = *v->getStyle();
+    out += first_field ? _("\n") : _(",\n");
+    first_field = false;
+    out += _("    {\"angle\": ") + layout_number(style.angle);
+    out += _(", \"height\": ") + layout_number(style.height);
+    out += _(", \"left\": ")   + layout_number(style.left);
+    out += _(", \"name\": ")   + layout_string(style.fieldP->name);
+    out += _(", \"top\": ")    + layout_number(style.top);
+    out += String(_(", \"visible\": ")) + (v->isVisible() ? _("true") : _("false"));
+    out += _(", \"width\": ")  + layout_number(style.width);
+    out += _(", \"z\": ")      + String::Format(_("%d"), style.z_index);
+    const TextValueViewer* tv = dynamic_cast<const TextValueViewer*>(v.get());
+    if (tv && v->isVisible()) {
+      out += _(", \"text_scale\": ") + layout_number(tv->getTextViewer().getScale());
+      out += _(", \"lines\": [");
+      bool first_line = true;
+      for (const TextViewer::LineGeometry& l : tv->getTextViewer().lineGeometry()) {
+        out += first_line ? _("\n") : _(",\n");
+        first_line = false;
+        out += _("      {\"end\": ")   + String::Format(_("%d"), (int)l.end);
+        out += _(", \"height\": ")     + layout_number(l.height);
+        out += _(", \"left\": ")       + layout_number(l.left);
+        out += _(", \"start\": ")      + String::Format(_("%d"), (int)l.start);
+        out += _(", \"top\": ")        + layout_number(l.top);
+        out += _(", \"width\": ")      + layout_number(l.width);
+        out += _("}");
+      }
+      out += first_line ? _("]") : _("\n    ]");
+    }
+    out += _("}");
+  }
+  out += first_field ? _("],\n") : _("\n  ],\n");
+  out += _("  \"height\": ") + layout_number(size.height) + _(",\n");
+  out += _("  \"stylesheet\": ") + layout_string(set->stylesheetFor(card).name()) + _(",\n");
+  out += _("  \"width\": ") + layout_number(size.width) + _("\n");
+  out += _("}\n");
+  return out;
 }
 
 // ----------------------------------------------------------------------------- : Stitching faces

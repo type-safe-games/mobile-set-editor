@@ -27,6 +27,9 @@ public:
   void onAction(const Action&, bool undone) override;
   double getStretch() const override;
   
+  /// The text layout, as prepared by the last draw (read by the layout dump)
+  const TextViewer& getTextViewer() const { return v; }
+  
 protected:
   TextViewer v;
 };
