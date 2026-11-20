@@ -16,8 +16,6 @@
 #include <util/io/package_manager.hpp>
 #include <util/platform.hpp>
 #include <gfx/image_load.hpp>
-#include <wx/wfstream.h>
-#include <wx/zipstrm.h>
 #include <unordered_set>
 
 // Don't do this check for now, because we can't bless packages
@@ -85,15 +83,13 @@ void Installer::addPackage(Packaged& package) {
   for (FileInfos::const_iterator it = file_infos.begin() ; it != file_infos.end() ; ++it) {
     String file = it->first;
     auto in_stream = package.openIn(file);
-    unique_ptr<wxOutputStream> out_stream;
+    unique_ptr<OutputStream> out_stream;
     retry_io([&]{
       out_stream = openOut(name + _("/") + file);
-      return out_stream->IsOk();
+      return out_stream->ok();
     });
-    if (out_stream->IsOk()) {
-      out_stream->Write(*in_stream);
-    }
-    if (!out_stream->IsOk() || (!in_stream->Eof() && in_stream->GetLastError() != wxSTREAM_NO_ERROR)) {
+    bool written = out_stream->ok() && out_stream->write(*in_stream);
+    if (!out_stream->close() || !written) {
       throw PackageError(_("Unable to add file '") + file + _("' to installer: the file could not be written."));
     }
   }
@@ -233,12 +229,12 @@ bool InstallablePackage::ensureIsDownloaded(const DownloadProgressCallback& prog
   if (installer->installer_url.empty()) return false; // No URL
   // download installer
   String installer_file = make_temp_file_name(_("mse-installer"));
-  unique_ptr<wxFileOutputStream> os;
+  unique_ptr<FileOutputStream> os;
   retry_io([&]{
-    os = make_unique<wxFileOutputStream>(installer_file);
-    return os->IsOk();
+    os = make_unique<FileOutputStream>(installer_file);
+    return os->ok();
   });
-  if (!os->IsOk()) {
+  if (!os->ok()) {
     os.reset();
     remove_file(installer_file);
     throw Error(_ERROR_2_("can't download installer", description->name, installer->installer_url));
@@ -252,6 +248,7 @@ bool InstallablePackage::ensureIsDownloaded(const DownloadProgressCallback& prog
   DownloadResult result = download_file_hook
     ? download_file_hook(installer->installer_url, *os, progress)
     : DownloadResult::FAILED;
+  if (!os->close() && result == DownloadResult::OK) result = DownloadResult::FAILED;
   os.reset();
   if (result != DownloadResult::OK) {
     remove_file(installer_file);

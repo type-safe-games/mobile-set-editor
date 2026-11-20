@@ -25,7 +25,7 @@ namespace fs = std::filesystem;
 // ----------------------------------------------------------------------------- : Path conversion
 
 // Paths are converted the same way wx converted file names (wxConvFileName), so non-ASCII names keep working.
-static fs::path to_fs_path(const String& s) {
+fs::path to_fs_path(const String& s) {
   #ifdef _WIN32
     return fs::path(s.ToStdWstring());
   #else

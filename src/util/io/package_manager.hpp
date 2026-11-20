@@ -163,7 +163,7 @@ public:
    *      this is to force people to fill in the dependencies
    *  Returns the opened file and the package it is in
    */
-  pair<unique_ptr<wxInputStream>,Packaged*> openFileFromPackage(Packaged* package, const String& name);
+  pair<unique_ptr<InputStream>,Packaged*> openFileFromPackage(Packaged* package, const String& name);
 
   /// Get a filename to open from a package
   /** WARNING: this is a bit of a hack, since not all package types support names in this way.

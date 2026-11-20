@@ -19,8 +19,6 @@
 #define TokenType TokenType_ // some stupid windows header uses our name
 #endif
 
-String read_utf8_line(wxInputStream& input, bool until_eof = false);
-
 extern ScriptValueP script_warning;
 extern ScriptValueP script_warning_if_neq;
 

@@ -13,11 +13,12 @@
 // ----------------------------------------------------------------------------- : Includes
 
 #include <util/prec.hpp>
+#include <util/io/stream.hpp>
 
 // ----------------------------------------------------------------------------- : Image loading
 
-/// Load an image from a stream, the stream doesn't have to be seekable
-bool image_load_file(Image& image, wxInputStream &stream);
+/// Load an image from a stream
+bool image_load_file(Image& image, InputStream& stream);
 
 /// Load an image from a file
 bool image_load_file(Image& image, const wxString &name);

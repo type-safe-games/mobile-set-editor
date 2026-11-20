@@ -24,7 +24,7 @@
 
 // ----------------------------------------------------------------------------- : Downloading files
 
-static DownloadResult download_file(const String& url, wxOutputStream& out, const DownloadProgressCallback& progress) {
+static DownloadResult download_file(const String& url, OutputStream& out, const DownloadProgressCallback& progress) {
   wxEvtHandler handler;
   wxWebRequest request = wxWebSession::GetDefault().CreateRequest(&handler, url);
   if (!request.IsOk()) return DownloadResult::FAILED;
@@ -39,8 +39,7 @@ static DownloadResult download_file(const String& url, wxOutputStream& out, cons
   wxEventLoop loop;
   handler.Bind(wxEVT_WEBREQUEST_DATA, [&](wxWebRequestEvent& ev) {
     if (write_failed) return;
-    out.Write(ev.GetDataBuffer(), ev.GetDataSize());
-    if (!out.IsOk() || out.LastWrite() != ev.GetDataSize()) write_failed = true;
+    if (!out.write(ev.GetDataBuffer(), ev.GetDataSize())) write_failed = true;
   });
   handler.Bind(wxEVT_WEBREQUEST_STATE, [&](wxWebRequestEvent& ev) {
     switch (ev.GetState()) {

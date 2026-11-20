@@ -12,6 +12,7 @@
 #include <gui/util.hpp>
 #include <gfx/gfx.hpp>
 #include <wx/webrequest.h>
+#include <gui/wx_web_compat.hpp>
 
 // ----------------------------------------------------------------------------- : PackageUpdateList::TreeItem
 

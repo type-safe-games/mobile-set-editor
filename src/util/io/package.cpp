@@ -14,8 +14,6 @@
 #include <script/to_value.hpp> // for reflection
 #include <script/profiler.hpp> // for PROFILER
 #include <data/set.hpp>
-#include <wx/wfstream.h>
-#include <wx/zipstrm.h>
 
 // ----------------------------------------------------------------------------- : Package : outside
 
@@ -23,7 +21,6 @@ IMPLEMENT_DYNAMIC_ARG(Package*, writing_package,   nullptr);
 IMPLEMENT_DYNAMIC_ARG(Package*, clipboard_package, nullptr);
 
 Package::Package()
-  : zipStream (nullptr)
 {}
 
 Package::~Package() {
@@ -85,7 +82,7 @@ void Package::open(const String& n, bool fast) {
 void Package::reopen() {
   if (dir_exists(filename)) {
     // make sure we have no zip open
-    zipStream.reset();
+    zipReader.reset();
   } else {
     // reopen only needed for zipfile
     openZipfile();
@@ -117,6 +114,24 @@ void Package::saveCopy(const String& name) {
   clearKeepFlag();
 }
 
+void Package::saveCopy(OutputStream& out) {
+  if (Set* s = dynamic_cast<Set*>(this)) s->referenceActionStackFiles();
+  String tempFile = make_temp_file_name(_("mse-zip"));
+  try {
+    writeZipfile(tempFile, true);
+    FileInputStream in(tempFile);
+    if (!in.ok() || !out.write(in)) {
+      throw PackageError(_ERROR_("unable to store file"));
+    }
+  } catch (...) {
+    remove_file(tempFile);
+    clearKeepFlag();
+    throw;
+  }
+  remove_file(tempFile);
+  clearKeepFlag();
+}
+
 void Package::removeTempFiles(bool remove_unused) {
   // cleanup : remove temp files, remove deleted files from the list
   FileInfos::iterator it = files.begin();
@@ -131,11 +146,10 @@ void Package::removeTempFiles(bool remove_unused) {
       ++it;
       files.erase(to_remove);
     } else {
-      // free zip entry, we will reopen the file
+      // forget the zip entry, we will reopen the file
       it->second.keep = false;
       it->second.tempName.clear();
-      delete it->second.zipEntry; 
-      it->second.zipEntry = 0;
+      it->second.zipEntry.reset();
       ++it;
     }
   }
@@ -146,46 +160,6 @@ void Package::clearKeepFlag() {
     f.second.keep = false;
   }
 }
-
-// ----------------------------------------------------------------------------- : Streams
-
-/// Class to use as a superclass
-class FileInputStream_aux {
-protected:
-  wxFileInputStream file_stream;
-  inline FileInputStream_aux(const String& filename)
-    : file_stream(filename)
-  {}
-};
-
-/// Class that is a wxZipInputStream over a wxFileInput stream
-/** Note that wxFileInputStream is also a base class, because it must be constructed first
-*/
-class ZipFileInputStream : private FileInputStream_aux, public wxZipInputStream {
-public:
-  ZipFileInputStream(const String& filename)
-    : FileInputStream_aux(filename)
-    , wxZipInputStream(file_stream)
-  {}
-  ZipFileInputStream(const String& filename, wxZipEntry* entry)
-    : ZipFileInputStream(filename)
-  {
-    OpenEntry(*entry);
-  }
-};
-
-/// A buffered version of wxFileInputStream
-/** 2007-08-24:
-*    According to profiling this gives a significant speedup
-*    Bringing the avarage run time of read_utf8_line from 186k to 54k (in cpu time units)
-*/
-class BufferedFileInputStream : private FileInputStream_aux, public wxBufferedInputStream {
-public:
-  inline BufferedFileInputStream(const String& filename)
-    : FileInputStream_aux(filename)
-    , wxBufferedInputStream(file_stream)
-  {}
-};
 
 // ----------------------------------------------------------------------------- : Package : inside
 
@@ -198,27 +172,27 @@ bool Package::contains(const String& file) {
     }
   }
 
-  unique_ptr<wxInputStream> stream;
+  unique_ptr<InputStream> stream;
   if (it != files.end() && it->second.wasWritten()) {
     // written to this file, open the temp file
-    retry_io([&]{ stream = make_unique<wxFileInputStream>(it->second.tempName); return stream->IsOk(); });
+    retry_io([&]{ stream = make_unique<FileInputStream>(it->second.tempName); return stream->ok(); });
   }
   else if (file_exists(filename + _("/") + file)) {
     // a file in directory package
-    retry_io([&]{ stream = make_unique<wxFileInputStream>(filename + _("/") + file); return stream->IsOk(); });
+    retry_io([&]{ stream = make_unique<FileInputStream>(filename + _("/") + file); return stream->ok(); });
   }
   else if (file_exists(filename) && it != files.end() && it->second.zipEntry) {
     // a file in a zip archive
-    retry_io([&]{ stream = make_unique<ZipFileInputStream>(filename, it->second.zipEntry); return stream->IsOk(); });
+    retry_io([&]{ stream = make_unique<ZipEntryInputStream>(filename, it->second.zipEntry->cd_pos); return stream->ok(); });
   }
   else {
     // shouldn't happen, packaged changed by someone else since opening it
     return false;
   }
-  return stream && stream->IsOk();
+  return stream && stream->ok();
 }
 
-unique_ptr<wxInputStream> Package::openIn(const String& file) {
+unique_ptr<InputStream> Package::openIn(const String& file) {
   if (!file.empty() && file.GetChar(0) == _('/')) {
     // absolute path, open file from another package
     Packaged* p = dynamic_cast<Packaged*>(this);
@@ -240,29 +214,29 @@ unique_ptr<wxInputStream> Package::openIn(const String& file) {
       }
     }
   }
-  unique_ptr<wxInputStream> stream;
+  unique_ptr<InputStream> stream;
   if (it != files.end() && it->second.wasWritten()) {
     // written to this file, open the temp file
-    retry_io([&]{ stream = make_unique<wxFileInputStream>(it->second.tempName); return stream->IsOk(); });
+    retry_io([&]{ stream = make_unique<FileInputStream>(it->second.tempName); return stream->ok(); });
   } else if (file_exists(filename+_("/")+file)) {
     // a file in directory package
-    retry_io([&]{ stream = make_unique<wxFileInputStream>(filename+_("/")+file); return stream->IsOk(); });
+    retry_io([&]{ stream = make_unique<FileInputStream>(filename+_("/")+file); return stream->ok(); });
   } else if (file_exists(filename) && it != files.end() && it->second.zipEntry) {
     // a file in a zip archive
-    retry_io([&]{ stream = make_unique<ZipFileInputStream>(filename, it->second.zipEntry); return stream->IsOk(); });
+    retry_io([&]{ stream = make_unique<ZipEntryInputStream>(filename, it->second.zipEntry->cd_pos); return stream->ok(); });
   } else {
     // shouldn't happen, packaged changed by someone else since opening it
     throw FileNotFoundError(file, filename);
   }
-  if (!stream || !stream->IsOk()) {
+  if (!stream || !stream->ok()) {
     throw FileNotFoundError(file, filename);
   } else {
     return stream;
   }
 }
 
-unique_ptr<wxOutputStream> Package::openOut(const String& file) {
-  return make_unique<wxFileOutputStream>(nameOut(file));
+unique_ptr<OutputStream> Package::openOut(const String& file) {
+  return make_unique<FileOutputStream>(nameOut(file));
 }
 
 String Package::nameOut(const String& file) {
@@ -337,13 +311,13 @@ String Package::absoluteName(const LocalFileName& file) {
   }
 }
 // Open a file that is in some package
-unique_ptr<wxInputStream> Package::openAbsoluteFile(const String& name) {
+unique_ptr<InputStream> Package::openAbsoluteFile(const String& name) {
   size_t pos = name.find_first_of(_('\1'));
   if (pos == String::npos) {
     // temp or dir file
-    unique_ptr<wxFileInputStream> stream;
-    retry_io([&]{ stream = make_unique<wxFileInputStream>(name); return stream->IsOk(); });
-    if (!stream->IsOk()) throw FileNotFoundError(_("<unknown>"), name);
+    unique_ptr<FileInputStream> stream;
+    retry_io([&]{ stream = make_unique<FileInputStream>(name); return stream->ok(); });
+    if (!stream->ok()) throw FileNotFoundError(_("<unknown>"), name);
     return stream;
   } else {
     // packaged file, always in zip format
@@ -377,7 +351,7 @@ LocalFileName LocalFileName::fromReadString(String const& fn, String const& pref
       LocalFileName local_name = clipboard_package()->newFileName(_("image"), _("")); // a new unique name in the package, assume it's an image
       auto out_stream = clipboard_package()->openOut(local_name);
       auto in_stream  = Package::openAbsoluteFile(fn);
-      out_stream->Write(*in_stream); // copy
+      out_stream->write(*in_stream); // copy
       return local_name;
     } catch (const Error&) {
       // ignore errors
@@ -392,22 +366,15 @@ LocalFileName LocalFileName::fromReadString(String const& fn, String const& pref
 // ----------------------------------------------------------------------------- : Package : private
 
 Package::FileInfo::FileInfo()
-  : keep(false), created(false), zipEntry(nullptr)
+  : keep(false), created(false)
 {}
 
-Package::FileInfo::~FileInfo() {
-  delete zipEntry;
-}
-
-void Package::loadZipStream() {
+void Package::loadZipEntries() {
   files.clear();
-  while (true) {
-    wxZipEntry* entry = zipStream->GetNextEntry();
-    if (!entry) break;
-    String name = normalize_internal_filename(entry->GetName(wxPATH_UNIX));
+  for (const ZipEntry& entry : zipReader->entries()) {
+    String name = normalize_internal_filename(entry.name);
     files[name].zipEntry = entry;
   }
-  zipStream->CloseEntry();
 }
 
 void Package::openDirectory(bool fast) {
@@ -440,12 +407,12 @@ void Package::openSubdir(const String& name) {
 void Package::openZipfile() {
   // open stream, retry a few times
   retry_io([&]{
-    zipStream = make_unique<ZipFileInputStream>(filename);
-    return zipStream->IsOk();
+    zipReader = make_unique<ZipReader>(filename);
+    return zipReader->ok();
   });
-  if (!zipStream->IsOk())  throw PackageError(_ERROR_1_("package not found", filename));
+  if (!zipReader->ok())  throw PackageError(_ERROR_1_("package not found", filename));
   // read zip entries
-  loadZipStream();
+  loadZipEntries();
 }
 
 void Package::saveToDirectory(const String& saveAs, bool remove_unused, bool is_copy) {
@@ -478,15 +445,13 @@ void Package::saveToDirectory(const String& saveAs, bool remove_unused, bool is_
       // save as, copy old files
       if (isZipfile()) {
         auto in_stream  = openIn(f.first);
-        unique_ptr<wxFileOutputStream> out;
+        unique_ptr<FileOutputStream> out;
         retry_io([&]{
-          out = make_unique<wxFileOutputStream>(f_out_path);
-          return out->IsOk();
+          out = make_unique<FileOutputStream>(f_out_path);
+          return out->ok();
         });
-        if (out->IsOk()) {
-          out->Write(*in_stream);
-        }
-        if (!out->IsOk() || (!in_stream->Eof() && in_stream->GetLastError() != wxSTREAM_NO_ERROR)) {
+        bool written = out->ok() && out->write(*in_stream);
+        if (!out->close() || !written) {
           throw PackageError(_ERROR_("unable to store file"));
         }
       } else {
@@ -509,59 +474,19 @@ void Package::saveToZipfile(const String& saveAs, bool remove_unused, bool is_co
   String tempFile    = make_temp_file_name(_("mse-zip"));
   String bakFile     = saveAs + _(".bak");
   String bakTempFile = saveAs + _(".bak.tmp");
-  // open temp zip file
+  // write the new zip to the temp file
   try {
-    unique_ptr<wxFileOutputStream> newFile(new wxFileOutputStream(tempFile));
-    if (!newFile->IsOk()) throw PackageError(_ERROR_("unable to open output file"));
-    unique_ptr<wxZipOutputStream>  newZip(new wxZipOutputStream(*newFile));
-    if (!newZip->IsOk())  throw PackageError(_ERROR_("unable to open output file"));
-    // copy everything to a new zip file, unless it's updated or removed
-    if (zipStream) newZip->CopyArchiveMetaData(*zipStream);
-    FOR_EACH(f, files) {
-      if (!f.second.keep && remove_unused && !isIgnoredOnSave(f.first)) {
-        // to remove a file simply don't copy it
-      } else if (!is_copy && f.second.zipEntry && !f.second.wasWritten()) {
-        // old file, was also in zip, not changed
-        // can't do this when saving a copy, since it destroys the zip entry
-        zipStream->CloseEntry();
-        if (!newZip->CopyEntry(f.second.zipEntry, *zipStream)) {
-          throw PackageError(
-            _("Unable to save: the file\n'") + f.first + _("'\n") +
-            _("could not be read from the existing package file\n'") + filename + _("'.\n\n") +
-            _("This often happens when a set is stored on a cloud-synced drive.\n") +
-            _("Please make sure the file is fully available offline\n") +
-            _("(for example by marking it 'Always keep on this device')\n") +
-            _("then try saving again. Your changes have not been lost.")
-          );
-        }
-        f.second.zipEntry = 0;
-      } else {
-        // changed file, or the old package was not a zipfile
-        newZip->PutNextEntry(f.first);
-        auto temp_stream = openIn(f.first);
-        newZip->Write(*temp_stream);
-        if (!newZip->IsOk() || (!temp_stream->Eof() && temp_stream->GetLastError() != wxSTREAM_NO_ERROR)) {
-          throw PackageError(
-            _("Unable to save: the file\n'") + f.first + _("'\n") +
-            _("could not be written to the package.\n\n") +
-            _("This often happens when a set is stored on a cloud-synced drive.\n") +
-            _("Please make sure the file is fully available offline\n") +
-            _("(for example by marking it 'Always keep on this device')\n") +
-            _("then try saving again. Your changes have not been lost.")
-          );
-        }
-      }
-    }
+    writeZipfile(tempFile, remove_unused);
     // close the old file
     if (!is_copy) {
-      zipStream.reset();
+      zipReader.reset();
     }
   } catch (Error const& e) {
     // when things go wrong delete the temp file
     remove_file(tempFile);
     // and release our read handle on the original file
     if (!is_copy) {
-      zipStream.reset();
+      zipReader.reset();
     }
     throw e;
   }
@@ -641,6 +566,46 @@ void Package::saveToZipfile(const String& saveAs, bool remove_unused, bool is_co
 }
 
 
+void Package::writeZipfile(const String& zipFile, bool remove_unused) {
+  ZipWriter newZip(zipFile);
+  if (!newZip.ok()) throw PackageError(_ERROR_("unable to open output file"));
+  // copy everything to a new zip file, unless it's updated or removed
+  if (zipReader) newZip.setComment(zipReader->comment());
+  FOR_EACH(f, files) {
+    if (!f.second.keep && remove_unused && !isIgnoredOnSave(f.first)) {
+      // to remove a file simply don't copy it
+    } else if (zipReader && f.second.zipEntry && !f.second.wasWritten()) {
+      // old file, was also in zip, not changed: copy it as it is
+      if (!newZip.copyEntry(*zipReader, *f.second.zipEntry)) {
+        throw PackageError(
+          _("Unable to save: the file\n'") + f.first + _("'\n") +
+          _("could not be read from the existing package file\n'") + filename + _("'.\n\n") +
+          _("This often happens when a set is stored on a cloud-synced drive.\n") +
+          _("Please make sure the file is fully available offline\n") +
+          _("(for example by marking it 'Always keep on this device')\n") +
+          _("then try saving again. Your changes have not been lost.")
+        );
+      }
+    } else {
+      // changed file, or the old package was not a zipfile
+      auto entry_stream = newZip.openEntry(f.first);
+      auto temp_stream = openIn(f.first);
+      bool written = entry_stream->write(*temp_stream);
+      if (!entry_stream->close() || !written) {
+        throw PackageError(
+          _("Unable to save: the file\n'") + f.first + _("'\n") +
+          _("could not be written to the package.\n\n") +
+          _("This often happens when a set is stored on a cloud-synced drive.\n") +
+          _("Please make sure the file is fully available offline\n") +
+          _("(for example by marking it 'Always keep on this device')\n") +
+          _("then try saving again. Your changes have not been lost.")
+        );
+      }
+    }
+  }
+  if (!newZip.close()) throw PackageError(_ERROR_("unable to store file"));
+}
+
 Package::FileInfos::iterator Package::addFile(const String& name) {
   return files.insert(make_pair(normalize_internal_filename(name), FileInfo())).first;
 }
@@ -650,7 +615,7 @@ DateTime Package::modificationTime(const pair<String, FileInfo>& fi) const {
     // note: this looks at fi.first relative to the working directory, as before
     return file_exists(fi.first) ? DateTime::fromTimeT(file_modified_time(fi.first)) : DateTime();
   } else if (fi.second.zipEntry) {
-    return DateTime::fromTimeT(fi.second.zipEntry->GetDateTime().GetTicks()); // TODO: zip moves off wx in #29 part 2
+    return DateTime::fromTimeT(fi.second.zipEntry->modified);
   } else if (file_exists(filename+_("/")+fi.first)) {
     return DateTime::fromTimeT(file_modified_time(filename+_("/")+fi.first));
   } else {
@@ -710,7 +675,7 @@ bool Packaged::isIgnoredOnSave(const String& file) const {
   return false;
 }
 
-unique_ptr<wxInputStream> Packaged::openIconFile() {
+unique_ptr<InputStream> Packaged::openIconFile() {
   String filename = icon_filename;
   if (settings.darkMode() && !dark_icon_filename.empty()) {
     filename = dark_icon_filename;
@@ -718,7 +683,7 @@ unique_ptr<wxInputStream> Packaged::openIconFile() {
   if (!filename.empty()) {
     return openIn(filename);
   } else {
-    return unique_ptr<wxInputStream>();
+    return unique_ptr<InputStream>();
   }
 }
 
@@ -781,6 +746,12 @@ void Packaged::saveCopy(const String& package) {
   writeFile(typeName(), *this, fileVersion());
   referenceFile(typeName());
   Package::saveCopy(package);
+}
+void Packaged::saveCopy(OutputStream& out) {
+  WITH_DYNAMIC_ARG(writing_package, this);
+  writeFile(typeName(), *this, fileVersion());
+  referenceFile(typeName());
+  Package::saveCopy(out);
 }
 
 void Packaged::validate(Version) {

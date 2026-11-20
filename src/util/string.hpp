@@ -18,8 +18,6 @@
 #include <ctype.h>
 #include <boost/preprocessor/cat.hpp>
 
-class wxTextOutputStream;
-
 // ----------------------------------------------------------------------------- : String type
 
 /// The string type used throughout MSE
@@ -65,12 +63,6 @@ typedef wxChar Char;
  *  In unicode builds it is a normal \xFEFF.
  */
 const wchar_t BYTE_ORDER_MARK[] = L"\xFEFF";
-
-/// Writes a string to an output stream, encoded as UTF8
-void writeUTF8(wxTextOutputStream& stream, const String& str);
-
-/// Remove a UTF-8 Byte order mark from an input stream
-bool eat_utf8_bom(wxInputStream& input);
 
 /// Some constants we like to use
 #ifdef UNICODE

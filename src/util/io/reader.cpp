@@ -18,13 +18,13 @@ using boost::tribool;
 
 // ----------------------------------------------------------------------------- : Reader
 
-Reader::Reader(wxInputStream& input, Packaged* package, const String& filename, bool ignore_invalid, bool suppress_warnings)
+Reader::Reader(InputStream& input, Packaged* package, const String& filename, bool ignore_invalid, bool suppress_warnings)
   : indent(0), expected_indent(0), state(OUTSIDE)
   , ignore_invalid(ignore_invalid), suppress_warnings(suppress_warnings)
   , filename(filename), package(package), line_number(0), previous_line_number(0)
   , input(input)
 {
-  assert(input.IsOk());
+  assert(input.ok());
   eat_utf8_bom(input);
   moveNext();
   handleAppVersion();
@@ -99,96 +99,18 @@ void Reader::moveNext() {
   key.clear();
   indent = -1; // if no line is read it never has the expected indentation
   // repeat until we have a good line
-  while (key.empty() && !input.Eof()) {
+  while (key.empty() && !input.eof()) {
     readLine();
   }
   // did we reach the end of the file?
-  if (key.empty() && input.Eof()) {
+  if (key.empty() && input.eof()) {
     line_number += 1;
     indent = -1;
   }
 }
 
-/// Faster vector, uses large local storage
-/** Usually a line from a file doesn't use very many characters.
- *  In that case, allocating a vector is a waste of resources.
- *  2007-09-21: Profiling => Using this class roughly halves the runtime of read_utf8_line,
- *              making startup slightly faster.
- */
-template <typename T> class LocalVector {
-public:
-  LocalVector() : the_size(0), alloced(SMALL_SIZE), buffer(small) {}
-  ~LocalVector() { if (buffer != small) free(buffer); }
-  void push_back(T t) {
-    if (the_size >= alloced) {
-      // double buffer size
-      if (buffer != small) {
-        buffer = (T*)realloc(buffer, sizeof(T) * alloced * 2);
-      } else {
-        buffer = (T*)malloc(sizeof(T) * alloced * 2);
-        memcpy(buffer, small, alloced * sizeof(T));
-      }
-      alloced *= 2;
-    }
-    buffer[the_size++] = t;
-  }
-  inline const T* get() const { return buffer; }
-  inline size_t size() const { return the_size; }
-private:
-  static const int SMALL_SIZE = 1024;
-  size_t the_size, alloced;
-  T* buffer;
-  T small[SMALL_SIZE];
-};
-
-/// Eat a utf-8 byte order mark from the begining of a stream
-bool eat_utf8_bom(wxInputStream& input) {
-  int c;
-  if ((c = input.GetC()) == 0xEF) {
-    if ((c = input.GetC()) == 0xBB) {
-      if ((c = input.GetC()) == 0xBF) {
-        return true;
-      } else if (c != EOF) input.Ungetch(c);
-    } else if (c != EOF) input.Ungetch(c);
-  } else if (c != EOF) input.Ungetch(c);
-  return false;
-}
-
-/// Read an UTF-8 encoded line from an input stream
-/** As opposed to wx functions, this one actually reports errors
- */
-String read_utf8_line(wxInputStream& input, bool until_eof = false);
-String read_utf8_line(wxInputStream& input, bool until_eof) {
-  LocalVector<char> buffer;
-  while (true) {
-    int c = input.GetC();
-    if (c == EOF) break;
-    if (!until_eof) {
-      if (c == '\n') break;
-      if (c == '\r') {
-        c = input.GetC();
-        if (c != '\n' && c != EOF) {
-          input.Ungetch(c); // \r but not \r\n
-        }
-        break; 
-      }
-    }
-    buffer.push_back((Byte)c);
-  }
-  // convert to string
-  // TODO: Doing this in one step should be faster
-  size_t size = wxConvUTF8.ToWChar(nullptr, 0, buffer.get(), buffer.size());
-  if (size == size_t(-1)) {
-    throw ParseError(_("Invalid UTF-8 sequence"));
-  } else if (size == 0) {
-    return _("");
-  }
-  return wxString::FromUTF8(buffer.get(), buffer.size());
-}
-
 void Reader::readLine(bool in_string) {
   line_number += 1;
-  // We have to do our own line reading, because wxTextInputStream is insane
   try {
     line = read_utf8_line(input);
   } catch (const ParseError& e) {
@@ -265,7 +187,7 @@ const String& Reader::getValue() {
     // read all lines that are indented enough
     readLine(true);
     previous_line_number = line_number;
-    while (indent >= expected_indent && !input.Eof()) {
+    while (indent >= expected_indent && !input.eof()) {
       previous_value.resize(previous_value.size() + pending_newlines, _('\n'));
       pending_newlines = 0;
       previous_value += line.substr(expected_indent); // strip expected indent
@@ -273,15 +195,15 @@ const String& Reader::getValue() {
         readLine(true);
         pending_newlines++;
         // skip empty lines that are not indented enough
-      } while(trim(line).empty() && indent < expected_indent && !input.Eof());
+      } while(trim(line).empty() && indent < expected_indent && !input.eof());
     }
     // moveNext(), but without the initial readLine()
     state = HANDLED;
-    while (key.empty() && !input.Eof()) {
+    while (key.empty() && !input.eof()) {
       readLine();
     }
     // did we reach the end of the file?
-    if (key.empty() && input.Eof()) {
+    if (key.empty() && input.eof()) {
       line_number += 1;
       indent = -1;
     }

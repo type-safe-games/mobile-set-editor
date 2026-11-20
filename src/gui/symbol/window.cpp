@@ -20,7 +20,7 @@
 #include <util/io/package.hpp>
 #include <util/error.hpp>
 #include <wx/filename.h>
-#include <wx/wfstream.h>
+#include <util/io/stream.hpp>
 #include <wx/spinctrl.h>
 
 // ----------------------------------------------------------------------------- : Constructor
@@ -35,10 +35,10 @@ SymbolWindow::SymbolWindow(Window* parent, const String& filename)
   : performer(nullptr)
 {
   // open file
-  unique_ptr<wxFileInputStream> stream;
+  unique_ptr<FileInputStream> stream;
   retry_io([&]{
-    stream = make_unique<wxFileInputStream>(filename);
-    return stream->IsOk();
+    stream = make_unique<FileInputStream>(filename);
+    return stream->ok();
   });
   Reader reader(*stream, nullptr, filename);
   SymbolP symbol;
@@ -223,10 +223,10 @@ void SymbolWindow::onFileOpen(wxCommandEvent& ev) {
     String ext = n.GetExt();
     SymbolP symbol;
     if (ext.Lower() == _("mse-symbol")) {
-      unique_ptr<wxFileInputStream> stream;
+      unique_ptr<FileInputStream> stream;
       retry_io([&]{
-        stream = make_unique<wxFileInputStream>(name);
-        return stream->IsOk();
+        stream = make_unique<FileInputStream>(name);
+        return stream->ok();
       });
       Reader reader(*stream, nullptr, name);
       reader.handle_greedy(symbol);
@@ -258,16 +258,18 @@ void SymbolWindow::onFileSaveAs(wxCommandEvent& ev) {
     String temp_file = wxFileName::CreateTempFileName(_("mse-symbol"));
     bool ok;
     {
-      unique_ptr<wxFileOutputStream> stream;
+      unique_ptr<FileOutputStream> stream;
       retry_io([&]{
-        stream = make_unique<wxFileOutputStream>(temp_file);
-        return stream->IsOk();
+        stream = make_unique<FileOutputStream>(temp_file);
+        return stream->ok();
       });
-      ok = stream->IsOk();
+      ok = stream->ok();
       if (ok) {
-        Writer writer(*stream, file_version_symbol);
-        writer.handle(control->getSymbol());
-        ok = stream->IsOk();
+        {
+          Writer writer(*stream, file_version_symbol);
+          writer.handle(control->getSymbol());
+        }
+        ok = stream->close();
       }
     }
     if (!ok || !rename_file_or_dir(temp_file, name)) {
@@ -282,16 +284,16 @@ void SymbolWindow::onFileStore(wxCommandEvent& ev) {
     SymbolValueP value = static_pointer_cast<SymbolValue>(performer->value);
     Package& package = performer->getLocalPackage();
     LocalFileName new_filename = package.newFileName(value->field().name,_(".mse-symbol")); // a new unique name in the package
-    unique_ptr<wxOutputStream> stream;
+    unique_ptr<OutputStream> stream;
     retry_io([&]{
       stream = package.openOut(new_filename);
-      return stream->IsOk();
+      return stream->ok();
     });
-    if (stream->IsOk()) {
+    if (stream->ok()) {
       Writer writer(*stream, file_version_symbol);
       writer.handle(control->getSymbol());
     }
-    if (!stream->IsOk()) {
+    if (!stream->close()) {
       queue_message(MESSAGE_ERROR, _ERROR_1_("can't write symbol", new_filename.toStringForWriting()));
       return;
     }

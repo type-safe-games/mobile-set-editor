@@ -19,7 +19,6 @@
 #include <gfx/generated_image.hpp>
 #include <util/error.hpp>
 #include <util/file_utils.hpp>
-#include <wx/wfstream.h>
 
 // ----------------------------------------------------------------------------- : Utility
 
@@ -402,14 +401,14 @@ SCRIPT_FUNCTION(copy_file) {
   ExportInfo& ei = *export_info();
   auto in = ei.export_template->openIn(input);
   ensure_dir_valid(out_path);
-  unique_ptr<wxFileOutputStream> out;
+  unique_ptr<FileOutputStream> out;
   retry_io([&]{
-    out = make_unique<wxFileOutputStream>(out_path);
-    return out->Ok();
+    out = make_unique<FileOutputStream>(out_path);
+    return out->ok();
   });
-  if (!out->Ok()) throw Error(_("Unable to open file '") + out_path + _("' for output"));
-  out->Write(*in);
-  if (!out->Ok() || (!in->Eof() && in->GetLastError() != wxSTREAM_NO_ERROR)) {
+  if (!out->ok()) throw Error(_("Unable to open file '") + out_path + _("' for output"));
+  bool written = out->write(*in);
+  if (!out->close() || !written) {
     throw Error(_("Unable to write file '") + out_path + _("'"));
   }
   SCRIPT_RETURN(out_name);
@@ -424,16 +423,16 @@ SCRIPT_FUNCTION(write_text_file) {
   String out_path = get_export_full_path(file);
   // write
   ensure_dir_valid(out_path);
-  unique_ptr<wxFileOutputStream> out;
+  unique_ptr<FileOutputStream> out;
   retry_io([&]{
-    out = make_unique<wxFileOutputStream>(out_path);
-    return out->Ok();
+    out = make_unique<FileOutputStream>(out_path);
+    return out->ok();
   });
-  if (!out->Ok()) throw Error(_("Unable to open file '") + out_path + _("' for output"));
-  wxTextOutputStream tout(*out);
-  tout.WriteString(BYTE_ORDER_MARK);
-  tout.WriteString(input);
-  if (!out->Ok()) throw Error(_("Unable to write file '") + out_path + _("'"));
+  if (!out->ok()) throw Error(_("Unable to open file '") + out_path + _("' for output"));
+  TextOutputStream tout(*out);
+  tout.writeString(BYTE_ORDER_MARK);
+  tout.writeString(input);
+  if (!out->close()) throw Error(_("Unable to write file '") + out_path + _("'"));
   SCRIPT_RETURN(file);
 }
 
@@ -500,6 +499,17 @@ SCRIPT_FUNCTION(write_set_file) {
   
 }
 
+// Write the set as a zip file to a file descriptor the process already has open, which is left open.
+// This is how the Android host saves (saveTo(fd), ADR 0009); from the CLI it tests that path.
+SCRIPT_FUNCTION(write_set_to_fd) {
+  SCRIPT_PARAM(int, fd);
+  SCRIPT_PARAM_C(Set*, set);
+  FdOutputStream out(fd);
+  set->saveCopy(out);
+  if (!out.close()) throw Error(_("Unable to write the set to file descriptor ") + String::Format(_("%d"), fd));
+  SCRIPT_RETURN(true);
+}
+
 // ----------------------------------------------------------------------------- : Layout dump
 
 // The layout of a rendered card (ADR 0010): field regions and laid-out text lines, as JSON text
@@ -517,14 +527,14 @@ SCRIPT_FUNCTION(write_layout_file) {
   String out_path = get_export_full_path(file);
   ensure_dir_valid(out_path);
   std::string bytes = card_layout_dump(set, input).ToStdString(wxConvUTF8);
-  unique_ptr<wxFileOutputStream> out;
+  unique_ptr<FileOutputStream> out;
   retry_io([&]{
-    out = make_unique<wxFileOutputStream>(out_path);
-    return out->Ok();
+    out = make_unique<FileOutputStream>(out_path);
+    return out->ok();
   });
-  if (!out->Ok()) throw Error(_("Unable to open file '") + out_path + _("' for output"));
-  out->Write(bytes.data(), bytes.size());
-  if (!out->Ok()) throw Error(_("Unable to write file '") + out_path + _("'"));
+  if (!out->ok()) throw Error(_("Unable to open file '") + out_path + _("' for output"));
+  out->write(bytes.data(), bytes.size());
+  if (!out->close()) throw Error(_("Unable to write file '") + out_path + _("'"));
   SCRIPT_RETURN(file);
 }
 
@@ -544,6 +554,7 @@ void init_script_export_functions(Context& ctx) {
   ctx.setVariable(_("write_text_file"),  script_write_text_file);
   ctx.setVariable(_("write_image_file"), script_write_image_file);
   ctx.setVariable(_("write_set_file"),   script_write_set_file);
+  ctx.setVariable(_("write_set_to_fd"),  script_write_set_to_fd);
   ctx.setVariable(_("card_layout"),      script_card_layout);
   ctx.setVariable(_("write_layout_file"), script_write_layout_file);
   ctx.setVariable(_("sanitize"),         script_sanitize);

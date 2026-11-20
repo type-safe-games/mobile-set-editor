@@ -9,7 +9,7 @@
 // ----------------------------------------------------------------------------- : Includes
 
 #include <util/prec.hpp>
-#include <wx/txtstrm.h>
+#include <util/io/stream.hpp>
 #ifdef __APPLE__
     #include <unordered_map>
 #endif
@@ -86,7 +86,7 @@ private:
   /// Output stream we are writing to
   OutputStream& output;
   /// Text stream wrapping the output stream
-  wxTextOutputStream stream;
+  TextOutputStream stream;
   bool indent_output;
   
   // --------------------------------------------------- : Writing to the stream

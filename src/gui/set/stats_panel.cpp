@@ -253,7 +253,8 @@ void StatDimensionList::drawItem(DC& dc, int x, int y, size_t item) {
     }
     if (!filename.empty()) {
       auto file = game->openIn(filename);
-      Image img(*file);
+      Image img;
+      image_load_file(img, *file);
       if (img.HasMask()) img.InitAlpha(); // we can't handle masks
       Image resampled(21, 21);
       resample_preserve_aspect(img, resampled);

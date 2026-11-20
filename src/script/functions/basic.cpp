@@ -21,7 +21,6 @@
 #include <data/game.hpp>
 #include <random>
 #include <util/file_utils.hpp>
-#include <wx/wfstream.h>
 #include <boost/json.hpp>
 
 // ----------------------------------------------------------------------------- : Debugging

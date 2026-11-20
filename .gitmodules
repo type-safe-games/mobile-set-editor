@@ -1,3 +1,6 @@
 [submodule "templates/Full-Magic-Pack"]
 	path = templates/Full-Magic-Pack
 	url = https://gitea.home/admin/Full-Magic-Pack.git
+[submodule "third_party/minizip-ng"]
+	path = third_party/minizip-ng
+	url = https://github.com/zlib-ng/minizip-ng

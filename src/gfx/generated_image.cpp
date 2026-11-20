@@ -16,7 +16,6 @@
 #include <script/functions/json.hpp>
 #include <render/symbol/filter.hpp>
 #include <gfx/image_load.hpp>
-#include <wx/wfstream.h>
 
 // ----------------------------------------------------------------------------- : GeneratedImage
 

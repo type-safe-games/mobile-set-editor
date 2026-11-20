@@ -23,7 +23,6 @@
 #include <render/symbol/filter.hpp>
 #include <script/functions/construction_helper.hpp>
 #include <sstream>
-#include <wx/sstream.h>
 
 
 // All this isn't great, but it will do for now. Idealy you would create JsonWriter and JsonReader classes
@@ -165,7 +164,7 @@ void read(T& out, boost::json::object& jv, const char value_name[]) {
   if (wxstring.empty() && size > 0) {
     wxstring = String(data, wxConvWhateverWorks, size);
   }
-  wxStringInputStream stream(wxstring);
+  StringInputStream stream(encode_utf8(wxstring));
   Reader reader(stream, nullptr, _(""), false, true);
   reader.setValue(wxstring);
   reader.handle(out);
@@ -181,7 +180,7 @@ void read(PackSelectType& out, boost::json::object& jv, const char value_name[])
   if (wxstring.empty() && size > 0) {
     wxstring = String(data, wxConvWhateverWorks, size);
   }
-  wxStringInputStream stream(wxstring);
+  StringInputStream stream(encode_utf8(wxstring));
   Reader reader(stream, nullptr, _(""), false, true);
   reader.setValue(wxstring);
   reader.handle(out);
@@ -450,10 +449,10 @@ inline boost::json::string to_json_string(const String& s) {
 
 template <typename T>
 void write(boost::json::object& out, const String& name, const T& value) {
-  wxStringOutputStream stream;
+  StringOutputStream stream;
   Writer writer(stream, false);
   writer.handle(name, value);
-  String string = stream.GetString();
+  String string = String::FromUTF8(stream.str().data(), stream.str().size());
   if (!string.empty()) {
     if (string.StartsWith(name + ":")) string = string.substr(name.length() + 1).Trim(false);
     if (string.EndsWith("\n")) string = string.substr(0, string.length() - 1);

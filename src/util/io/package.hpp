@@ -13,12 +13,12 @@
 #include <util/error.hpp>
 #include <util/file_utils.hpp>
 #include <util/vcs.hpp>
+#include <util/io/stream.hpp>
+#include <util/io/zip.hpp>
+#include <optional>
 #include <data/format/image_encoding.hpp>
 
 class Package;
-class wxFileInputStream;
-class wxZipInputStream;
-class wxZipEntry;
 DECLARE_POINTER_TYPE(PackageDependency);
 
 /// The package that is currently being written to
@@ -76,13 +76,9 @@ private:
  *  To accomplish this modified files are first written to temporary files, when save() is called
  *  the temporary files are moved/copied.
  *
- *  Zip files are accessed using wxZip(Input|Output)Stream.
- *  The zip input stream appears to only allow one file at a time, since the stream itself maintains
- *  state about what file we are reading.
- *  There are multiple solutions:
- *    1. (currently used) Open a new ZipInputStream for each file
- *    2. (may be faster) First read the file into a memory buffer,
- *      return a stream based on that buffer (StringInputStream).
+ *  Zip files are accessed using ZipReader/ZipWriter (util/io/zip.hpp, on top of minizip-ng).
+ *  Each file opened from a zip gets its own ZipEntryInputStream, with its own handle on the zip file,
+ *  so several can be open at once.
  *
  *  TODO: maybe support sub packages (a package inside another package)?
  */
@@ -135,6 +131,10 @@ public:
   /// Saves the package under a different filename, but keep the old one open
   void saveCopy(const String& package);
 
+  /// Saves a copy of the package as a zip file into a stream (for example a file descriptor)
+  /** The zip is first written to a temporary file. Closing the stream is up to the caller. */
+  void saveCopy(OutputStream& out);
+
 
   // --------------------------------------------------- : Managing the inside of the package
 
@@ -145,15 +145,15 @@ public:
   }
 
   /// Open an input stream for a file in the package.
-  unique_ptr<wxInputStream> openIn(const String& file);
-  inline unique_ptr<wxInputStream> openIn(const LocalFileName& file) {
+  unique_ptr<InputStream> openIn(const String& file);
+  inline unique_ptr<InputStream> openIn(const LocalFileName& file) {
     return openIn(file.fn);
   }
 
   /// Open an output stream for a file in the package.
   /// (changes are only committed with save())
-  unique_ptr<wxOutputStream> openOut(const String& file);
-  inline unique_ptr<wxOutputStream> openOut(const LocalFileName& file) {
+  unique_ptr<OutputStream> openOut(const String& file);
+  inline unique_ptr<OutputStream> openOut(const LocalFileName& file) {
     return openOut(file.fn);
   }
 
@@ -210,11 +210,10 @@ protected:
   /// Information about a file in the package
   struct FileInfo {
     FileInfo();
-    ~FileInfo();
     bool keep;               ///< Should this file be kept in the package? (as opposed to deleting it)
     bool created;            ///< Was this file just created (e.g. should the VCS add it?)
     String tempName;         ///< Name of the temporary file where new contents of this file are placed
-    wxZipEntry* zipEntry;    ///< Entry in the zip file for this file
+    optional<ZipEntry> zipEntry; ///< Entry in the zip file for this file
     /// Is this file changed, and therefore written to a temporary file?
     inline bool wasWritten() const { return !tempName.empty(); }
   };
@@ -233,10 +232,10 @@ public:
 private:
   /// All files in the package
   FileInfos files;
-  /// Filestream/zipstream for reading zip files
-  unique_ptr<wxZipInputStream> zipStream;
+  /// Reader for the zip file, kept open
+  unique_ptr<ZipReader> zipReader;
 
-  void loadZipStream();
+  void loadZipEntries();
   void openDirectory(bool fast = false);
   void openSubdir(const String&);
   void openZipfile();
@@ -244,6 +243,7 @@ private:
   void removeTempFiles(bool remove_unused);
   void clearKeepFlag();
   void saveToZipfile(const String&,   bool remove_unused, bool is_copy);
+  void writeZipfile(const String&,    bool remove_unused);
   void saveToDirectory(const String&, bool remove_unused, bool is_copy);
   FileInfos::iterator addFile(const String& file);
 
@@ -252,7 +252,7 @@ private:
   String absoluteName(const LocalFileName& file);
 
   /// Open a file given an absolute filename
-  static unique_ptr<wxInputStream> openAbsoluteFile(const String& name);
+  static unique_ptr<InputStream> openAbsoluteFile(const String& name);
   friend class LocalFileName;
 };
 
@@ -291,7 +291,7 @@ public:
                                            ///< must never be overwritten or garbage collected on save.
 
   /// Get an input stream for the package icon, if there is any
-  unique_ptr<wxInputStream> openIconFile();
+  unique_ptr<InputStream> openIconFile();
 
   /// A file matches if it equals, or matches a wildcard (*,?) pattern in, read_only_files
   bool isIgnoredOnSave(const String& file) const override;
@@ -305,6 +305,7 @@ public:
   void save(bool remove_unused = true);
   void saveAs(const String& package, bool remove_unused = true, bool as_directory = false);
   void saveCopy(const String& package);
+  void saveCopy(OutputStream& out);
 
   /// Check if this package lists a dependency on the given package
   /** This is done to force people to fill in the dependencies */

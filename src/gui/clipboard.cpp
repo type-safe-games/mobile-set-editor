@@ -17,23 +17,23 @@
 #include <util/io/package.hpp>
 #include <script/scriptable.hpp>
 #include <wx/filename.h>
-#include <wx/sstream.h>
+#include <util/io/stream.hpp>
 
 // ----------------------------------------------------------------------------- : Clipboard serialization
 
 /// Serialize an object to a string, clipboard_package will be set to the given package.
 template <typename T>
 String serialize_for_clipboard(Package& package, T& object) {
-  wxStringOutputStream stream;
+  StringOutputStream stream;
   Writer writer(stream, file_version_clipboard);
   WITH_DYNAMIC_ARG(clipboard_package, &package);
     writer.handle(object);
-  return stream.GetString();
+  return String::FromUTF8(stream.str().data(), stream.str().size());
 }
 
 template <typename T>
 void deserialize_from_clipboard(T& object, Package& package, const String& data) {
-  wxStringInputStream stream = {data};
+  StringInputStream stream(encode_utf8(data));
   Reader reader(stream, nullptr, _("clipboard"));
   WITH_DYNAMIC_ARG(clipboard_package, &package);
     reader.handle_greedy(object);

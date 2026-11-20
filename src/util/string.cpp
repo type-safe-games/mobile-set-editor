@@ -9,18 +9,6 @@
 #include <util/prec.hpp>
 #include <util/string.hpp>
 #include <util/for_each.hpp>
-#include <wx/txtstrm.h>
-
-// ----------------------------------------------------------------------------- : Unicode
-
-void writeUTF8(wxTextOutputStream& stream, const String& str) {
-  #ifdef UNICODE
-    stream.WriteString(str);
-  #else
-    wxWCharBuffer buf = str.wc_str(*wxConvCurrent);
-    stream.WriteString(wxString(buf, wxConvUTF8));
-  #endif
-}
 
 // ----------------------------------------------------------------------------- : Char functions
 

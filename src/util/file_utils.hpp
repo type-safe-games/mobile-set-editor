@@ -10,10 +10,14 @@
 
 #include <util/prec.hpp>
 #include <chrono>
+#include <filesystem>
 #include <thread>
 #include <data/settings.hpp>
 
 // ----------------------------------------------------------------------------- : Path components
+
+/// Convert a path to a std::filesystem path, the way wx converted file names (wxConvFileName)
+std::filesystem::path to_fs_path(const String& path);
 
 // These work on String paths, and follow the conventions of the wxFileName functions they replaced:
 // the last component of a path is its 'full name' (name+extension), everything before it its 'path'.

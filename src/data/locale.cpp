@@ -15,11 +15,6 @@
 #include <util/io/package_manager.hpp>
 #include <util/regex.hpp>
 #include <script/to_value.hpp>
-#include <wx/wfstream.h>
-
-#if defined(__WXMSW__)
-  #include <wx/mstream.h>
-#endif
 
 // ----------------------------------------------------------------------------- : Locale class
 

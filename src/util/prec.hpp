@@ -54,8 +54,6 @@ typedef wxBitmap Bitmap;
 typedef wxImage  Image;
 typedef wxDC     DC;
 
-typedef wxOutputStream OutputStream;
-
 // ----------------------------------------------------------------------------- : Compatability fixes
 
 #include "wx_compat.hpp"

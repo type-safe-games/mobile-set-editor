@@ -17,7 +17,6 @@
 #include <data/locale.hpp>
 #include <data/export_template.hpp>
 #include <data/installer.hpp>
-#include <wx/wfstream.h>
 
 // ----------------------------------------------------------------------------- : PackageManager : in memory
 
@@ -126,7 +125,7 @@ bool PackageManager::existsInPackage(const String& name) {
   throw FileNotFoundError(name, _("No package name specified, use '/package/filename'"));
 }
 
-pair<unique_ptr<wxInputStream>,Packaged*> PackageManager::openFileFromPackage(Packaged* package, const String& name) {
+pair<unique_ptr<InputStream>,Packaged*> PackageManager::openFileFromPackage(Packaged* package, const String& name) {
   if (!name.empty() && name.GetChar(0) == _('/')) {
     // absolute name; break name
     size_t start = name.find_first_not_of(_("/\\"), 1); // allow "//package/name" from incorrect scripts
@@ -145,7 +144,7 @@ pair<unique_ptr<wxInputStream>,Packaged*> PackageManager::openFileFromPackage(Pa
   }
   throw FileNotFoundError(name, _("No package name specified, use '/package/filename'"));
 }
-pair<unique_ptr<wxInputStream>, Packaged*> openFileFromPackage(Packaged* package, const String& name) {
+pair<unique_ptr<InputStream>, Packaged*> openFileFromPackage(Packaged* package, const String& name) {
   return package_manager.openFileFromPackage(package, name);
 }
 
@@ -408,8 +407,8 @@ void PackageDirectory::loadDatabase() {
   String filename = databaseFile();
   if (file_exists(filename)) {
     // packages file not existing is not an error
-    wxFileInputStream file_stream = {filename};
-    if (!file_stream.Ok()) return; // failure is not an error
+    FileInputStream file_stream(filename);
+    if (!file_stream.ok()) return; // failure is not an error
     Reader reader(file_stream, nullptr, filename);
     reader.handle_greedy(*this);
     sort(packages.begin(), packages.end(), compare_name);
@@ -417,7 +416,7 @@ void PackageDirectory::loadDatabase() {
 }
 
 void PackageDirectory::saveDatabase() {
-  wxFileOutputStream stream(databaseFile());
+  FileOutputStream stream(databaseFile());
   Writer writer(stream, app_version);
   writer.handle(*this);
 }
@@ -471,15 +470,13 @@ bool PackageDirectory::actual_install(const InstallablePackage& package, const S
     create_parent_dirs(local_file);
     // copy file
     auto in_stream = installer.openIn(file);
-    unique_ptr<wxFileOutputStream> out_stream;
+    unique_ptr<FileOutputStream> out_stream;
     retry_io([&]{
-      out_stream = make_unique<wxFileOutputStream>(local_file);
-      return out_stream->IsOk();
+      out_stream = make_unique<FileOutputStream>(local_file);
+      return out_stream->ok();
     });
-    if (out_stream->IsOk()) {
-      out_stream->Write(*in_stream);
-    }
-    if (!out_stream->IsOk() || (!in_stream->Eof() && in_stream->GetLastError() != wxSTREAM_NO_ERROR)) {
+    bool written = out_stream->ok() && out_stream->write(*in_stream);
+    if (!out_stream->close() || !written) {
       out_stream.reset();
       remove_file(local_file);
       queue_message(MESSAGE_ERROR, _ERROR_1_("cannot create file", file));

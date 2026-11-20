@@ -20,7 +20,6 @@
 #include <util/io/writer.hpp>
 #include <util/delayed_index_maps.hpp>
 #include <util/file_utils.hpp>
-#include <wx/wfstream.h>
 
 // ----------------------------------------------------------------------------- : Extra types
 
@@ -403,8 +402,8 @@ void Settings::read() {
   String filename = settingsFile();
   if (file_exists(filename)) {
     // settings file not existing is not an error
-    wxFileInputStream file(filename);
-    if (!file.Ok()) return; // failure is not an error
+    FileInputStream file(filename);
+    if (!file.ok()) return; // failure is not an error
     Reader reader(file, nullptr, filename);
     reader.handle_greedy(*this);
     // make sure things aren't in a problematic state
@@ -419,7 +418,7 @@ void Settings::read() {
 }
 
 void Settings::write() {
-  wxFileOutputStream file(settingsFile());
+  FileOutputStream file(settingsFile());
   Writer writer(file, app_version);
   writer.handle(*this);
 }

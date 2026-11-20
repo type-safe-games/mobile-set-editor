@@ -10,6 +10,7 @@
 
 #include <util/prec.hpp>
 #include <util/version.hpp>
+#include <util/io/stream.hpp>
 #ifdef __APPLE__
     #include <unordered_map>
 #endif
@@ -20,7 +21,7 @@ DECLARE_POINTER_TYPE(Game);
 DECLARE_POINTER_TYPE(Updater);
 DECLARE_POINTER_TYPE(StyleSheet);
 class Packaged;
-pair<unique_ptr<wxInputStream>, Packaged*> openFileFromPackage(Packaged* package, const String& name);
+pair<unique_ptr<InputStream>, Packaged*> openFileFromPackage(Packaged* package, const String& name);
 
 // ----------------------------------------------------------------------------- : Reader
 
@@ -38,7 +39,7 @@ public:
   /** filename is used only for error messages
    *  package is used for looking up included files.
    */
-  Reader(wxInputStream& input, Packaged* package = nullptr, const String& filename = _(""), bool ignore_invalid = false, bool suppress_warnings = false);
+  Reader(InputStream& input, Packaged* package = nullptr, const String& filename = _(""), bool ignore_invalid = false, bool suppress_warnings = false);
   
   ~Reader() { showWarnings(); }
   
@@ -160,7 +161,7 @@ private:
   /// Line number of the previous_line
   int previous_line_number;
   /// Input stream we are reading from
-  wxBufferedInputStream input;
+  InputStream& input;
   /// Accumulated warning messages
   String warnings;
   

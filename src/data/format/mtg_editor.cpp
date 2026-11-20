@@ -16,7 +16,7 @@
 #include <data/field/choice.hpp>
 #include <data/field/image.hpp>
 #include <util/tagged_string.hpp>
-#include <wx/wfstream.h>
+#include <util/io/stream.hpp>
 
 // ----------------------------------------------------------------------------- : MtgEditorFileFormat
 
@@ -48,12 +48,7 @@ FileFormatP mtg_editor_file_format() {
 // ----------------------------------------------------------------------------- : Importing
 
 SetP MtgEditorFileFormat::importSet(const String& filename) {
-  wxFileInputStream f(filename);
-  #ifdef UNICODE
-    wxTextInputStream file(f, _('\n'), wxConvLibc);
-  #else
-    wxTextInputStream file(f);
-  #endif
+  FileInputStream f(filename);
   // create set
   SetP set(new Set(Game::byName(_("magic"))));
   
@@ -65,23 +60,23 @@ SetP MtgEditorFileFormat::importSet(const String& filename) {
   bool first = true;
   
   // read file
-  while (!f.Eof()) {
+  while (!f.eof()) {
     // read a line
     if (!current_card) current_card = make_intrusive<Card>(*set->game);
-    String line = file.ReadLine();
+    String line = read_locale_line(f);
     if        (line == _("#SET###########")) {                    // set.title
       target = &set->value<TextValue>(_("title")).value;
     } else if (line == _("#SETDATE#######")) {                    // date
       // remember date for generation of illustration filename
       target = nullptr;
-      set_date = file.ReadLine();
+      set_date = read_locale_line(f);
     } else if (line == _("#SHOWRARITY####") ||
                line == _("#FONTS#########") || line == _("#COUNT#########")) {    // ignore
       target = nullptr;
-      file.ReadLine();
+      read_locale_line(f);
     } else if (line == _("#LAYOUT########")) {                    // layout type
       target = nullptr;
-      layout = file.ReadLine();
+      layout = read_locale_line(f);
     } else if (line == _("#CARD##########") || line == _("#EOF###########")) {  // begin/end of card
       if (!first) {
         // First [CARD##] indicates only the start of a card, subsequent ones also the end of the previous
@@ -107,7 +102,7 @@ SetP MtgEditorFileFormat::importSet(const String& filename) {
     } else if (line == _("#DATE##########")) {                    // date
       // remember date for generation of illustration filename
       target = nullptr;
-      card_date = file.ReadLine();
+      card_date = read_locale_line(f);
     } else if (line == _("#TYPE##########")) {                    // super type
       target = &current_card->value<TextValue>(_("super type")).value;
     } else if (line == _("#SUBTYPE#######")) {                    // sub type
@@ -116,17 +111,17 @@ SetP MtgEditorFileFormat::importSet(const String& filename) {
       target = &current_card->value<TextValue>(_("casting cost")).value;
     } else if (line == _("#RARITY########") || line == _("#FREQUENCY#####")) {  // rarity
       target = nullptr;
-      line = file.ReadLine();
+      line = read_locale_line(f);
       if      (line == _("0")) current_card->value<ChoiceValue>(_("rarity")).value.assign(_("common"));
       else if (line == _("1")) current_card->value<ChoiceValue>(_("rarity")).value.assign(_("uncommon"));
       else                     current_card->value<ChoiceValue>(_("rarity")).value.assign(_("rare"));
     } else if (line == _("#COLOR#########")) {                    // card color
       target = nullptr;
-      line = file.ReadLine();
+      line = read_locale_line(f);
       current_card->value<ChoiceValue>(_("card color")).value.assign(line);
     } else if (line == _("#AUTOBG########")) {                    // card color.isDefault
       target = nullptr;
-      line = file.ReadLine();
+      line = read_locale_line(f);
       if (line == _("TRUE")) {
         current_card->value<ChoiceValue>(_("card color")).value.makeDefault();
       }
@@ -144,7 +139,7 @@ SetP MtgEditorFileFormat::importSet(const String& filename) {
       target = &current_card->value<TextValue>(_("toughness")).value;
     } else if (line == _("#ILLUSTRATION##") || line == _("#ILLUSTRATION8#")) {    // image
       target = nullptr;
-      line = file.ReadLine();
+      line = read_locale_line(f);
       if (!file_exists(line)) {
         // based on card name and date
         line = filter1(filename) + set_date + _("/") +
@@ -159,7 +154,7 @@ SetP MtgEditorFileFormat::importSet(const String& filename) {
       }
     } else if (line == _("#TOMBSTONE#####")) {                    // tombstone
       target = nullptr;
-      line = file.ReadLine();
+      line = read_locale_line(f);
       current_card->value<ChoiceValue>(_("card symbol")).value.assign(
         line==_("TRUE") ? _("tombstone") : _("none")
       );

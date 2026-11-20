@@ -15,7 +15,7 @@
 #include <data/field/text.hpp>
 #include <data/field/choice.hpp>
 #include <data/field/image.hpp>
-#include <wx/wfstream.h>
+#include <util/io/stream.hpp>
 
 // ----------------------------------------------------------------------------- : MSE1FileFormat
 
@@ -36,37 +36,32 @@ FileFormatP mse1_file_format() {
 // ----------------------------------------------------------------------------- : Importing
 
 // read a card from a mse1 file, add to the set when done
-void read_mse1_card(Set& set, wxFileInputStream& f, wxTextInputStream& file);
+void read_mse1_card(Set& set, InputStream& f);
 
 SetP MSE1FileFormat::importSet(const String& filename) {
-  wxFileInputStream f(filename);
-  #ifdef UNICODE
-    wxTextInputStream file(f, _('\n'), wxConvLibc);
-  #else
-    wxTextInputStream file(f);
-  #endif
+  FileInputStream f(filename);
   // create set
   SetP set(new Set(Game::byName(_("magic"))));
   
   // file version check
-  String format = file.ReadLine();
+  String format = read_locale_line(f);
   if (format.substr(0,8) != _("MTG Set8")) {
     throw ParseError(_("Expected MSE format version 8\nTo convert files made with older versions of Magic Set Editor:\n  1. Download the latest version 1 from https://magicseteditor.boards.net/page/downloads\n  2. Open the set, then save the set\n  3. Try to open them again in this program."));
   }
   // read general info
-  set->value<TextValue>(_("title"))    .value = file.ReadLine();
-  set->value<TextValue>(_("artist"))   .value = file.ReadLine();
-  set->value<TextValue>(_("copyright")).value = file.ReadLine();
-  file.ReadLine(); // border color, ignored
-  String stylesheet = file.ReadLine();
-  set->apprentice_code = file.ReadLine(); // apprentice prefix
-  file.ReadLine(); // 'formatN'?, not even used by MSE1 :S, ignored
-  file.ReadLine(); // 'formatS'?, same, ignored
-  file.ReadLine(); // symbol filename, ignored
-  file.ReadLine(); // use black symbol for all rarities, ignored
+  set->value<TextValue>(_("title"))    .value = read_locale_line(f);
+  set->value<TextValue>(_("artist"))   .value = read_locale_line(f);
+  set->value<TextValue>(_("copyright")).value = read_locale_line(f);
+  read_locale_line(f); // border color, ignored
+  String stylesheet = read_locale_line(f);
+  set->apprentice_code = read_locale_line(f); // apprentice prefix
+  read_locale_line(f); // 'formatN'?, not even used by MSE1 :S, ignored
+  read_locale_line(f); // 'formatS'?, same, ignored
+  read_locale_line(f); // symbol filename, ignored
+  read_locale_line(f); // use black symbol for all rarities, ignored
   String desc, line;
-  while (!f.Eof()) {
-    line = file.ReadLine();
+  while (!f.eof()) {
+    line = read_locale_line(f);
     if (line == _("\xFF")) break;
     desc += line;
   }
@@ -86,8 +81,8 @@ SetP MSE1FileFormat::importSet(const String& filename) {
   
   // read cards
   CardP current_card;
-  while (!f.Eof()) {
-    read_mse1_card(*set, f, file);
+  while (!f.eof()) {
+    read_mse1_card(*set, f);
   }
   
   // done
@@ -95,11 +90,11 @@ SetP MSE1FileFormat::importSet(const String& filename) {
   return set;
 }
 
-void read_mse1_card(Set& set, wxFileInputStream& f, wxTextInputStream& file) {
+void read_mse1_card(Set& set, InputStream& f) {
   CardP card(new Card(*set.game));
-  while (!f.Eof()) {
+  while (!f.eof()) {
     // read a line
-    String line = file.ReadLine();
+    String line = read_locale_line(f);
     if (line.empty()) continue;
     Char type = line.GetChar(0);
     line = line.substr(1);

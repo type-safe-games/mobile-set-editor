@@ -140,7 +140,7 @@ typedef std::function<bool(long long bytes_received, long long bytes_total)> Dow
 enum class DownloadResult { OK, ABORTED, FAILED };
 /// Downloads a url into a stream, reporting progress; the progress callback can abort.
 /** Installed by the host; without one, downloads fail. */
-typedef function<DownloadResult(const String& url, wxOutputStream& out, const DownloadProgressCallback& progress)> DownloadFileHook;
+typedef function<DownloadResult(const String& url, OutputStream& out, const DownloadProgressCallback& progress)> DownloadFileHook;
 extern DownloadFileHook download_file_hook;
 
 /// A package that can be installed, or is already installed

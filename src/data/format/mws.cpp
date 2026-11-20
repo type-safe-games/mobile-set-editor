@@ -15,7 +15,7 @@
 #include <data/field/choice.hpp>
 #include <util/string.hpp>
 #include <util/tagged_string.hpp>
-#include <wx/wfstream.h>
+#include <util/io/stream.hpp>
 
 // ----------------------------------------------------------------------------- : Utilities
 
@@ -58,43 +58,43 @@ void export_mws(const SetP& set, const String& name) {
     throw Error(_("Can only export magic sets to Magic Workstation"));
   }
   // Open file
-  wxFileOutputStream f(name);
-  wxTextOutputStream file(f, wxEOL_DOS);
+  FileOutputStream f(name);
+  TextOutputStream file(f, LineEnding::DOS);
   
   // Write header
-  file.WriteString(set->value<TextValue>(_("title")).value + _(" Spoiler List\n"));
-  file.WriteString(_("Set exported using Magic Set Editor 2, version ") + app_version.toString() + _("\n\n"));
-  file.WriteString(_("Spoiler List created on ") + DateTime::now().format(_("%Y-%m-%d %H:%M:%S")));
-  file.WriteString(_("\n\n"));
+  file.writeString(set->value<TextValue>(_("title")).value + _(" Spoiler List\n"));
+  file.writeString(_("Set exported using Magic Set Editor 2, version ") + app_version.toString() + _("\n\n"));
+  file.writeString(_("Spoiler List created on ") + DateTime::now().format(_("%Y-%m-%d %H:%M:%S")));
+  file.writeString(_("\n\n"));
   
   // Write cards
   FOR_EACH(card, set->cards) {
-    file.WriteString(_("Card Name:\t"));
-    file.WriteString(untag_mws(card->value<TextValue>(_("name")).value));
-    file.WriteString(_("\nCard Color:\t"));
-    file.WriteString(card_color_mws(card->value<ChoiceValue>(_("card color")).value));
-    file.WriteString(_("\nMana Cost:\t"));
-    file.WriteString(untag_mws(card->value<TextValue>(_("casting cost")).value));
-    file.WriteString(_("\nType & Class:\t"));
+    file.writeString(_("Card Name:\t"));
+    file.writeString(untag_mws(card->value<TextValue>(_("name")).value));
+    file.writeString(_("\nCard Color:\t"));
+    file.writeString(card_color_mws(card->value<ChoiceValue>(_("card color")).value));
+    file.writeString(_("\nMana Cost:\t"));
+    file.writeString(untag_mws(card->value<TextValue>(_("casting cost")).value));
+    file.writeString(_("\nType & Class:\t"));
     String sup_type = untag_mws(card->value<TextValue>(_("super type")).value);
     String sub_type = untag_mws(card->value<TextValue>(_("sub type")).value);
     if (sub_type.empty()) {
-      file.WriteString(sup_type);
+      file.writeString(sup_type);
     } else {
-      file.WriteString(sup_type + _(" - ") + sub_type);
+      file.writeString(sup_type + _(" - ") + sub_type);
     }
-    file.WriteString(_("\nPow/Tou:\t"));
-    file.WriteString(untag_mws(card->value<TextValue>(_("pt")).value));
-    file.WriteString(_("\nCard Text:\t"));
-    file.WriteString(untag_mws(card->value<TextValue>(_("rule text")).value));
-    file.WriteString(_("\nFlavor Text:\t"));
-    file.WriteString(untag_mws(card->value<TextValue>(_("flavor text")).value));
-    file.WriteString(_("\nArtist:\t\t"));
-    file.WriteString(untag_mws(card->value<TextValue>(_("illustrator")).value));
-    file.WriteString(_("\nRarity:\t\t"));
-    file.WriteString(card_rarity_code(card->value<ChoiceValue>(_("rarity")).value));
-    file.WriteString(_("\nCard #:\t\t"));
-    file.WriteString(untag_mws(card->value<TextValue>(_("card number")).value));
-    file.WriteString(_("\n\n"));
+    file.writeString(_("\nPow/Tou:\t"));
+    file.writeString(untag_mws(card->value<TextValue>(_("pt")).value));
+    file.writeString(_("\nCard Text:\t"));
+    file.writeString(untag_mws(card->value<TextValue>(_("rule text")).value));
+    file.writeString(_("\nFlavor Text:\t"));
+    file.writeString(untag_mws(card->value<TextValue>(_("flavor text")).value));
+    file.writeString(_("\nArtist:\t\t"));
+    file.writeString(untag_mws(card->value<TextValue>(_("illustrator")).value));
+    file.writeString(_("\nRarity:\t\t"));
+    file.writeString(card_rarity_code(card->value<ChoiceValue>(_("rarity")).value));
+    file.writeString(_("\nCard #:\t\t"));
+    file.writeString(untag_mws(card->value<TextValue>(_("card number")).value));
+    file.writeString(_("\n\n"));
   }
 }

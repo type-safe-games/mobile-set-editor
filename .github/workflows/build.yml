@@ -108,6 +108,10 @@ jobs:
         with:
           path: project
 
+      - name: submodules
+        # only minizip-ng: the template pack is private
+        run: git -C project submodule update --init third_party/minizip-ng
+
       - name: compile
         shell: bash
         run: |

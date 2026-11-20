@@ -20,6 +20,37 @@ if(POLICY CMP0167)
 endif()
 find_package(Boost REQUIRED COMPONENTS regex json)
 
+# minizip-ng (third_party/minizip-ng, a submodule pinned to 4.2.2) reads and writes
+# the zip packages (src/util/io/zip.cpp). Deflate through the system zlib only: no
+# other codecs, no encryption, no compat layer, nothing fetched, nothing installed.
+if(NOT EXISTS "${PROJECT_SOURCE_DIR}/third_party/minizip-ng/CMakeLists.txt")
+  message(FATAL_ERROR "third_party/minizip-ng is empty: run git submodule update --init third_party/minizip-ng")
+endif()
+find_package(ZLIB REQUIRED)
+# Let the plain variables below set its options and cache entries.
+set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
+set(CMAKE_POLICY_DEFAULT_CMP0126 NEW)
+set(MZ_COMPAT OFF)
+set(MZ_ZLIB ON)
+set(MZ_ZLIB_FLAVOR "zlib")
+set(MZ_BZIP2 OFF)
+set(MZ_LZMA OFF)
+set(MZ_PPMD OFF)
+set(MZ_ZSTD OFF)
+set(MZ_LIBCOMP OFF)
+set(MZ_FETCH_LIBS OFF)
+set(MZ_FORCE_FETCH_LIBS OFF)
+set(MZ_PKCRYPT OFF)
+set(MZ_WZAES OFF)
+set(MZ_OPENSSL OFF)
+set(MZ_LIBBSD OFF)
+set(MZ_ICONV OFF)
+set(MZ_BUILD_TESTS OFF)
+set(MZ_BUILD_UNIT_TESTS OFF)
+set(MZ_BUILD_FUZZ_TESTS OFF)
+set(SKIP_INSTALL_ALL ON)
+add_subdirectory(third_party/minizip-ng EXCLUDE_FROM_ALL)
+
 find_package(PkgConfig)
 
 # find hunspell
@@ -49,7 +80,7 @@ include_directories(${HUNSPELL_INCLUDE_DIRS})
 # Magic Set Editor executable
 
 add_executable(magicseteditor WIN32)
-target_link_libraries(${PROJECT_NAME} PRIVATE wxWidgets::wxWidgets Boost::regex Boost::json ${HUNSPELL_LIBRARIES})
+target_link_libraries(${PROJECT_NAME} PRIVATE wxWidgets::wxWidgets Boost::regex Boost::json MINIZIP::minizip ${HUNSPELL_LIBRARIES})
 
 file(GLOB_RECURSE sources src/*.cpp)
 list(FILTER sources EXCLUDE REGEX win32_cli_wrapper.cpp)

@@ -20,6 +20,7 @@
 #include <util/platform.hpp>
 #include <wx/filename.h>
 #include <wx/wfstream.h>
+#include <wx/txtstrm.h>
 
 DECLARE_POINTER_TYPE(ExportTemplate);
 

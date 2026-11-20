@@ -10,8 +10,10 @@
 #include <data/installer.hpp>
 #include <util/io/package_manager.hpp>
 #include <gui/packages_window.hpp>
+#include <gui/wx_stream.hpp>
 #include <wx/wfstream.h>
 #include <wx/webrequest.h>
+#include <gui/wx_web_compat.hpp>
 #include <wx/dialup.h>
 #include <wx/datetime.h>
 
@@ -120,8 +122,9 @@ private:
           return 0;
         }
         wxInputStream* is = request.GetResponse().GetStream();
+        WxInputStreamReader in(*is);
         // Read installer list
-        Reader reader(*is, nullptr, _("installers"), true);
+        Reader reader(in, nullptr, _("installers"), true);
         vector<DownloadableInstallerP> installers;
         reader.handle(_("installers"),installers);
         // done

@@ -14,9 +14,7 @@
 #include <script/profiler.hpp>
 #include <data/format/formats.hpp>
 #include <wx/process.h>
-#include <wx/wfstream.h>
-
-String read_utf8_line(wxInputStream& input, bool until_eof = false);
+#include <util/io/stream.hpp>
 
 // ----------------------------------------------------------------------------- : Command line interface
 
@@ -71,8 +69,8 @@ void CLISetInterface::setExportInfoCwd() {
 // ----------------------------------------------------------------------------- : Running
 
 String read_file(String const& filename) {
-  wxFileInputStream stream(filename);
-  if (!stream.IsOk()) throw FileNotFoundError(_("<unknown>"), filename);
+  FileInputStream stream(filename);
+  if (!stream.ok()) throw FileNotFoundError(_("<unknown>"), filename);
   eat_utf8_bom(stream);
   return read_utf8_line(stream, true);
 }

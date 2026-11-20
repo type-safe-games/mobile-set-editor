@@ -20,17 +20,17 @@ using boost::tribool;
 Writer::Writer(OutputStream& output, bool indent_output)
   : indentation(0)
   , output(output)
-  , stream(output, wxEOL_UNIX, wxMBConvUTF8())
+  , stream(output, LineEnding::UNIX)
   , indent_output(indent_output)
 {}
 
 Writer::Writer(OutputStream& output, Version file_app_version)
   : indentation(0)
   , output(output)
-  , stream(output, wxEOL_UNIX, wxMBConvUTF8())
+  , stream(output, LineEnding::UNIX)
   , indent_output(true)
 {
-  stream.WriteString(BYTE_ORDER_MARK);
+  stream.writeString(BYTE_ORDER_MARK);
   handle(_("mse_version"), file_app_version);
 }
 
@@ -57,11 +57,11 @@ void Writer::writePending() {
   for (size_t i = 0 ; i < pending_opened.size() ; ++i) {
     if (i > 0) {
       // before entering a sub-block, write a colon after the parent's name
-      stream.WriteString(_(":\n"));
+      stream.writeString(_(":\n"));
     }
     indentation += 1;
     writeIndentation();
-    writeUTF8(stream, pending_opened[i]);
+    stream.writeString(pending_opened[i]);
   }
   pending_opened.clear();
 }
@@ -69,7 +69,7 @@ void Writer::writePending() {
 void Writer::writeIndentation() {
   if (!indent_output) return;
   for(int i = 1 ; i < indentation ; ++i) {
-    stream.PutChar(_('\t'));
+    stream.putChar(_('\t'));
   }
 }
 
@@ -83,7 +83,7 @@ void Writer::handle(const String& value) {
   // write indentation and key
   if (value.find_first_of(_('\n')) != String::npos || (!value.empty() && isSpace(value.GetChar(0)))) {
     // multiline string, or contains leading whitespace
-    stream.WriteString(_(":\n"));
+    stream.writeString(_(":\n"));
     indentation += 1;
     // split lines, and write each line
     size_t start = 0, end, size = value.size();
@@ -91,10 +91,10 @@ void Writer::handle(const String& value) {
       end = value.find_first_of(_("\n\r"), start); // until end of line
       // write the line
       writeIndentation();
-      writeUTF8(stream, value.substr(start, end - start));
+      stream.writeString(value.substr(start, end - start));
       // Skip \r and \n
       if (end == String::npos) break;
-      stream.PutChar(_('\n'));
+      stream.putChar(_('\n'));
       start = end + 1;
       if (start < size) {
         Char c1 = value.GetChar(start - 1);
@@ -105,10 +105,10 @@ void Writer::handle(const String& value) {
     }
     indentation -= 1;
   } else {
-    stream.WriteString(_(": "));
-    writeUTF8(stream, value);
+    stream.writeString(_(": "));
+    stream.writeString(value);
   }
-  stream.PutChar(_('\n'));
+  stream.putChar(_('\n'));
 }
 
 template <> void Writer::handle(const int& value) {
