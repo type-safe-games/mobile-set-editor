@@ -24,3 +24,7 @@ Building the registry (#32) showed that the fontconfig-based desktop reference m
 - Families match case-insensitively on family and typographic family names, never on the full name.
 - An unknown family resolves to the fallback family, Noto Sans. Android has no system fonts, so the app must ship Noto Sans (OFL) in its font store. On desktop the wx `Canvas` still selects by name through fontconfig.
 - Known remaining gaps against fontconfig: tie-breaking between faces of equal weight (seen once, ITC Souvenir Medium vs Demi), system fonts the pack doesn't ship (DejaVu, Verdana, Minion Pro), and Type 1 `.pfb` fonts. These are checked when the Skia `Canvas` is compared with the goldens (#42).
+
+## Amendment (2026-11-20): raster ops copy the Linux reference, not Windows
+
+The golden images come from wxGTK, which draws through cairo. There, `AND`, `OR` and `AND_INVERT` draw and blit nothing, and `XOR` is cairo's XOR compositing, not a bitwise op. This affects symbol SUBTRACT, INTERSECTION and DIFFERENCE. The golden images are the fidelity bar, so the Skia `Canvas` copies the reference's behaviour for each raster op, not Windows semantics. The wx `Canvas` declares only `COPY` as supported on GTK (#32). The core already branches on that capability, so on Android the core takes the same code paths as on the Linux reference. The Skia `Canvas` copies wxGTK's results for any op it still receives. Windows/Wine remains a spot check only.

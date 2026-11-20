@@ -15,3 +15,7 @@ The app ships with no Templates and never names, links to or downloads a Templat
 - The core Magic fonts (Beleren, MPlantin, Matrix, Relay) live in no package — the pack ships them loose for desktop users to install into the OS — so import collects loose font files into a shared font store that the font registry reads as a second source (amends ADR 0004).
 - Import reuses MSE's installer data model: a picker grouped by `installer group:` with dependencies auto-selected; per-package version comparison (newer replaces, same/older skipped, no downgrade, one version per package); packages with missing dependencies or a newer `mse version:` than the app are refused.
 - Each package extracts to a temp directory and is renamed into place, so a crash or full disk never leaves a half-installed Template.
+
+## Amendment (2026-11-20): import also collects spelling dictionaries
+
+Magic Styles spell-check card text with the pack's hunspell dictionaries, and a missing dictionary queues errors that change the Layout dump. So import also copies `.dic`/`.aff` files from any `dictionaries/` directory in the zip into `<template store>/dictionaries/`, where the core looks for them. A different file with the same name replaces the old one, and the host can switch this off per import (#46).
