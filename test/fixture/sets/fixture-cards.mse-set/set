@@ -25,6 +25,9 @@ card:
 	name: Back Face
 	frame: grey
 	level: 5
-	rules: The other side of <sym>U</sym> Front Face.
+	rules:
+		Swiftness
+		Charge 2
+		The other side of <sym>U</sym> Front Face.
 	linked_card_1: fixture-front
 	linked_relation_1: Front Face

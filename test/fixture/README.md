@@ -16,11 +16,16 @@ A tiny Game, two Styles and a symbol font that public CI renders instead of the 
 | Image field        | `picture` (`image1.png` on the first card; empty on the others)       |
 | Linked card pair   | *Front Face* ↔ *Back Face*, through the game's `Front Face`/`Back Face` card link |
 | Card list script   | `number` (the card's position in the set; not drawn), for stale cards after card list changes |
+| Keywords           | the game's *Swiftness* and *Charge* (a `number` parameter), used on *Back Face*; `rules` expands them with reminder text, a locked span |
 
 `data/fixture-alternate.mse-style` is a second Style of the same Game, with another card size, an
 icon and two style options (`accent`, a choice that colours the name, and `footer`, a text that is
 not drawn). The fixture set doesn't use it, so it has no Golden images; the facade tests use it to
 change Styles and to switch a card's own style options on and off.
+
+The game has two keyword modes (`core`, and `custom`, the default for new keywords) and one
+keyword parameter type (`number`). Its keywords are read-only; the facade tests add set keywords
+of their own.
 
 ## How the tests use it
 

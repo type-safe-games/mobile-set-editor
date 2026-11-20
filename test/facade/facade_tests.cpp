@@ -446,6 +446,303 @@ TEST(link_and_unlink_are_one_undo_step_each) {
   F::closeSession(s);
 }
 
+// ----------------------------------------------------------------------------- : Keywords
+
+static const F::KeywordInfo* find_keyword(const F::KeywordList& list, const std::string& name) {
+  for (const F::KeywordInfo& k : list.keywords) if (k.keyword == name) return &k;
+  return nullptr;
+}
+
+static std::string to_s(const F::TextSpan& span) {
+  return "[" + std::to_string(span.start) + "," + std::to_string(span.end) + ")";
+}
+
+TEST(list_keywords_modes_and_parameter_types) {
+  F::SessionHandle s = open_fixture();
+  F::KeywordList list = F::listKeywords(s);
+  REQUIRE_OK(list);
+  // the fixture set has none of its own: the Game's two
+  CHECK_EQ(list.keywords.size(), (size_t)2);
+  const F::KeywordInfo* swift  = find_keyword(list, "Swiftness");
+  const F::KeywordInfo* charge = find_keyword(list, "Charge");
+  if (!swift || !charge) { report_failure(__FILE__, __LINE__, "the Game's keywords are not listed"); return; }
+  CHECK(swift->from_game);
+  CHECK(swift->valid);
+  CHECK_EQ(swift->match, "Swiftness");
+  CHECK_EQ(swift->reminder, "This card acts first.");
+  CHECK_EQ(swift->mode, "core");
+  CHECK(swift->parameters.empty());
+  CHECK_EQ(swift->usage, 1); // on fixture-back
+  CHECK_EQ(charge->match, "Charge <number>");
+  CHECK_EQ(charge->parameters.size(), (size_t)1);
+  if (!charge->parameters.empty()) CHECK_EQ(charge->parameters[0], "number");
+  CHECK_EQ(charge->reminder, "Put {param1} charge counters on this card.");
+  CHECK_EQ(charge->usage, 1);
+  CHECK(swift->id != 0 && swift->id != charge->id);
+  // the same ids every time
+  F::KeywordList again = F::listKeywords(s);
+  CHECK_EQ(find_keyword(again, "Swiftness")->id, swift->id);
+  F::KeywordResult got = F::getKeyword(s, charge->id);
+  REQUIRE_OK(got);
+  CHECK_EQ(got.keyword.keyword, "Charge");
+  CHECK_EQ(F::getKeyword(s, 999999).status, F::Status::NotFound);
+  // the Game's modes and parameter types
+  F::KeywordModeList modes = F::listKeywordModes(s);
+  REQUIRE_OK(modes);
+  CHECK_EQ(modes.modes.size(), (size_t)2);
+  if (modes.modes.size() == 2) {
+    CHECK_EQ(modes.modes[0].name, "core");
+    CHECK(!modes.modes[0].is_default);
+    CHECK_EQ(modes.modes[1].name, "custom");
+    CHECK(modes.modes[1].is_default);
+  }
+  F::KeywordParamTypeList types = F::listKeywordParamTypes(s);
+  REQUIRE_OK(types);
+  CHECK_EQ(types.types.size(), (size_t)1);
+  if (!types.types.empty()) {
+    CHECK_EQ(types.types[0].name, "number");
+    CHECK_EQ(types.types[0].placeholder, "N");
+    CHECK_EQ(types.types[0].example, "2");
+  }
+  // a keyword's fields
+  F::Target kw = F::Target::keyword(charge->id);
+  F::FieldList fields = F::listFields(s, kw);
+  REQUIRE_OK(fields);
+  CHECK_EQ(fields.fields.size(), (size_t)5);
+  for (const F::FieldInfo& f : fields.fields) {
+    CHECK(!f.editable); // the Game's
+    if (f.name == "mode") { CHECK_EQ(f.type, "choice"); CHECK(contains(f.choices, "custom")); }
+    else CHECK_EQ(f.type, "text");
+  }
+  CHECK_EQ(F::getValue(s, kw, "mode").value, "core");
+  CHECK_EQ(F::getValue(s, kw, "match").value, "Charge <atom-param>number</atom-param>");
+  F::TextResult match = F::getText(s, kw, "match");
+  REQUIRE_OK(match);
+  CHECK_EQ(match.text, "Charge number");
+  CHECK_EQ(match.locked.size(), (size_t)1);
+  if (!match.locked.empty()) { CHECK_EQ(match.locked[0].start, 7); CHECK_EQ(match.locked[0].end, 13); }
+  CHECK_EQ(F::getText(s, kw, "reminder").text, "Put {param1} charge counters on this card.");
+  // the Game's keywords are read-only
+  CHECK_EQ(F::replaceRange(s, kw, "keyword", 0, 0, "X").status, F::Status::InvalidArgument);
+  CHECK_EQ(F::setValue(s, kw, "reminder", "x").status, F::Status::InvalidArgument);
+  CHECK_EQ(F::setValue(s, kw, "mode", "custom").status, F::Status::InvalidArgument);
+  CHECK_EQ(F::removeKeyword(s, charge->id).status, F::Status::InvalidArgument);
+  CHECK_EQ(F::insertKeywordParameter(s, charge->id, 0, 0, "number").status, F::Status::InvalidArgument);
+  CHECK_EQ(F::getText(s, kw, "mode").status, F::Status::InvalidArgument);
+  CHECK_EQ(F::getText(s, kw, "nothing").status, F::Status::NotFound);
+  CHECK(!F::sessionInfo(s).can_undo);
+  F::closeSession(s);
+}
+
+TEST(add_edit_and_remove_keywords_with_undo) {
+  F::SessionHandle s = open_fixture();
+  F::Target wrap = F::Target::card("fixture-wrap");
+  // a card that uses a keyword the set doesn't have yet
+  std::string rules = F::getValue(s, wrap, "rules").value;
+  REQUIRE_OK(F::setValue(s, wrap, "rules", rules + "\nGlimmer"));
+  std::string before = F::getText(s, wrap, "rules").text;
+  // adding a keyword no card uses: no stale cards
+  F::NewKeywordResult unused = F::addKeyword(s, F::NewKeyword{"Unused", "Unused", "Nothing.", "", ""});
+  REQUIRE_OK(unused);
+  CHECK(unused.stale.empty());
+  CHECK_OK(F::undo(s));
+  // adding one that the card uses: the card is stale, and shows its reminder text
+  F::NewKeywordResult add = F::addKeyword(s, F::NewKeyword{"Glimmer", "Glimmer", "It shines.", "Shiny cards.", ""});
+  REQUIRE_OK(add);
+  CHECK(add.id != 0);
+  CHECK(!add.stale.all);
+  CHECK(contains(add.stale.card_uids, "fixture-wrap"));
+  CHECK(!contains(add.stale.card_uids, "fixture-back"));
+  CHECK(add.dirty);
+  CHECK_EQ(add.undo_name, "Add Item");
+  CHECK_EQ(F::getText(s, wrap, "rules").text, before + " (It shines.)");
+  F::KeywordList list = F::listKeywords(s);
+  REQUIRE_OK(list);
+  CHECK_EQ(list.keywords.size(), (size_t)3);
+  CHECK_EQ(list.keywords[0].id, add.id); // the Set's first
+  CHECK(!list.keywords[0].from_game);
+  CHECK_EQ(list.keywords[0].mode, "custom"); // the default mode
+  CHECK_EQ(list.keywords[0].rules, "Shiny cards.");
+  CHECK_EQ(list.keywords[0].usage, 1);
+  F::Target kw = F::Target::keyword(add.id);
+  F::FieldList fields = F::listFields(s, kw);
+  for (const F::FieldInfo& f : fields.fields) CHECK(f.editable);
+  // typing in the reminder text: one undo step, and the card is stale each time
+  F::TextResult t = F::getText(s, kw, "reminder");
+  REQUIRE_OK(t);
+  CHECK_EQ(t.text, "It shines.");
+  int pos = 9; // before the "."
+  for (const char* c : {" ", "a", "l", "l"}) {
+    t = F::replaceRange(s, kw, "reminder", pos, pos, c);
+    REQUIRE_OK(t);
+    CHECK(contains(t.stale.card_uids, "fixture-wrap"));
+    CHECK(!contains(t.stale.card_uids, "fixture-front"));
+    pos = t.selection_end;
+  }
+  CHECK_EQ(t.text, "It shines all.");
+  CHECK_EQ(t.undo_name, "Typing");
+  CHECK_EQ(F::getText(s, wrap, "rules").text, before + " (It shines all.)");
+  CHECK_EQ(F::getKeyword(s, add.id).keyword.reminder, "It shines all.");
+  F::ActionResult u = F::undo(s);
+  REQUIRE_OK(u);
+  CHECK(contains(u.stale.card_uids, "fixture-wrap"));
+  CHECK_EQ(F::getText(s, kw, "reminder").text, "It shines.");
+  CHECK_EQ(F::getText(s, wrap, "rules").text, before + " (It shines.)");
+  CHECK_EQ(u.undo_name, "Add Item"); // the typing was one step
+  // a reminder text that doesn't compile is kept, with its error, and not used
+  t = F::replaceRange(s, kw, "reminder", 0, 0, "{");
+  REQUIRE_OK(t);
+  CHECK(t.stale.empty());
+  F::KeywordResult broken = F::getKeyword(s, add.id);
+  CHECK(!broken.keyword.reminder_error.empty());
+  CHECK(!broken.keyword.valid);
+  CHECK_EQ(broken.keyword.reminder, "It shines.");
+  CHECK_EQ(F::getText(s, wrap, "rules").text, before + " (It shines.)");
+  CHECK_OK(F::undo(s));
+  CHECK(F::getKeyword(s, add.id).keyword.reminder_error.empty());
+  // the name: not on the card, so nothing is stale
+  t = F::replaceRange(s, kw, "keyword", 7, 7, "s");
+  REQUIRE_OK(t);
+  CHECK_EQ(t.text, "Glimmers");
+  CHECK(t.stale.empty());
+  CHECK_EQ(F::getKeyword(s, add.id).keyword.keyword, "Glimmers");
+  CHECK_OK(F::undo(s));
+  // the mode: one undo step, none for the same mode, and only the Game's modes
+  F::ActionResult m = F::setValue(s, kw, "mode", "core");
+  REQUIRE_OK(m);
+  CHECK_EQ(F::getValue(s, kw, "mode").value, "core");
+  CHECK(m.stale.empty()); // the fixture's reminder text doesn't depend on the mode
+  CHECK_EQ(m.undo_name, "Keyword Mode");
+  CHECK_OK(F::setValue(s, kw, "mode", "core"));
+  CHECK_EQ(F::setValue(s, kw, "mode", "nope").status, F::Status::InvalidArgument);
+  CHECK_OK(F::undo(s));
+  CHECK_EQ(F::getValue(s, kw, "mode").value, "custom");
+  // the match: the card no longer uses the keyword
+  F::ActionResult mt = F::setValue(s, kw, "match", "Shimmer");
+  REQUIRE_OK(mt);
+  CHECK(contains(mt.stale.card_uids, "fixture-wrap"));
+  CHECK_EQ(F::getText(s, wrap, "rules").text, before);
+  CHECK_EQ(F::getKeyword(s, add.id).keyword.usage, 0);
+  F::ActionResult mu = F::undo(s);
+  CHECK(contains(mu.stale.card_uids, "fixture-wrap"));
+  CHECK_EQ(F::getText(s, wrap, "rules").text, before + " (It shines.)");
+  // a parameter in the match: a locked span
+  F::TextResult sp = F::replaceRange(s, kw, "match", 7, 7, " ");
+  F::TextResult param = F::insertKeywordParameter(s, add.id, sp.selection_end, sp.selection_end, "number");
+  REQUIRE_OK(param);
+  CHECK_EQ(param.text, "Glimmer number");
+  CHECK_EQ(param.locked.size(), (size_t)1);
+  if (!param.locked.empty()) CHECK_EQ(to_s(param.locked[0]), "[8,14)");
+  CHECK_EQ(param.selection_end, 14);
+  CHECK_EQ(param.undo_name, "Insert Parameter");
+  CHECK_EQ(F::getValue(s, kw, "match").value, "Glimmer <atom-param>number</atom-param>");
+  F::KeywordResult with_param = F::getKeyword(s, add.id);
+  CHECK_EQ(with_param.keyword.match, "Glimmer <number>");
+  CHECK_EQ(with_param.keyword.parameters.size(), (size_t)1);
+  CHECK_EQ(F::insertKeywordParameter(s, add.id, 0, 0, "colour").status, F::Status::InvalidArgument);
+  CHECK_OK(F::undo(s));
+  CHECK_OK(F::undo(s));
+  CHECK_EQ(F::getValue(s, kw, "match").value, "Glimmer");
+  CHECK_EQ(F::getText(s, wrap, "rules").text, before + " (It shines.)");
+  // removing: the card is stale, and undo puts the keyword back with the same id
+  F::ActionResult rm = F::removeKeyword(s, add.id);
+  REQUIRE_OK(rm);
+  CHECK(contains(rm.stale.card_uids, "fixture-wrap"));
+  CHECK_EQ(F::getText(s, wrap, "rules").text, before);
+  CHECK_EQ(F::listKeywords(s).keywords.size(), (size_t)2);
+  CHECK_EQ(F::getKeyword(s, add.id).status, F::Status::NotFound);
+  CHECK_EQ(F::removeKeyword(s, add.id).status, F::Status::NotFound);
+  CHECK_EQ(F::replaceRange(s, kw, "reminder", 0, 0, "x").status, F::Status::NotFound);
+  F::ActionResult back = F::undo(s);
+  REQUIRE_OK(back);
+  CHECK(contains(back.stale.card_uids, "fixture-wrap"));
+  CHECK_EQ(F::getKeyword(s, add.id).keyword.keyword, "Glimmer");
+  CHECK_EQ(F::getText(s, wrap, "rules").text, before + " (It shines.)");
+  CHECK_OK(F::redo(s));
+  CHECK_EQ(F::getText(s, wrap, "rules").text, before);
+  CHECK_OK(F::undo(s)); // back once more
+  // bad new keywords add nothing (and no undo step: the redo is still there)
+  CHECK_EQ(F::addKeyword(s, F::NewKeyword{"Bad", "Bad", "{", "", ""}).status, F::Status::InvalidArgument);
+  CHECK_EQ(F::addKeyword(s, F::NewKeyword{"Bad", "Bad", "", "", "nope"}).status, F::Status::InvalidArgument);
+  CHECK_EQ(F::listKeywords(s).keywords.size(), (size_t)3);
+  CHECK(F::sessionInfo(s).can_redo);
+  // the keyword is saved with the set
+  CHECK_OK(F::flush(s));
+  std::string saved = read_text(work_dir / "sessions" / ("s" + std::to_string(session_counter) + ".mse-set") / "set");
+  CHECK(saved.find("keyword: Glimmer") != std::string::npos);
+  CHECK(saved.find("reminder: It shines.") != std::string::npos);
+  F::closeSession(s);
+}
+
+TEST(locked_spans_of_keywords_in_replace_range) {
+  F::SessionHandle s = open_fixture();
+  F::Target back = F::Target::card("fixture-back");
+  F::TextResult t = F::getText(s, back, "rules");
+  REQUIRE_OK(t);
+  const std::string reminder1 = " (This card acts first.)";
+  const std::string line1 = "Swiftness" + reminder1;
+  const std::string line2 = "Charge 2 (Put 2 charge counters on this card.)";
+  const std::string line3 = "The other side of U Front Face.";
+  CHECK_EQ(t.text, line1 + "\n" + line2 + "\n" + line3);
+  // each reminder text is one locked span
+  CHECK_EQ(t.locked.size(), (size_t)2);
+  if (t.locked.size() == 2) {
+    CHECK_EQ(to_s(t.locked[0]), "[9,33)");
+    CHECK_EQ(to_s(t.locked[1]), "[42,80)");
+  }
+  // a position inside a span snaps to its nearest edge: near the end, so after it
+  F::TextResult after = F::replaceRange(s, back, "rules", 30, 30, "!");
+  REQUIRE_OK(after);
+  CHECK_EQ(after.text, line1 + "!\n" + line2 + "\n" + line3);
+  CHECK_EQ(after.selection_end, 34);
+  CHECK_OK(F::undo(s));
+  // near the start, so before it; the script puts the reminder text right after the keyword
+  // again, and the caret follows the text typed
+  F::TextResult before = F::replaceRange(s, back, "rules", 10, 10, " ");
+  REQUIRE_OK(before);
+  CHECK_EQ(before.text, line1 + " \n" + line2 + "\n" + line3);
+  CHECK_EQ(before.selection_end, 34);
+  CHECK_OK(F::undo(s));
+  CHECK_EQ(F::getText(s, back, "rules").text, t.text);
+  // a deletion that ends inside a span takes the whole span
+  F::TextResult cut = F::replaceRange(s, back, "rules", 5, 25, "");
+  REQUIRE_OK(cut);
+  CHECK_EQ(cut.text, "Swift\n" + line2 + "\n" + line3);
+  CHECK_EQ(cut.selection_end, 5);
+  CHECK_EQ(cut.locked.size(), (size_t)1);
+  CHECK_OK(F::undo(s));
+  // replacing a selection that covers part of a span replaces the whole span
+  F::TextResult repl = F::replaceRange(s, back, "rules", 41, 70, "3");
+  REQUIRE_OK(repl);
+  CHECK_EQ(repl.text, line1 + "\nCharge 3 (Put 3 charge counters on this card.)\n" + line3);
+  CHECK_OK(F::undo(s));
+  F::closeSession(s);
+}
+
+TEST(prefix_and_suffix_are_not_editable) {
+  // <prefix> and <suffix> (as combined_editor writes them) are not part of the visible text, and
+  // edits never reach into them
+  F::SessionHandle s = open_fixture();
+  F::Target front = F::Target::card("fixture-front");
+  REQUIRE_OK(F::setValue(s, front, "name", "<prefix>Pre: </prefix>Body<suffix> :Suf</suffix>"));
+  F::TextResult t = F::getText(s, front, "name");
+  REQUIRE_OK(t);
+  CHECK_EQ(t.text, "Body");
+  CHECK_EQ(t.selection_end, 4);
+  F::TextResult start = F::replaceRange(s, front, "name", 0, 0, "A");
+  REQUIRE_OK(start);
+  CHECK_EQ(start.text, "ABody");
+  CHECK_EQ(F::getValue(s, front, "name").value, "<prefix>Pre: </prefix>ABody<suffix> :Suf</suffix>");
+  F::TextResult end = F::replaceRange(s, front, "name", 5, 5, "Z");
+  CHECK_EQ(F::getValue(s, front, "name").value, "<prefix>Pre: </prefix>ABodyZ<suffix> :Suf</suffix>");
+  // deleting everything leaves them
+  F::TextResult all = F::replaceRange(s, front, "name", 0, 1000, "");
+  REQUIRE_OK(all);
+  CHECK_EQ(all.text, "");
+  CHECK_EQ(F::getValue(s, front, "name").value, "<prefix>Pre: </prefix><suffix> :Suf</suffix>");
+  F::closeSession(s);
+}
+
 // ----------------------------------------------------------------------------- : Changing the card list
 
 /// The uids of a session's cards, in order

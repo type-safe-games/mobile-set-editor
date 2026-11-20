@@ -42,9 +42,40 @@ card field:
 	name: rules
 	multi line: true
 	show statistics: false
+	script:
+		expand_keywords(
+			value,
+			default_expand: { true },
+			combine: { keyword + "<atom-reminder> <i>(" + reminder + ")</i></atom-reminder>" }
+		)
 card field:
 	type: text
 	name: number
 	editable: false
 	show statistics: false
 	script: position(of: card, in: set) + 1
+
+has keywords: true
+keyword mode:
+	name: core
+	description: Keywords of the game
+keyword mode:
+	name: custom
+	description: Keywords of a set
+	is default: true
+keyword parameter type:
+	name: number
+	description: A number
+	match: [0-9]+
+	placeholder: N
+	example: 2
+keyword:
+	keyword: Swiftness
+	match: Swiftness
+	mode: core
+	reminder: This card acts first.
+keyword:
+	keyword: Charge
+	match: Charge <atom-param>number</atom-param>
+	mode: core
+	reminder: Put {param1} charge counters on this card.

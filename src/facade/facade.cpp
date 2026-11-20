@@ -15,12 +15,14 @@
 #include <data/card.hpp>
 #include <data/card_link.hpp>
 #include <data/game.hpp>
+#include <data/keyword.hpp>
 #include <data/stylesheet.hpp>
 #include <data/locale.hpp>
 #include <data/word_list.hpp>
 #include <data/text_editing.hpp>
 #include <data/action/value.hpp>
 #include <data/action/set.hpp>
+#include <data/action/keyword.hpp>
 #include <data/field/text.hpp>
 #include <data/field/choice.hpp>
 #include <data/field/multiple_choice.hpp>
@@ -34,6 +36,7 @@
 #include <gfx/image_load.hpp>
 #include <gfx/font_registry.hpp>
 #include <script/script.hpp>
+#include <script/parser.hpp>
 #include <atomic>
 #include <filesystem>
 #include <mutex>
@@ -159,8 +162,16 @@ public:
     if (const ScriptValueEvent* e = dynamic_cast<const ScriptValueEvent*>(&action)) {
       if (e->card) addCard(e->card->uid); else stale.all = true;
     } else if (const ValueAction* a = dynamic_cast<const ValueAction*>(&action)) {
-      // a value without card is set info or style options: shown on every card
-      if (a->card) addCard(a->card->uid); else stale.all = true;
+      if (a->card) {
+        addCard(a->card->uid);
+      } else if (dynamic_cast<const KeywordTextValue*>(a->valueP.get())) {
+        // a keyword's field: the cards whose text changed with it come as ScriptValueEvents
+      } else {
+        // a value without card is set info or style options: shown on every card
+        stale.all = true;
+      }
+    } else if (dynamic_cast<const KeywordListAction*>(&action) || dynamic_cast<const ChangeKeywordModeAction*>(&action)) {
+      // likewise
     } else if (const OneWayLinkCardsAction* a = dynamic_cast<const OneWayLinkCardsAction*>(&action)) {
       addCard(a->card->uid);
     } else if (const ChangeCardStyleAction* a = dynamic_cast<const ChangeCardStyleAction*>(&action)) {
@@ -170,7 +181,7 @@ public:
     } else if (dynamic_cast<const BulkAction*>(&action)) {
       // a BulkAction's parts are reported one by one
     } else {
-      // display changes, the Set's Style, keywords, ...
+      // display changes, the Set's Style, ...
       stale.all = true;
     }
   }
@@ -205,6 +216,13 @@ struct Session {
   bool   auto_replace_enabled = true;
   vector<AutoReplaceP> auto_replaces; ///< when custom_auto_replace
   StaleCollector stale;
+  // keywords: their ids, and the values that edit their fields (one per keyword and field, so that
+  // typing merges into one undo step, as in the desktop's keyword panel)
+  std::map<const Keyword*, KeywordId> keyword_ids;
+  std::map<KeywordId, KeywordP> keywords;
+  KeywordId next_keyword_id = 1;
+  TextFieldP keyword_fields[4];
+  std::map<std::pair<const Keyword*, int>, TextValueP> keyword_values;
 
   ~Session() {
     if (set) set->actions.removeListener(&stale);
@@ -264,6 +282,8 @@ static void with_action(Session& s, ActionResult& r, F&& body) {
   begin_action(s);
   try {
     body();
+    // edits of keyword fields postpone updating the cards that use keywords; do it now
+    s.set->updateDelayed();
   } catch (...) {
     s.stale.collecting = false;
     throw;
@@ -623,9 +643,13 @@ struct FieldRef {
   ValueP value;
   CardP  card;  ///< for card values, so the action knows its card
   StyleP style; ///< the field's style, if there is one
+  bool   read_only_keyword = false; ///< a field of a Game keyword
 };
 
+static FieldRef find_keyword_field(Session& s, const Target& t, const std::string& name);
+
 static FieldRef find_field(Session& s, const Target& t, const std::string& name) {
+  if (t.kind == Target::Kind::Keyword) return find_keyword_field(s, t, name);
   Set& set = *s.set;
   FieldRef ref;
   IndexMap<FieldP, ValueP>* values = nullptr;
@@ -651,6 +675,8 @@ static FieldRef find_field(Session& s, const Target& t, const std::string& name)
       values = &set.stylingDataFor(*set.stylesheet);
       styles = &set.stylesheet->styling_style;
       break;
+    case Target::Kind::Keyword:
+      break; // above
   }
   String n = from_utf8(name);
   for (const ValueP& v : *values) {
@@ -668,6 +694,113 @@ static void add_value_action(Session& s, const CardP& card, unique_ptr<ValueActi
   if (!action) return;
   if (card) action->setCard(card);
   s.set->actions.addAction(std::move(action));
+}
+
+static void check_editable(const FieldRef& ref, const std::string& field) {
+  if (ref.read_only_keyword) fail(Status::InvalidArgument, "the Game's keywords can't be edited");
+  if (!ref.value->fieldP->editable) fail(Status::InvalidArgument, "field '" + field + "' can't be edited");
+}
+
+// ----------------------------------------------------------------------------- : Keywords : fields
+
+/// The text fields of a keyword, as in the desktop's keyword panel
+static const char* const keyword_text_fields[] = {"keyword", "match", "reminder", "rules"};
+enum { KW_KEYWORD, KW_MATCH, KW_REMINDER, KW_RULES, KW_TEXT_FIELDS };
+
+static KeywordId keyword_id(Session& s, const KeywordP& kw) {
+  auto it = s.keyword_ids.find(kw.get());
+  if (it != s.keyword_ids.end()) return it->second;
+  KeywordId id = s.next_keyword_id++;
+  s.keyword_ids[kw.get()] = id;
+  s.keywords[id] = kw;
+  return id;
+}
+
+struct KeywordRef {
+  KeywordP keyword;
+  bool from_game = false;
+};
+
+static bool has_keyword(const vector<KeywordP>& list, const Keyword* kw) {
+  for (const KeywordP& k : list) if (k.get() == kw) return true;
+  return false;
+}
+
+/// A keyword of the Set or its Game (not one that was removed)
+static KeywordRef find_keyword(Session& s, KeywordId id) {
+  auto it = s.keywords.find(id);
+  if (it != s.keywords.end()) {
+    if (has_keyword(s.set->keywords, it->second.get()))       return KeywordRef{it->second, false};
+    if (has_keyword(s.set->game->keywords, it->second.get())) return KeywordRef{it->second, true};
+  }
+  fail(Status::NotFound, "no keyword with id " + std::to_string(id));
+}
+
+/// The value that edits a text field of a keyword
+static TextValueP keyword_value(Session& s, const KeywordRef& k, int field) {
+  auto key = std::make_pair((const Keyword*)k.keyword.get(), field);
+  auto it = s.keyword_values.find(key);
+  if (it != s.keyword_values.end()) return it->second;
+  TextFieldP& f = s.keyword_fields[field];
+  if (!f) {
+    f = make_intrusive<TextField>();
+    f->name = from_utf8(keyword_text_fields[field]);
+    f->multi_line = field == KW_REMINDER || field == KW_RULES;
+    if (field == KW_MATCH) f->script = s.set->game->keyword_match_script;
+  }
+  Keyword* kw = k.keyword.get();
+  bool editable = !k.from_game;
+  intrusive_ptr<FakeTextValue> v;
+  switch (field) {
+    case KW_KEYWORD:  v = make_intrusive<KeywordTextValue>(f, kw, &kw->keyword, editable, true); break;
+    case KW_MATCH:    v = make_intrusive<KeywordTextValue>(f, kw, &kw->match, editable); break;
+    case KW_REMINDER: v = make_intrusive<KeywordReminderTextValue>(*s.set, f, kw, editable); break;
+    default:          v = make_intrusive<KeywordTextValue>(f, kw, &kw->rules, editable); break;
+  }
+  v->retrieve();
+  s.keyword_values[key] = v;
+  return v;
+}
+
+static int keyword_text_field(const std::string& name) {
+  for (int i = 0 ; i < KW_TEXT_FIELDS ; ++i) {
+    if (name == keyword_text_fields[i]) return i;
+  }
+  return -1;
+}
+
+static FieldRef find_keyword_field(Session& s, const Target& t, const std::string& name) {
+  KeywordRef k = find_keyword(s, t.keyword_id);
+  int field = keyword_text_field(name);
+  if (field < 0) {
+    if (name == "mode") fail(Status::InvalidArgument, "field 'mode' is not a text field");
+    fail(Status::NotFound, "no field '" + name + "'");
+  }
+  FieldRef ref;
+  ref.value = keyword_value(s, k, field);
+  ref.read_only_keyword = k.from_game;
+  return ref;
+}
+
+static void check_keyword_mode(const Game& game, const String& mode) {
+  if (game.keyword_modes.empty()) return; // any mode will do
+  for (const KeywordModeP& m : game.keyword_modes) {
+    if (m->name == mode) return;
+  }
+  fail(Status::InvalidArgument, "no keyword mode '" + to_utf8(mode) + "'");
+}
+
+/// Change a keyword's mode, one undo step (none if it doesn't change)
+static void set_keyword_mode(Session& s, const Target& t, const std::string& mode, ActionResult& r) {
+  KeywordRef k = find_keyword(s, t.keyword_id);
+  if (k.from_game) fail(Status::InvalidArgument, "the Game's keywords can't be edited");
+  String m = from_utf8(mode);
+  check_keyword_mode(*s.set->game, m);
+  if (m == k.keyword->mode) {
+    fill_undo_state(s, r);
+    return;
+  }
+  with_action(s, r, [&] { s.set->actions.addAction(make_unique<ChangeKeywordModeAction>(*k.keyword, m)); });
 }
 
 static FieldInfo field_info(const Field& f) {
@@ -698,6 +831,20 @@ FieldList listFields(SessionHandle h, const Target& t) {
       case Target::Kind::Set:       values = &set.data; break;
       case Target::Kind::CardStyle: values = &set.stylingDataFor(find_card(set, t.card_uid)); break;
       case Target::Kind::SetStyle:  values = &set.stylingDataFor(*set.stylesheet); break;
+      case Target::Kind::Keyword: {
+        KeywordRef k = find_keyword(s, t.keyword_id);
+        for (int i = 0 ; i < KW_TEXT_FIELDS ; ++i) {
+          r.fields.push_back(field_info(*keyword_value(s, k, i)->fieldP));
+          r.fields.back().editable = !k.from_game;
+        }
+        FieldInfo mode;
+        mode.name     = "mode";
+        mode.type     = "choice";
+        mode.editable = !k.from_game;
+        for (const KeywordModeP& m : set.game->keyword_modes) mode.choices.push_back(to_utf8(m->name));
+        r.fields.push_back(mode);
+        return;
+      }
     }
     for (const ValueP& v : *values) r.fields.push_back(field_info(*v->fieldP));
   });
@@ -717,6 +864,11 @@ static std::string value_string(const Value& v) {
 ValueResult getValue(SessionHandle h, const Target& t, const std::string& field) {
   return guarded<ValueResult>(t.card_uid, field, [&](ValueResult& r) {
     Session& s = get_session(h);
+    if (t.kind == Target::Kind::Keyword && field == "mode") {
+      r.type  = "choice";
+      r.value = to_utf8(find_keyword(s, t.keyword_id).keyword->mode);
+      return;
+    }
     FieldRef ref = find_field(s, t, field);
     r.type  = to_utf8(ref.value->fieldP->typeName());
     r.value = value_string(*ref.value);
@@ -741,8 +893,12 @@ static LocalFileName store_file(Set& set, const String& field_name, const String
 ActionResult setValue(SessionHandle h, const Target& t, const std::string& field, const std::string& value) {
   return guarded<ActionResult>(t.card_uid, field, [&](ActionResult& r) {
     Session& s = get_session(h);
+    if (t.kind == Target::Kind::Keyword && field == "mode") {
+      set_keyword_mode(s, t, value, r);
+      return;
+    }
     FieldRef ref = find_field(s, t, field);
-    if (!ref.value->fieldP->editable) fail(Status::InvalidArgument, "field '" + field + "' can't be edited");
+    check_editable(ref, field);
     String v = from_utf8(value);
     unique_ptr<ValueAction> action;
     const ValueP& val = ref.value;
@@ -783,6 +939,16 @@ static TextValueP text_value(const FieldRef& ref, const std::string& field) {
   TextValueP tv = dynamic_pointer_cast<TextValue>(ref.value);
   if (!tv) fail(Status::InvalidArgument, "field '" + field + "' is not a text field");
   return tv;
+}
+
+/// A selection given in visible text positions (which snap out of locked spans), as cursor positions
+static TextSelection visible_selection(const TextValue& value, int start, int end) {
+  VisibleText vt = visible_text(value.value());
+  TextSelection sel;
+  sel.start = vt.toCursor((size_t)start);
+  sel.end   = vt.toCursor((size_t)end);
+  fix_text_selection(value.value(), sel);
+  return sel;
 }
 
 TextResult getText(SessionHandle h, const Target& t, const std::string& field) {
@@ -836,7 +1002,7 @@ TextResult replaceRange(SessionHandle h, const Target& t, const std::string& fie
     FieldRef ref = find_field(s, t, field);
     TextValueP tv = text_value(ref, field);
     const TextField& tf = static_cast<const TextField&>(*tv->fieldP);
-    if (!tf.editable) fail(Status::InvalidArgument, "field '" + field + "' can't be edited");
+    check_editable(ref, field);
     if (start < 0 || end < 0) fail(Status::InvalidArgument, "negative text position");
     // the replacement as tagged text
     String plain = from_utf8(text);
@@ -846,12 +1012,7 @@ TextResult replaceRange(SessionHandle h, const Target& t, const std::string& fie
       const TextStyle* style = dynamic_cast<const TextStyle*>(ref.style.get());
       if (!(style && style->always_symbol)) replacement = _("<sym>") + replacement + _("</sym>");
     }
-    // visible text positions -> cursor positions
-    VisibleText vt = visible_text(tv->value());
-    TextSelection sel;
-    sel.start = vt.toCursor((size_t)start);
-    sel.end   = vt.toCursor((size_t)end);
-    fix_text_selection(tv->value(), sel);
+    TextSelection sel = visible_selection(*tv, start, end);
     AddValueAction add = [&](unique_ptr<ValueAction> action) { add_value_action(s, ref.card, std::move(action)); };
     String name = replacement.empty() ? _ACTION_("backspace") : _ACTION_("typing");
     with_action(s, r, [&] {
@@ -862,6 +1023,148 @@ TextResult replaceRange(SessionHandle h, const Target& t, const std::string& fie
           auto_replace_text(tv, sel, s.custom_auto_replace ? s.auto_replaces : game_auto_replaces(*s.set->game), add);
         }
       }
+    });
+    text_state(*tv, sel.start, sel.end, r);
+  });
+}
+
+// ----------------------------------------------------------------------------- : Keywords
+
+/// A keyword's match as the desktop lists it: "Charge <number>"
+static String match_display(const String& match) {
+  String out;
+  for (size_t pos = 0 ; pos < match.size() ; ) {
+    size_t open = match.find(_("<atom-param>"), pos);
+    if (open == String::npos) {
+      out += untag(match.substr(pos));
+      break;
+    }
+    out += untag(match.substr(pos, open - pos));
+    size_t close = match.find(_("</atom-param>"), open);
+    if (close == String::npos) close = match.size();
+    out += _("<") + untag(match.substr(open + 12, close - open - 12)) + _(">");
+    pos = close + 13;
+  }
+  return out;
+}
+
+static KeywordInfo keyword_info(Session& s, const KeywordP& kw, bool from_game) {
+  Set& set = *s.set;
+  kw->prepare(set.game->keyword_parameter_types); // as expanding keywords does: finds the parameters, checks the match
+  KeywordInfo info;
+  info.id        = keyword_id(s, kw);
+  info.keyword   = to_utf8(kw->keyword);
+  info.match     = to_utf8(match_display(kw->match));
+  info.reminder  = to_utf8(kw->reminder.getUnparsed());
+  info.rules     = to_utf8(kw->rules);
+  info.mode      = to_utf8(kw->mode);
+  for (const KeywordParamP& p : kw->parameters) info.parameters.push_back(to_utf8(p->name));
+  info.from_game = from_game;
+  auto it = s.keyword_values.find(std::make_pair((const Keyword*)kw.get(), (int)KW_REMINDER));
+  if (it != s.keyword_values.end()) {
+    info.reminder_error = to_utf8(static_cast<const KeywordReminderTextValue&>(*it->second).errors);
+  }
+  info.valid = kw->valid && info.reminder_error.empty();
+  for (const CardP& c : set.cards) {
+    for (const auto& use : c->keyword_usage) {
+      if (use.second == kw.get()) { ++info.usage; break; }
+    }
+  }
+  return info;
+}
+
+KeywordList listKeywords(SessionHandle h) {
+  return guarded<KeywordList>("", "", [&](KeywordList& r) {
+    Session& s = get_session(h);
+    for (const KeywordP& kw : s.set->keywords)       r.keywords.push_back(keyword_info(s, kw, false));
+    for (const KeywordP& kw : s.set->game->keywords) r.keywords.push_back(keyword_info(s, kw, true));
+  });
+}
+
+KeywordResult getKeyword(SessionHandle h, KeywordId id) {
+  return guarded<KeywordResult>("", "", [&](KeywordResult& r) {
+    Session& s = get_session(h);
+    KeywordRef k = find_keyword(s, id);
+    r.keyword = keyword_info(s, k.keyword, k.from_game);
+  });
+}
+
+KeywordModeList listKeywordModes(SessionHandle h) {
+  return guarded<KeywordModeList>("", "", [&](KeywordModeList& r) {
+    Session& s = get_session(h);
+    for (const KeywordModeP& m : s.set->game->keyword_modes) {
+      r.modes.push_back(KeywordModeInfo{to_utf8(m->name), to_utf8(m->description), m->is_default});
+    }
+  });
+}
+
+KeywordParamTypeList listKeywordParamTypes(SessionHandle h) {
+  return guarded<KeywordParamTypeList>("", "", [&](KeywordParamTypeList& r) {
+    Session& s = get_session(h);
+    for (const KeywordParamP& p : s.set->game->keyword_parameter_types) {
+      KeywordParamTypeInfo info;
+      info.name        = to_utf8(p->name);
+      info.description = to_utf8(p->description);
+      info.placeholder = to_utf8(p->placeholder);
+      info.example     = to_utf8(p->example);
+      info.optional    = p->optional;
+      r.types.push_back(info);
+    }
+  });
+}
+
+NewKeywordResult addKeyword(SessionHandle h, const NewKeyword& nk) {
+  return guarded<NewKeywordResult>("", "", [&](NewKeywordResult& r) {
+    Session& s = get_session(h);
+    Set& set = *s.set;
+    // as the desktop's "add keyword": a new keyword in the Game's default mode
+    unique_ptr<AddKeywordAction> action = make_unique<AddKeywordAction>(set);
+    KeywordP kw = action->action.steps.front().item;
+    kw->keyword = from_utf8(nk.keyword);
+    kw->match   = from_utf8(nk.match);
+    kw->rules   = from_utf8(nk.rules);
+    if (!nk.mode.empty()) {
+      kw->mode = from_utf8(nk.mode);
+      check_keyword_mode(*set.game, kw->mode);
+    }
+    if (!nk.reminder.empty()) {
+      String reminder = from_utf8(nk.reminder);
+      vector<ScriptParseError> errors;
+      ScriptP script = parse(reminder, nullptr, true, errors);
+      if (!errors.empty()) fail(Status::InvalidArgument, "error in the reminder text: " + to_utf8(ScriptParseErrors(errors).what()));
+      kw->reminder.setScriptP(script);
+      kw->reminder.setUnparsed(reminder);
+    }
+    with_action(s, r, [&] { set.actions.addAction(std::move(action)); });
+    r.id = keyword_id(s, kw);
+  });
+}
+
+ActionResult removeKeyword(SessionHandle h, KeywordId id) {
+  return guarded<ActionResult>("", "", [&](ActionResult& r) {
+    Session& s = get_session(h);
+    KeywordRef k = find_keyword(s, id);
+    if (k.from_game) fail(Status::InvalidArgument, "the Game's keywords can't be removed");
+    with_action(s, r, [&] { s.set->actions.addAction(make_unique<AddKeywordAction>(REMOVE, *s.set, k.keyword)); });
+  });
+}
+
+TextResult insertKeywordParameter(SessionHandle h, KeywordId id, int start, int end, const std::string& param_type) {
+  return guarded<TextResult>("", "match", [&](TextResult& r) {
+    Session& s = get_session(h);
+    KeywordRef k = find_keyword(s, id);
+    if (k.from_game) fail(Status::InvalidArgument, "the Game's keywords can't be edited");
+    if (start < 0 || end < 0) fail(Status::InvalidArgument, "negative text position");
+    String type = from_utf8(param_type);
+    bool known = false;
+    for (const KeywordParamP& p : s.set->game->keyword_parameter_types) known |= p->name == type;
+    if (!known) fail(Status::InvalidArgument, "no keyword parameter type '" + param_type + "'");
+    TextValueP tv = keyword_value(s, k, KW_MATCH);
+    TextSelection sel = visible_selection(*tv, start, end);
+    AddValueAction add = [&](unique_ptr<ValueAction> action) { add_value_action(s, CardP(), std::move(action)); };
+    // as the desktop's "insert parameter" button
+    with_action(s, r, [&] {
+      replace_text_selection(tv, sel, _("<atom-param>") + escape(type) + _("</atom-param>"), _("Insert parameter"), true, add);
     });
     text_state(*tv, sel.start, sel.end, r);
   });

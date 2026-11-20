@@ -217,6 +217,9 @@ ActionResult setCardOwnStyling(SessionHandle session, const std::string& card_ui
 
 // ----------------------------------------------------------------------------- : Fields and values
 
+/// A keyword of a session (see listKeywords). 0 is never a valid keyword.
+using KeywordId = std::int64_t;
+
 /// What a field call is about
 struct Target {
   enum class Kind {
@@ -224,14 +227,17 @@ struct Target {
     Set,       ///< a set info field
     CardStyle, ///< the style options in effect for a card (the Set's, unless the card has its own)
     SetStyle,  ///< the Set's style options for its default Style
+    Keyword,   ///< a keyword's fields (see Keywords below)
   };
   Kind        kind = Kind::Card;
-  std::string card_uid; ///< for Card and CardStyle
+  std::string card_uid;   ///< for Card and CardStyle
+  KeywordId   keyword_id = 0; ///< for Keyword
 
   static Target card(const std::string& uid)      { return Target{Kind::Card, uid}; }
   static Target set()                             { return Target{Kind::Set, std::string()}; }
   static Target cardStyle(const std::string& uid) { return Target{Kind::CardStyle, uid}; }
   static Target setStyle()                        { return Target{Kind::SetStyle, std::string()}; }
+  static Target keyword(KeywordId id)             { return Target{Kind::Keyword, std::string(), id}; }
 };
 
 struct FieldInfo {
@@ -307,6 +313,92 @@ AutoReplaceResult getAutoReplace(SessionHandle session);
  *  around it best matches what was typed. Auto-replace runs after inserting text. */
 TextResult replaceRange(SessionHandle session, const Target& target, const std::string& field,
                         int start, int end, const std::string& text, bool as_symbol = false);
+
+// ----------------------------------------------------------------------------- : Keywords
+
+// A Set's keywords are its own plus the Game's. The Game's are read-only. Cards use a keyword by
+// having its match text in a text field whose script expands keywords; the reminder text it adds
+// is a locked span in that field's visible text.
+//
+// A keyword's fields are edited through Target::keyword(id), with the same calls as card fields
+// (listFields, getValue, setValue, getText, replaceRange; typing merges into one undo step):
+//  - "keyword":  text, the keyword's name (plain text)
+//  - "match":    text, what cards must contain; parameters are <atom-param>type</atom-param>
+//                (locked spans, see insertKeywordParameter)
+//  - "reminder": text, the reminder text, a script template ("Put {param1} counters ...")
+//  - "rules":    text, an explanation of the keyword (not drawn)
+//  - "mode":     choice, one of the Game's keyword modes
+// Every change to a keyword, and adding and removing one, is one undo step and reports the cards
+// whose text changed with it as stale. Changing a Game keyword is an InvalidArgument.
+
+struct KeywordInfo {
+  KeywordId   id = 0;      ///< stays the same for this keyword while the session is open (also when it is removed and put back)
+  std::string keyword;     ///< the name, e.g. "Charge"
+  std::string match;       ///< as the desktop lists it: parameters shown as <type>, e.g. "Charge <number>"
+  std::string reminder;    ///< the reminder text script, e.g. "Put {param1} charge counters on this card."
+  std::string rules;
+  std::string mode;
+  std::vector<std::string> parameters; ///< the parameter types in the match, in order
+  bool        from_game = false; ///< a Game keyword: read-only
+  bool        valid = true;      ///< false if the match or the reminder text has an error
+  std::string reminder_error;    ///< why the last reminder text typed doesn't work (it is then not used), empty if it does
+  int         usage = 0;         ///< the number of cards using it
+};
+
+struct KeywordList : Result {
+  std::vector<KeywordInfo> keywords; ///< the Set's keywords in the Set's order, then the Game's
+};
+KeywordList listKeywords(SessionHandle session);
+
+struct KeywordResult : Result {
+  KeywordInfo keyword;
+};
+KeywordResult getKeyword(SessionHandle session, KeywordId keyword);
+
+struct KeywordModeInfo {
+  std::string name;
+  std::string description;
+  bool is_default = false; ///< the mode of new keywords
+};
+struct KeywordModeList : Result {
+  std::vector<KeywordModeInfo> modes; ///< the Game's keyword modes
+};
+KeywordModeList listKeywordModes(SessionHandle session);
+
+struct KeywordParamTypeInfo {
+  std::string name;        ///< what goes in <atom-param>, e.g. "number"
+  std::string description;
+  std::string placeholder; ///< shown in reminder text where the parameter is left out
+  std::string example;
+  bool optional = true;
+};
+struct KeywordParamTypeList : Result {
+  std::vector<KeywordParamTypeInfo> types; ///< the Game's keyword parameter types
+};
+KeywordParamTypeList listKeywordParamTypes(SessionHandle session);
+
+/// The fields of a new keyword (all optional)
+struct NewKeyword {
+  std::string keyword;
+  std::string match;    ///< tagged, as the "match" field
+  std::string reminder;
+  std::string rules;
+  std::string mode;     ///< empty: the Game's default mode
+};
+
+struct NewKeywordResult : ActionResult {
+  KeywordId id = 0;
+};
+
+/// Add a keyword to the end of the Set's keywords, one undo step
+NewKeywordResult addKeyword(SessionHandle session, const NewKeyword& keyword = NewKeyword());
+
+/// Remove one of the Set's keywords, one undo step (undo puts it back with the same id)
+ActionResult removeKeyword(SessionHandle session, KeywordId keyword);
+
+/// Replace [start, end) of a keyword's "match" with a parameter of the given type, one undo step.
+/** Positions are as for replaceRange. */
+TextResult insertKeywordParameter(SessionHandle session, KeywordId keyword, int start, int end, const std::string& param_type);
 
 // ----------------------------------------------------------------------------- : Undo
 
