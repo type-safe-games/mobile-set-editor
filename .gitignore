@@ -29,3 +29,12 @@
 # put a pack in templates/ by hand, e.g. templates/Full-Magic-Pack
 /templates/
 __pycache__/
+
+# Agent and planning tooling is private (ADR 0008, #51). It is tracked in the private
+# admin/mse-agent-tooling repo, overlaid on this tree from .tooling.git (see `git tooling`).
+/.tooling.git/
+/CLAUDE.md
+/AGENTS.md
+/docs/agents/
+/.claude/
+/prototypes/
