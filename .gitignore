@@ -24,3 +24,6 @@
 /.serena/
 /.claude/worktrees/
 /.claude/settings.local.json
+
+# Private golden corpus beside the template pack (ADR 0008, ADR 0010)
+/templates/goldens/
