@@ -10,6 +10,7 @@
 
 #include <util/prec.hpp>
 #include <util/tagged_string.hpp> // for Movement
+#include <data/text_editing.hpp> // for IndexType, TextSelection
 #include <gui/value/editor.hpp>
 #include <render/value/text.hpp>
 
@@ -18,11 +19,6 @@ DECLARE_POINTER_TYPE(WordListPos);
 DECLARE_SHARED_POINTER_TYPE(DropDownWordList);
 
 // ----------------------------------------------------------------------------- : TextValueEditor
-
-enum IndexType
-{  TYPE_CURSOR  ///< Positions are cursor positions
-,  TYPE_INDEX  ///< Positions are character indices
-};
 
 /// An editor 'control' for editing TextValues
 /** Okay, this class responds to pretty much every event available... :)
@@ -112,6 +108,10 @@ private:
   vector<WordListPosP> word_lists;           ///< Word lists in the text
   
   // --------------------------------------------------- : Selection / movement
+  
+  /// The selection as one value, for the typing logic in data/text_editing.hpp
+  TextSelection selection() const;
+  void setSelection(const TextSelection& sel);
   
   /// Move the selection to a new location, clears the previously drawn selection.
   /** t specifies what kind of position new_end is */

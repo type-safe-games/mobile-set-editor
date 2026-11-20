@@ -167,9 +167,8 @@ public:
   virtual StyleP clone() const = 0;
   
   /// Make a viewer object for values using this style
+  /** (Editors are made by the desktop GUI: make_value_editor in gui/value/editor.hpp) */
   virtual ValueViewerP makeViewer(DataViewer& parent) = 0;
-  /// Make an editor object for values using this style
-  virtual ValueViewerP makeEditor(DataEditor& parent) = 0;
   
   /// Update scripted values of this style, return nonzero if anything has changed.
   /** The caller should tellListeners()
@@ -330,8 +329,7 @@ inline String type_name(const Value&) {
   public: \
     DECLARE_HAS_FIELD(Type) \
     StyleP clone() const override; \
-    ValueViewerP makeViewer(DataViewer& parent) override; \
-    ValueViewerP makeEditor(DataEditor& parent) override
+    ValueViewerP makeViewer(DataViewer& parent) override
 
 #define DECLARE_VALUE_TYPE(Type,ValueType_) \
     DECLARE_REFLECTION_OVERRIDE(); \

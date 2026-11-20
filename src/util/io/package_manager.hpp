@@ -63,6 +63,7 @@ class PackageDirectory {
 public:
   void init(bool local);
   void init(const String& dir);
+  inline void init(const String& dir, bool local) { is_local = local; init(dir); }
 
   void deleteEmptyFolders();
 
@@ -117,6 +118,11 @@ class PackageManager {
 public:
   /// Initialize the package manager
   void init();
+  /// Initialize the package manager with given directories, instead of the desktop locations.
+  /** templates_dir: where the user's Templates are installed (the local data directory);
+   *  program_data_dir: the program's own data (e.g. locales), may be empty.
+   *  Unlike init(), empty folders are left alone, and at least one directory must exist. */
+  void init(const String& templates_dir, const String& program_data_dir);
   /// Empty the list of packages.
   /** This function MUST be called before the program terminates, otherwise
    *  we could get into fights with pool allocators used by ScriptValues */

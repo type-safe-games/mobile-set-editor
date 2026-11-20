@@ -37,6 +37,14 @@ void PackageManager::init() {
   if (local.valid())  font_registry().addTemplateDirectory(local.getDirectory());
   if (global.valid()) font_registry().addTemplateDirectory(global.getDirectory());
 }
+void PackageManager::init(const String& templates_dir, const String& program_data_dir) {
+  local.init(templates_dir);
+  global.init(program_data_dir);
+  if (!(local.valid() || global.valid()))
+    throw Error(_("The template directory can not be found: ") + templates_dir);
+  if (local.valid())  font_registry().addTemplateDirectory(local.getDirectory());
+  if (global.valid()) font_registry().addTemplateDirectory(global.getDirectory());
+}
 void PackageManager::destroy() {
   loaded_packages.clear();
 }

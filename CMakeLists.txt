@@ -77,15 +77,40 @@ include_directories("${PROJECT_SOURCE_DIR}/src")
 include_directories(${Boost_INCLUDE_DIRS})
 include_directories(${HUNSPELL_INCLUDE_DIRS})
 
+# The core: everything under src/ except the desktop program (gui/, cli/, main.cpp) and the
+# facade. An object library, so every object file (and its static initialisers) goes into each
+# program that uses it, exactly as when the core was compiled into the executable.
+
+file(GLOB_RECURSE core_sources src/*.cpp)
+list(FILTER core_sources EXCLUDE REGEX "/src/(gui|cli|facade)/")
+list(FILTER core_sources EXCLUDE REGEX "/src/main\\.cpp$")
+add_library(mse_core OBJECT ${core_sources})
+target_link_libraries(mse_core PUBLIC wxWidgets::wxWidgets Boost::regex Boost::json MINIZIP::minizip ${HUNSPELL_LIBRARIES})
+target_precompile_headers(mse_core PRIVATE src/util/prec.hpp)
+
+# The wx-free facade over the core (ADR 0006, ADR 0009). Its public header uses only std types;
+# a host (the desktop test host below, later Android) installs the drawing and image backends.
+
+file(GLOB facade_sources src/facade/*.cpp)
+add_library(mse_facade OBJECT ${facade_sources})
+target_link_libraries(mse_facade PUBLIC mse_core)
+target_precompile_headers(mse_facade REUSE_FROM mse_core)
+
 # Magic Set Editor executable
 
 add_executable(magicseteditor WIN32)
-target_link_libraries(${PROJECT_NAME} PRIVATE wxWidgets::wxWidgets Boost::regex Boost::json MINIZIP::minizip ${HUNSPELL_LIBRARIES})
+target_link_libraries(${PROJECT_NAME} PRIVATE mse_core)
 
-file(GLOB_RECURSE sources src/*.cpp)
+file(GLOB_RECURSE sources src/gui/*.cpp src/cli/*.cpp)
 list(FILTER sources EXCLUDE REGEX win32_cli_wrapper.cpp)
-target_sources(magicseteditor PRIVATE ${sources})
-target_precompile_headers(magicseteditor PRIVATE src/util/prec.hpp)
+target_sources(magicseteditor PRIVATE ${sources} src/main.cpp)
+target_precompile_headers(magicseteditor REUSE_FROM mse_core)
+
+# Headless tests of the facade, on a desktop host that installs the wx backends (test/tests.cmake)
+
+add_executable(facade_tests test/facade/facade_tests.cpp src/facade/desktop/desktop_host.cpp)
+target_link_libraries(facade_tests PRIVATE mse_facade mse_core)
+target_precompile_headers(facade_tests REUSE_FROM mse_core)
 
 configure_file(src/config.hpp.in src/config.hpp)
 

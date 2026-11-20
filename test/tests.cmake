@@ -46,3 +46,13 @@ add_test(
           -P ${test_dir}/run_cli.cmake
 )
 set_tests_properties(layout-dump PROPERTIES ENVIRONMENT "${fixture_env}")
+
+# The facade (ADR 0009), headless on the desktop host, against the fixture. Renders are also compared
+# with the fixture's Golden images when the private goldens are there (ADR 0008, ADR 0010).
+set(FIXTURE_GOLDENS_DIR "${PROJECT_SOURCE_DIR}/templates/goldens/images/fixture/fixture-cards"
+    CACHE PATH "Golden images of the Test fixture (optional)")
+add_test(
+  NAME facade
+  COMMAND facade_tests ${test_dir}/fixture ${PROJECT_BINARY_DIR}/test-output/facade ${FIXTURE_GOLDENS_DIR}
+)
+set_tests_properties(facade PROPERTIES ENVIRONMENT "${fixture_env}")

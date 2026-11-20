@@ -197,6 +197,47 @@ String card_layout_dump(const SetP& set, const CardP& card) {
   return out;
 }
 
+// ----------------------------------------------------------------------------- : Rendering for a host
+
+/// The export viewer at any zoom, with access to its value viewers after drawing
+class RegionDataViewer : public ZoomedUnrotatedDataViewer {
+public:
+  RegionDataViewer(double zoom) : ZoomedUnrotatedDataViewer(zoom) {}
+  const vector<ValueViewerP>& getViewers() const { return viewers; }
+};
+
+RealSize card_render_size(const SetP& set, const CardP& card) {
+  if (!set) throw Error(_("no set"));
+  if (!card) throw Error(_("no card"));
+  RegionDataViewer viewer(1.0);
+  viewer.setSet(set);
+  viewer.setCard(card);
+  return viewer.getRotation().getExternalSize();
+}
+
+void render_card(const SetP& set, const CardP& card, Canvas& canvas, double zoom, vector<CardFieldRegion>* regions) {
+  if (!set) throw Error(_("no set"));
+  if (!card) throw Error(_("no card"));
+  RegionDataViewer viewer(zoom);
+  viewer.setSet(set);
+  viewer.setCard(card);
+  viewer.draw(canvas);
+  if (!regions) return;
+  // the regions as this drawing pass laid them out, in drawing (z) order
+  regions->clear();
+  for (const ValueViewerP& v : viewer.getViewers()) {
+    if (!v->isVisible()) continue;
+    const Style& style = *v->getStyle();
+    CardFieldRegion r;
+    r.field    = style.fieldP->name;
+    r.rect     = RealRect(style.left * zoom, style.top * zoom, style.width * zoom, style.height * zoom);
+    r.angle    = style.angle;
+    r.z_index  = style.z_index;
+    r.editable = style.fieldP->editable;
+    regions->push_back(r);
+  }
+}
+
 // ----------------------------------------------------------------------------- : Stitching faces
 
 /// Paste images side by side onto one transparent canvas, and report the x offset of each.
@@ -265,12 +306,12 @@ static Image render_row(const SetP& set, const vector<ExportPart>& parts, int pa
 
 // ----------------------------------------------------------------------------- : Image export
 
-Image export_image(const SetP& set, const CardP& card, bool write_metadata, const Settings::ExportSettings& card_settings) {
+Image export_image(const SetP& set, const CardP& card, bool write_metadata, const Settings::ExportSettings& card_settings, bool other_face_same_settings) {
   if (!set) throw Error(_("no set"));
   // this card, plus its other face if card_settings ask for it
   vector<CardP> cards{card};
   SettingsFor settings_for = [&](const CardP& c) -> Settings::ExportSettings {
-    return c == card ? card_settings : settings.exportSettingsFor(set->stylesheetFor(c));
+    return c == card || other_face_same_settings ? card_settings : settings.exportSettingsFor(set->stylesheetFor(c));
   };
   ExportGroup group = group_faces(set, cards, settings_for).front();
   return render_row(set, group, DEFAULT_FACE_PADDING, write_metadata);

@@ -1,0 +1,686 @@
+// Mobile Set Editor - headless tests of the facade on the desktop host
+// SPDX-License-Identifier: GPL-3.0-or-later
+//
+// Usage: facade_tests <fixture dir> <work dir> [<fixture goldens dir>]
+//
+// Runs the facade (ADR 0009) against the Test fixture (ADR 0008) with the wx backends of the
+// desktop host. GTK needs a display: run under xvfb-run, as ctest does. When the private fixture
+// goldens are there (templates/goldens/images/fixture/fixture-cards), renders are also compared
+// with them; otherwise only with the core's own export.
+//
+// The tests talk to the facade only; core headers are used just to decode PNGs and build a zip.
+
+#include <util/prec.hpp>
+#include <facade/facade.hpp>
+#include <facade/desktop/desktop_host.hpp>
+#include <data/text_editing.hpp>
+#include <gfx/image_codec.hpp>
+#include <util/io/zip.hpp>
+#include <util/thread.hpp>
+#include <cstdio>
+#include <fcntl.h>
+#include <unistd.h>
+#include <filesystem>
+#include <fstream>
+#include <functional>
+#include <thread>
+
+namespace F = mse::facade;
+namespace fs = std::filesystem;
+
+// ----------------------------------------------------------------------------- : Test runner
+
+static int failures = 0;
+static int checks = 0;
+static std::string current_test;
+
+static void report_failure(const char* file, int line, const std::string& what) {
+  ++failures;
+  std::fprintf(stderr, "FAIL [%s] %s:%d: %s\n", current_test.c_str(), file, line, what.c_str());
+}
+
+#define CHECK(cond) do { ++checks; if (!(cond)) report_failure(__FILE__, __LINE__, #cond); } while (0)
+#define CHECK_EQ(a, b) do { ++checks; auto&& a_ = (a); auto&& b_ = (b); \
+    if (!(a_ == b_)) report_failure(__FILE__, __LINE__, std::string(#a " == " #b) + " (" + to_s(a_) + " vs " + to_s(b_) + ")"); } while (0)
+#define CHECK_OK(r) do { ++checks; const auto& r_ = (r); \
+    if (!r_.ok()) report_failure(__FILE__, __LINE__, std::string(#r) + " failed: status " + std::to_string((int)r_.status) + ": " + r_.error); } while (0)
+#define REQUIRE_OK(r) do { const auto& r_ = (r); ++checks; \
+    if (!r_.ok()) { report_failure(__FILE__, __LINE__, std::string(#r) + " failed: status " + std::to_string((int)r_.status) + ": " + r_.error); return; } } while (0)
+
+static std::string to_s(const std::string& s) { return "\"" + s + "\""; }
+static std::string to_s(const char* s) { return to_s(std::string(s)); }
+template <typename T> static std::string to_s(const T& x) {
+  if constexpr (std::is_enum_v<T>) return std::to_string((int)x);
+  else return std::to_string(x);
+}
+
+struct TestCase { const char* name; std::function<void()> run; };
+static std::vector<TestCase>& tests() { static std::vector<TestCase> t; return t; }
+struct Register { Register(const char* name, std::function<void()> f) { tests().push_back({name, f}); } };
+#define TEST(name) static void test_##name(); static Register reg_##name(#name, test_##name); static void test_##name()
+
+// ----------------------------------------------------------------------------- : Environment
+
+static fs::path fixture_dir, work_dir, goldens_dir;
+static fs::path templates_dir, font_store_dir;
+static int session_counter = 0;
+
+static fs::path fixture_set() { return fixture_dir / "sets" / "fixture-cards.mse-set"; }
+
+/// A new session on the fixture set, with its own working copy
+static F::SessionHandle open_fixture() {
+  fs::path work = work_dir / "sessions" / ("s" + std::to_string(++session_counter) + ".mse-set");
+  F::OpenResult r = F::openSession(fixture_set().string(), work.string());
+  if (!r.ok()) {
+    report_failure(__FILE__, __LINE__, "openSession: " + r.error);
+    return 0;
+  }
+  return r.session;
+}
+
+static std::string read_text(const fs::path& p) {
+  std::ifstream in(p, std::ios::binary);
+  return std::string(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+}
+
+static bool decode_png(const std::vector<std::uint8_t>& data, Image& out) {
+  return image_codec().decode(data.data(), data.size(), out);
+}
+
+static bool has_message(const F::Result& r, const std::string& part) {
+  for (const F::Message& m : r.messages) if (m.text.find(part) != std::string::npos) return true;
+  return false;
+}
+
+static const F::CardInfo* find_card(const F::CardList& list, const std::string& uid) {
+  for (const F::CardInfo& c : list.cards) if (c.uid == uid) return &c;
+  return nullptr;
+}
+
+static bool contains(const std::vector<std::string>& v, const std::string& x) {
+  return std::find(v.begin(), v.end(), x) != v.end();
+}
+
+// ----------------------------------------------------------------------------- : Sessions and cards
+
+TEST(open_and_list_cards) {
+  F::SessionHandle s = open_fixture();
+  F::CardList cards = F::listCards(s);
+  REQUIRE_OK(cards);
+  CHECK_EQ(cards.cards.size(), (size_t)3);
+  CHECK_EQ(cards.cards[0].uid, "fixture-wrap");
+  CHECK_EQ(cards.cards[0].name, "Long Wrapping Text");
+  CHECK_EQ(cards.cards[1].uid, "fixture-front");
+  CHECK_EQ(cards.cards[2].uid, "fixture-back");
+  CHECK_EQ(cards.cards[1].links.size(), (size_t)1);
+  if (!cards.cards[1].links.empty()) {
+    CHECK_EQ(cards.cards[1].links[0].uid, "fixture-back");
+    CHECK_EQ(cards.cards[1].links[0].relation, "Back Face");
+  }
+  F::SessionInfo info = F::sessionInfo(s);
+  CHECK_OK(info);
+  CHECK_EQ(info.game, "fixture.mse-game");
+  CHECK_EQ(info.stylesheet, "fixture-standard.mse-style");
+  CHECK(!info.dirty);
+  CHECK(!info.can_undo);
+  // the working copy was written as a directory
+  CHECK(fs::exists(work_dir / "sessions" / ("s" + std::to_string(session_counter) + ".mse-set") / "set"));
+  F::FieldList fields = F::listFields(s, F::Target::card("fixture-wrap"));
+  CHECK_OK(fields);
+  bool has_rules = false;
+  for (const F::FieldInfo& f : fields.fields) {
+    if (f.name == "rules") { has_rules = true; CHECK_EQ(f.type, "text"); CHECK(f.multi_line); }
+    if (f.name == "frame") { CHECK_EQ(f.type, "choice"); CHECK(contains(f.choices, "blue")); }
+  }
+  CHECK(has_rules);
+  CHECK_OK(F::closeSession(s));
+  CHECK_EQ(F::listCards(s).status, F::Status::NotFound);
+}
+
+// ----------------------------------------------------------------------------- : Rendering
+
+TEST(render_matches_export_layout_and_goldens) {
+  F::SessionHandle s = open_fixture();
+  F::CardList cards = F::listCards(s);
+  REQUIRE_OK(cards);
+  bool have_goldens = !goldens_dir.empty() && fs::exists(goldens_dir / "0.json");
+  if (!have_goldens) std::printf("  (no fixture goldens at '%s': comparing with the core's export only)\n", goldens_dir.string().c_str());
+  for (size_t i = 0 ; i < cards.cards.size() ; ++i) {
+    const std::string& uid = cards.cards[i].uid;
+    F::CardSize size = F::cardSize(s, uid);
+    REQUIRE_OK(size);
+    CHECK_EQ(size.width, 300.0);
+    CHECK_EQ(size.height, 420.0);
+    int w = (int)size.width, h = (int)size.height, stride = w * 4 + 8; // padded rows
+    std::vector<std::uint8_t> buf((size_t)stride * h, 0x55);
+    F::RenderResult r = F::renderCard(s, uid, buf.data(), w, h, stride);
+    REQUIRE_OK(r);
+    CHECK(r.messages.empty());
+    // regions: from the same pass as the layout dump
+    F::TextOutput dump = F::layoutDump(s, uid);
+    REQUIRE_OK(dump);
+    size_t visible_in_dump = 0;
+    for (size_t p = dump.text.find("\"visible\": true") ; p != std::string::npos ; p = dump.text.find("\"visible\": true", p + 1)) ++visible_in_dump;
+    CHECK_EQ(r.regions.size(), visible_in_dump);
+    bool has_rules = false;
+    int last_z = -1000000;
+    for (const F::FieldRegion& fr : r.regions) {
+      CHECK(dump.text.find("\"name\": \"" + fr.field + "\"") != std::string::npos);
+      CHECK(fr.z >= last_z); // drawing order
+      last_z = fr.z;
+      CHECK(fr.x >= 0 && fr.y >= 0 && fr.x + fr.width <= w + 0.5 && fr.y + fr.height <= h + 0.5);
+      if (fr.field == "rules") { has_rules = true; CHECK(fr.editable); CHECK(fr.width > 0 && fr.height > 0); }
+    }
+    CHECK(has_rules);
+    // the pixels are those of the desktop's export at zoom 1 (which made the goldens)
+    F::ExportOptions plain;
+    plain.zoom = 1.0; plain.angle_degrees = 0; plain.bleed = false; plain.both_faces = false; plain.metadata = false;
+    F::BytesResult png = F::exportCardImage(s, uid, plain);
+    REQUIRE_OK(png);
+    Image exported;
+    CHECK(decode_png(png.data, exported));
+    CHECK_EQ(exported.GetWidth(), w);
+    CHECK_EQ(exported.GetHeight(), h);
+    if (exported.GetWidth() == w && exported.GetHeight() == h) {
+      size_t differ = 0;
+      for (int y = 0 ; y < h ; ++y) for (int x = 0 ; x < w ; ++x) {
+        const Byte* e = exported.GetData() + 3 * ((size_t)y * w + x);
+        const std::uint8_t* p = buf.data() + (size_t)y * stride + 4 * x;
+        if (e[0] != p[0] || e[1] != p[1] || e[2] != p[2] || p[3] != 255) ++differ;
+      }
+      CHECK_EQ(differ, (size_t)0);
+    }
+    // the padding at the end of each row is untouched
+    CHECK_EQ(buf[(size_t)stride - 1], 0x55);
+    if (have_goldens) {
+      std::string n = std::to_string(i);
+      CHECK_EQ(dump.text, read_text(goldens_dir / (n + ".json")));
+      std::string golden_png = read_text(goldens_dir / (n + ".png"));
+      Image golden;
+      CHECK(image_codec().decode(golden_png.data(), golden_png.size(), golden));
+      if (golden.GetWidth() == w && golden.GetHeight() == h) {
+        size_t differ = 0;
+        for (int y = 0 ; y < h ; ++y) for (int x = 0 ; x < w ; ++x) {
+          const Byte* g = golden.GetData() + 3 * ((size_t)y * w + x);
+          const std::uint8_t* p = buf.data() + (size_t)y * stride + 4 * x;
+          if (g[0] != p[0] || g[1] != p[1] || g[2] != p[2]) ++differ;
+        }
+        CHECK_EQ(differ, (size_t)0);
+      } else {
+        report_failure(__FILE__, __LINE__, "golden image has another size");
+      }
+    }
+    // at half size the regions scale with it
+    std::vector<std::uint8_t> half((size_t)(w / 2) * 4 * (h / 2));
+    F::RenderResult rh = F::renderCard(s, uid, half.data(), w / 2, h / 2, (w / 2) * 4);
+    CHECK_OK(rh);
+    CHECK_EQ(rh.regions.size(), r.regions.size());
+    for (size_t k = 0 ; k < rh.regions.size() && k < r.regions.size() ; ++k) {
+      CHECK(std::abs(rh.regions[k].x * 2 - r.regions[k].x) < 1e-6);
+      CHECK(std::abs(rh.regions[k].width * 2 - r.regions[k].width) < 1e-6);
+    }
+  }
+  // a bad buffer is an error, not a crash
+  CHECK_EQ(F::renderCard(s, "fixture-wrap", nullptr, 300, 420, 1200).status, F::Status::InvalidArgument);
+  std::vector<std::uint8_t> small(16);
+  CHECK_EQ(F::renderCard(s, "fixture-wrap", small.data(), 300, 420, 100).status, F::Status::InvalidArgument);
+  CHECK_EQ(F::renderCard(s, "no-such-card", small.data(), 1, 1, 4).status, F::Status::NotFound);
+  F::closeSession(s);
+}
+
+// ----------------------------------------------------------------------------- : Text editing
+
+TEST(replace_range_typing_merges_into_one_undo_step) {
+  F::SessionHandle s = open_fixture();
+  F::Target card = F::Target::card("fixture-wrap");
+  F::TextResult t = F::getText(s, card, "name");
+  REQUIRE_OK(t);
+  CHECK_EQ(t.text, "Long Wrapping Text");
+  int n = (int)t.text.size();
+  CHECK_EQ(t.selection_end, n);
+  // three keystrokes at the caret
+  F::TextResult r1 = F::replaceRange(s, card, "name", n, n, "X");
+  REQUIRE_OK(r1);
+  CHECK_EQ(r1.selection_end, n + 1);
+  CHECK(r1.can_undo);
+  CHECK_EQ(r1.undo_name, "Typing");
+  F::TextResult r2 = F::replaceRange(s, card, "name", r1.selection_end, r1.selection_end, "Y");
+  F::TextResult r3 = F::replaceRange(s, card, "name", r2.selection_end, r2.selection_end, "Z");
+  REQUIRE_OK(r3);
+  CHECK_EQ(r3.text, "Long Wrapping TextXYZ");
+  CHECK_EQ(r3.selection_start, n + 3);
+  CHECK_EQ(r3.selection_end, n + 3);
+  // one undo step takes all three away
+  F::ActionResult u = F::undo(s);
+  REQUIRE_OK(u);
+  CHECK(!u.can_undo);
+  CHECK(u.can_redo);
+  CHECK_EQ(F::getText(s, card, "name").text, "Long Wrapping Text");
+  CHECK_OK(F::redo(s));
+  CHECK_EQ(F::getText(s, card, "name").text, "Long Wrapping TextXYZ");
+  // two backspaces merge too
+  F::TextResult b1 = F::replaceRange(s, card, "name", n + 2, n + 3, "");
+  F::TextResult b2 = F::replaceRange(s, card, "name", b1.selection_end - 1, b1.selection_end, "");
+  REQUIRE_OK(b2);
+  CHECK_EQ(b2.text, "Long Wrapping TextX");
+  CHECK_EQ(b2.undo_name, "Backspace");
+  CHECK_OK(F::undo(s));
+  CHECK_EQ(F::getText(s, card, "name").text, "Long Wrapping TextXYZ");
+  // typing somewhere else is a new step
+  F::replaceRange(s, card, "name", 0, 0, "A");
+  F::TextResult other = F::replaceRange(s, card, "name", 10, 10, "B");
+  CHECK_EQ(other.text, "ALong WrapBping TextXYZ");
+  CHECK_OK(F::undo(s));
+  CHECK_EQ(F::getText(s, card, "name").text, "ALong Wrapping TextXYZ");
+  // replacing a selection
+  F::TextResult sel = F::replaceRange(s, card, "name", 1, 5, "Short");
+  CHECK_EQ(sel.text, "AShort Wrapping TextXYZ");
+  CHECK_EQ(sel.selection_end, 6);
+  // out of range positions are clamped; a single-line field drops newlines
+  F::TextResult clamp = F::replaceRange(s, card, "name", 1000, 1000, "!\n");
+  CHECK_OK(clamp);
+  CHECK_EQ(clamp.text, "AShort Wrapping TextXYZ!");
+  CHECK_EQ(F::replaceRange(s, card, "name", -1, 0, "x").status, F::Status::InvalidArgument);
+  F::closeSession(s);
+}
+
+TEST(replace_range_symbols_and_auto_replace) {
+  F::SessionHandle s = open_fixture();
+  F::Target card = F::Target::card("fixture-front");
+  F::TextResult t = F::getText(s, card, "rules");
+  REQUIRE_OK(t);
+  CHECK_EQ(t.text, "Transform: pay U.");
+  // as a symbol
+  int n = (int)t.text.size();
+  F::TextResult sym = F::replaceRange(s, card, "rules", n, n, "R", true);
+  REQUIRE_OK(sym);
+  CHECK_EQ(sym.text, "Transform: pay U.R");
+  CHECK_EQ(F::getValue(s, card, "rules").value, "Transform: pay <sym>U</sym>.<sym>R</sym>");
+  // auto replace with the host's rules, not the global settings
+  F::AutoReplaceSettings ar;
+  ar.rules.push_back(F::AutoReplaceRule{"teh", "the", true, true});
+  CHECK_OK(F::setAutoReplace(s, ar));
+  F::AutoReplaceResult got = F::getAutoReplace(s);
+  CHECK_EQ(got.settings.rules.size(), (size_t)1);
+  F::Target name = F::Target::card("fixture-front");
+  F::TextResult r = F::getText(s, name, "name");
+  int pos = (int)r.text.size();
+  for (const char* c : {" ", "t", "e", "h"}) {
+    r = F::replaceRange(s, name, "name", pos, pos, c);
+    pos = r.selection_end;
+  }
+  CHECK_EQ(r.text, "Front Face the");
+  CHECK_EQ(r.selection_end, (int)r.text.size());
+  // disabled: no replacing
+  ar.enabled = false;
+  CHECK_OK(F::setAutoReplace(s, ar));
+  for (const char* c : {" ", "t", "e", "h"}) {
+    r = F::replaceRange(s, name, "name", pos, pos, c);
+    pos = r.selection_end;
+  }
+  CHECK_EQ(r.text, "Front Face the teh");
+  // not a text field
+  CHECK_EQ(F::replaceRange(s, card, "frame", 0, 0, "x").status, F::Status::InvalidArgument);
+  F::closeSession(s);
+}
+
+TEST(visible_text_and_separators) {
+  // the core side of replaceRange's positions: atoms show as their contents and are locked
+  VisibleText vt = visible_text(_("a<sep> - </sep>b<atom-reminder>(x)</atom-reminder>"));
+  CHECK(vt.text == _("a - b(x)"));
+  CHECK_EQ(vt.locked.size(), (size_t)2);
+  CHECK_EQ(vt.toCursor(0), (size_t)0);
+  CHECK_EQ(vt.toCursor(1), (size_t)1);
+  CHECK_EQ(vt.toCursor(2), (size_t)1); // inside the separator: nearest edge
+  CHECK_EQ(vt.toCursor(3), (size_t)2);
+  CHECK_EQ(vt.toCursor(4), (size_t)2);
+  CHECK_EQ(vt.toCursor(5), (size_t)3);
+  CHECK_EQ(vt.toVisible(3), (size_t)5);
+  // a selection never crosses a separator
+  String value = _("ab<sep> - </sep>cd");
+  TextSelection sel;
+  sel.start = 1; sel.end = 4;
+  fix_text_selection(value, sel);
+  CHECK_EQ(sel.end, (size_t)2);
+}
+
+// ----------------------------------------------------------------------------- : Undo and dirty
+
+TEST(undo_redo_and_dirty_flag) {
+  F::SessionHandle s = open_fixture();
+  F::Target card = F::Target::card("fixture-back");
+  CHECK(!F::sessionInfo(s).dirty);
+  F::ActionResult a = F::setValue(s, card, "frame", "red");
+  REQUIRE_OK(a);
+  CHECK(a.dirty);
+  CHECK_EQ(F::getValue(s, card, "frame").value, "red");
+  // saving to a file descriptor makes it clean
+  fs::path out = work_dir / "dirty.mse-set";
+  int fd = ::open(out.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
+  CHECK(fd >= 0);
+  F::ActionResult saved = F::saveTo(s, fd);
+  ::close(fd);
+  REQUIRE_OK(saved);
+  CHECK(!saved.dirty);
+  F::ActionResult u = F::undo(s);
+  CHECK(u.dirty);
+  CHECK_EQ(F::getValue(s, card, "frame").value, "grey");
+  F::ActionResult r = F::redo(s);
+  CHECK(!r.dirty);
+  CHECK_EQ(F::getValue(s, card, "frame").value, "red");
+  CHECK_EQ(F::redo(s).status, F::Status::InvalidArgument); // nothing to redo
+  // autosave writes the working copy
+  CHECK_OK(F::flush(s));
+  CHECK(read_text(work_dir / "sessions" / ("s" + std::to_string(session_counter) + ".mse-set") / "set").find("frame: red") != std::string::npos);
+  F::closeSession(s);
+}
+
+// ----------------------------------------------------------------------------- : Stale cards
+
+TEST(stale_cards) {
+  F::SessionHandle s = open_fixture();
+  F::ActionResult a = F::setValue(s, F::Target::card("fixture-wrap"), "level", "1");
+  REQUIRE_OK(a);
+  CHECK(!a.stale.all);
+  CHECK(contains(a.stale.card_uids, "fixture-wrap"));
+  CHECK(!contains(a.stale.card_uids, "fixture-back"));
+  F::TextResult t = F::replaceRange(s, F::Target::card("fixture-back"), "rules", 0, 0, "X");
+  CHECK(!t.stale.all);
+  CHECK(contains(t.stale.card_uids, "fixture-back"));
+  F::ActionResult u = F::undo(s);
+  CHECK(contains(u.stale.card_uids, "fixture-back"));
+  // set info is on every card
+  F::ActionResult set_info = F::setValue(s, F::Target::set(), "title", "Another title");
+  REQUIRE_OK(set_info);
+  CHECK(set_info.stale.all);
+  CHECK_EQ(F::getValue(s, F::Target::set(), "title").value, "Another title");
+  CHECK(F::undo(s).stale.all);
+  F::closeSession(s);
+}
+
+// ----------------------------------------------------------------------------- : Linked cards
+
+TEST(link_and_unlink_are_one_undo_step_each) {
+  F::SessionHandle s = open_fixture();
+  F::LinkTypeList types = F::listLinkTypes(s);
+  REQUIRE_OK(types);
+  CHECK(!types.types.empty());
+  if (!types.types.empty()) {
+    CHECK_EQ(types.types[0].selected, "Front Face");
+    CHECK_EQ(types.types[0].linked, "Back Face");
+  }
+  F::ActionResult l = F::link(s, "fixture-wrap", "fixture-back", "Front Face", "Back Face");
+  REQUIRE_OK(l);
+  CHECK(contains(l.stale.card_uids, "fixture-wrap"));
+  CHECK(contains(l.stale.card_uids, "fixture-back"));
+  F::CardList cards = F::listCards(s);
+  const F::CardInfo* wrap = find_card(cards, "fixture-wrap");
+  const F::CardInfo* back = find_card(cards, "fixture-back");
+  CHECK(wrap && wrap->links.size() == 1 && wrap->links[0].uid == "fixture-back" && wrap->links[0].relation == "Back Face");
+  CHECK(back && back->links.size() == 2 && back->links[1].uid == "fixture-wrap" && back->links[1].relation == "Front Face");
+  // one undo step
+  F::ActionResult u = F::undo(s);
+  CHECK(!u.can_undo);
+  cards = F::listCards(s);
+  CHECK(find_card(cards, "fixture-wrap")->links.empty());
+  CHECK_EQ(find_card(cards, "fixture-back")->links.size(), (size_t)1);
+  // unlink the fixture's own pair, one undo step
+  F::ActionResult ul = F::unlink(s, "fixture-front", "fixture-back");
+  REQUIRE_OK(ul);
+  cards = F::listCards(s);
+  CHECK(find_card(cards, "fixture-front")->links.empty());
+  CHECK(find_card(cards, "fixture-back")->links.empty());
+  CHECK_OK(F::undo(s));
+  cards = F::listCards(s);
+  CHECK_EQ(find_card(cards, "fixture-front")->links.size(), (size_t)1);
+  CHECK_EQ(find_card(cards, "fixture-back")->links.size(), (size_t)1);
+  CHECK(!F::sessionInfo(s).can_undo);
+  // errors
+  CHECK_EQ(F::link(s, "fixture-wrap", "fixture-wrap", "a", "b").status, F::Status::InvalidArgument);
+  CHECK_EQ(F::unlink(s, "fixture-wrap", "fixture-back").status, F::Status::InvalidArgument);
+  F::closeSession(s);
+}
+
+// ----------------------------------------------------------------------------- : Saving
+
+TEST(save_to_fd_and_reopen) {
+  F::SessionHandle s = open_fixture();
+  CHECK_OK(F::setValue(s, F::Target::card("fixture-wrap"), "name", "Saved <b>Name</b>"));
+  CHECK_OK(F::link(s, "fixture-wrap", "fixture-back", "Front Face", "Back Face"));
+  fs::path out = work_dir / "saved.mse-set";
+  int fd = ::open(out.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
+  REQUIRE_OK(F::saveTo(s, fd));
+  ::close(fd);
+  CHECK(fs::file_size(out) > 0);
+  F::OpenResult again = F::openSession(out.string(), "");
+  REQUIRE_OK(again);
+  F::CardList a = F::listCards(s), b = F::listCards(again.session);
+  CHECK_EQ(a.cards.size(), b.cards.size());
+  for (size_t i = 0 ; i < a.cards.size() && i < b.cards.size() ; ++i) {
+    CHECK_EQ(a.cards[i].uid, b.cards[i].uid);
+    CHECK_EQ(a.cards[i].name, b.cards[i].name);
+    CHECK_EQ(a.cards[i].links.size(), b.cards[i].links.size());
+    for (const char* field : {"name", "rules", "frame", "level", "picture"}) {
+      CHECK_EQ(F::getValue(s, F::Target::card(a.cards[i].uid), field).value,
+               F::getValue(again.session, F::Target::card(b.cards[i].uid), field).value);
+    }
+  }
+  CHECK_EQ(F::getValue(again.session, F::Target::card("fixture-wrap"), "name").value, "Saved <b>Name</b>");
+  // the picture came along inside the zip
+  std::vector<std::uint8_t> buf(300 * 420 * 4);
+  CHECK_OK(F::renderCard(again.session, "fixture-wrap", buf.data(), 300, 420, 1200));
+  CHECK_EQ(F::saveTo(s, -1).status, F::Status::InvalidArgument);
+  F::closeSession(again.session);
+  F::closeSession(s);
+}
+
+// ----------------------------------------------------------------------------- : Export
+
+TEST(export_card_image) {
+  F::SessionHandle s = open_fixture();
+  F::BytesResult def = F::exportCardImage(s, "fixture-wrap");
+  REQUIRE_OK(def);
+  CHECK(def.data.size() > 8 && def.data[1] == 'P' && def.data[2] == 'N' && def.data[3] == 'G');
+  Image img;
+  CHECK(decode_png(def.data, img));
+  CHECK(img.GetWidth() >= 300);
+  // explicit settings
+  F::ExportOptions o;
+  o.zoom = 1.0; o.angle_degrees = 90; o.bleed = false; o.both_faces = false;
+  F::BytesResult rotated = F::exportCardImage(s, "fixture-wrap", o);
+  REQUIRE_OK(rotated);
+  CHECK(decode_png(rotated.data, img));
+  CHECK_EQ(img.GetWidth(), 420);
+  CHECK_EQ(img.GetHeight(), 300);
+  o.angle_degrees = 0; o.bleed = true; // 36 pixels at 300 dpi, the fixture is 150 dpi
+  F::BytesResult bled = F::exportCardImage(s, "fixture-wrap", o);
+  CHECK(decode_png(bled.data, img));
+  CHECK_EQ(img.GetWidth(), 300 + 2 * 18);
+  CHECK_EQ(img.GetHeight(), 420 + 2 * 18);
+  o.bleed = false; o.zoom = 2.0;
+  CHECK(decode_png(F::exportCardImage(s, "fixture-wrap", o).data, img));
+  CHECK_EQ(img.GetWidth(), 600);
+  // both faces of a linked pair side by side (2 pixels apart)
+  o.zoom = 1.0; o.both_faces = true;
+  CHECK(decode_png(F::exportCardImage(s, "fixture-back", o).data, img));
+  CHECK_EQ(img.GetWidth(), 2 * 300 + 2);
+  o.angle_degrees = 45;
+  CHECK_EQ(F::exportCardImage(s, "fixture-back", o).status, F::Status::InvalidArgument);
+  F::closeSession(s);
+}
+
+// ----------------------------------------------------------------------------- : Errors
+
+static fs::path copy_fixture_set(const std::string& name, const std::string& from, const std::string& to) {
+  fs::path dir = work_dir / name;
+  fs::remove_all(dir);
+  fs::copy(fixture_set(), dir, fs::copy_options::recursive);
+  std::string set = read_text(dir / "set");
+  size_t pos = set.find(from);
+  if (pos != std::string::npos) set.replace(pos, from.size(), to);
+  std::ofstream(dir / "set", std::ios::binary | std::ios::trunc) << set;
+  return dir;
+}
+
+TEST(missing_template_is_a_structured_error) {
+  fs::path dir = copy_fixture_set("missing-style.mse-set", "stylesheet: standard", "stylesheet: nonexistent");
+  F::OpenResult r = F::openSession(dir.string(), "");
+  CHECK_EQ(r.status, F::Status::MissingTemplate);
+  CHECK_EQ(r.missing_package, "fixture-nonexistent.mse-style");
+  CHECK_EQ(r.session, 0);
+  CHECK(has_message(r, "fixture-nonexistent"));
+  // the messages belonged to that call only
+  F::CardList next = F::listCards(12345);
+  CHECK(next.messages.empty());
+  fs::path dir2 = copy_fixture_set("missing-game.mse-set", "game: fixture", "game: nonexistent");
+  F::OpenResult r2 = F::openSession(dir2.string(), "");
+  CHECK_EQ(r2.status, F::Status::MissingTemplate);
+  CHECK_EQ(r2.missing_package, "nonexistent.mse-game");
+}
+
+TEST(messages_are_returned_per_call) {
+  F::SessionHandle s = open_fixture();
+  // an image that can't be read: the call fails with its own messages
+  F::ActionResult a = F::setValue(s, F::Target::card("fixture-wrap"), "picture", (work_dir / "no-such-image.png").string());
+  CHECK_EQ(a.status, F::Status::InvalidArgument);
+  // a call that queues a message: a broken script in a set value would; here, a corrupt set
+  fs::path dir = copy_fixture_set("corrupt.mse-set", "card:", "card:\n\tlevel: 3\n\tlevel\n<<<");
+  F::OpenResult r = F::openSession(dir.string(), "");
+  F::CardList after = F::listCards(s);
+  CHECK_OK(after);
+  CHECK(after.messages.empty());
+  if (r.ok()) F::closeSession(r.session);
+  F::closeSession(s);
+}
+
+TEST(no_exception_escapes) {
+  CHECK_EQ(F::listCards(999).status, F::Status::NotFound);
+  CHECK_EQ(F::undo(999).status, F::Status::NotFound);
+  F::SessionHandle s = open_fixture();
+  CHECK_EQ(F::getValue(s, F::Target::card("nope"), "name").status, F::Status::NotFound);
+  CHECK_EQ(F::getValue(s, F::Target::card("fixture-wrap"), "nope").status, F::Status::NotFound);
+  CHECK_EQ(F::undo(s).status, F::Status::InvalidArgument);
+  CHECK_EQ(F::openSession((work_dir / "nothing-here.mse-set").string(), "").status, F::Status::NotFound);
+  // a file that isn't a set
+  fs::path junk = work_dir / "junk.mse-set";
+  std::ofstream(junk, std::ios::binary) << "this is not a zip file";
+  F::OpenResult j = F::openSession(junk.string(), "");
+  CHECK(!j.ok());
+  CHECK(!j.error.empty());
+  // the working copy must not exist yet
+  fs::create_directories(work_dir / "existing.mse-set");
+  CHECK_EQ(F::openSession(fixture_set().string(), (work_dir / "existing.mse-set").string()).status, F::Status::InvalidArgument);
+  // calls from another thread are refused
+  F::Status other_thread = F::Status::Ok;
+  std::thread([&] { other_thread = F::listCards(s).status; }).join();
+  CHECK_EQ(other_thread, F::Status::WrongThread);
+  F::closeSession(s);
+}
+
+// ----------------------------------------------------------------------------- : Template import
+
+static void write_zip_entry(ZipWriter& zip, const std::string& name, const std::string& data) {
+  unique_ptr<OutputStream> out = zip.openEntry(decode_utf8(name));
+  out->write(data);
+  out->close();
+}
+
+static fs::path make_pack(const std::string& name, const std::string& version, const std::string& mse_version) {
+  fs::path zip_path = work_dir / name;
+  ZipWriter zip(decode_utf8(zip_path.string()));
+  fs::path src = fixture_dir / "data" / "fixture-symbols.mse-symbol-font";
+  std::string font = read_text(src / "symbol-font");
+  font.replace(font.find("version: 2026-11-19"), 19, "version: " + version);
+  font.replace(font.find("mse version: 2.6.0"), 18, "mse version: " + mse_version);
+  write_zip_entry(zip, "My Pack-main/data/imported-symbols.mse-symbol-font/symbol-font", font);
+  write_zip_entry(zip, "My Pack-main/data/imported-symbols.mse-symbol-font/red.png", read_text(src / "red.png"));
+  write_zip_entry(zip, "My Pack-main/data/imported-symbols.mse-symbol-font/blue.png", read_text(src / "blue.png"));
+  write_zip_entry(zip, "My Pack-main/Magic - Fonts/ImportedFont.ttf", read_text(fixture_dir / "fonts" / "DejaVuSans.ttf"));
+  write_zip_entry(zip, "My Pack-main/README.md", "ignored");
+  zip.close();
+  return zip_path;
+}
+
+/// importTemplates runs off the core thread
+static F::ImportResult import_on_thread(const fs::path& zip) {
+  F::ImportResult r;
+  std::thread([&] { r = F::importTemplates(zip.string()); }).join();
+  return r;
+}
+
+TEST(template_import) {
+  F::ImportResult r = import_on_thread(make_pack("pack1.zip", "2026-11-19", "2.6.0"));
+  REQUIRE_OK(r);
+  CHECK_EQ(r.packages.size(), (size_t)1);
+  if (r.packages.size() == 1) {
+    CHECK_EQ(r.packages[0].name, "imported-symbols.mse-symbol-font");
+    CHECK_EQ(r.packages[0].version, "2026-11-19");
+    CHECK(r.packages[0].outcome == F::ImportedPackage::Outcome::Installed);
+  }
+  CHECK(fs::exists(templates_dir / "imported-symbols.mse-symbol-font" / "red.png"));
+  CHECK_EQ(r.fonts.size(), (size_t)1);
+  CHECK(fs::exists(font_store_dir / "ImportedFont.ttf"));
+  // the same version again: skipped
+  r = import_on_thread(make_pack("pack2.zip", "2026-11-19", "2.6.0"));
+  CHECK(r.packages.size() == 1 && r.packages[0].outcome == F::ImportedPackage::Outcome::SkippedNotNewer);
+  CHECK(r.fonts.empty());
+  // newer: replaced
+  r = import_on_thread(make_pack("pack3.zip", "2026-12-01", "2.6.0"));
+  CHECK(r.packages.size() == 1 && r.packages[0].outcome == F::ImportedPackage::Outcome::Replaced);
+  CHECK(read_text(templates_dir / "imported-symbols.mse-symbol-font" / "symbol-font").find("2026-12-01") != std::string::npos);
+  // for a newer program: refused
+  r = import_on_thread(make_pack("pack4.zip", "2027-01-01", "99.0.0"));
+  CHECK(r.packages.size() == 1 && r.packages[0].outcome == F::ImportedPackage::Outcome::Failed);
+  // no temporary directories left behind
+  for (auto& e : fs::directory_iterator(templates_dir)) CHECK(e.path().filename().string()[0] != '.');
+  CHECK_OK(F::refreshTemplates());
+  // not a zip
+  CHECK_EQ(import_on_thread(work_dir / "junk.mse-set").status, F::Status::InvalidArgument);
+}
+
+// ----------------------------------------------------------------------------- : Main
+
+int main(int argc, char** argv) {
+  if (argc < 3) {
+    std::fprintf(stderr, "usage: %s <fixture dir> <work dir> [<fixture goldens dir>]\n", argv[0]);
+    return 2;
+  }
+  fixture_dir = fs::absolute(argv[1]);
+  work_dir    = fs::absolute(argv[2]);
+  if (argc > 3) goldens_dir = fs::absolute(argv[3]);
+  // a template store of our own, so import can write to it
+  fs::remove_all(work_dir);
+  templates_dir  = work_dir / "templates";
+  font_store_dir = work_dir / "fonts";
+  fs::create_directories(work_dir / "sessions");
+  fs::copy(fixture_dir / "data", templates_dir, fs::copy_options::recursive);
+
+  if (!mse::facade::desktop::start_host(argc, argv)) {
+    std::fprintf(stderr, "could not start the desktop host (no display? run under xvfb-run)\n");
+    return 1;
+  }
+  F::InitOptions options;
+  options.template_dir   = templates_dir.string();
+  options.font_store_dir = font_store_dir.string();
+  F::Result init = F::init(options);
+  if (!init.ok()) {
+    std::fprintf(stderr, "init failed: %s\n", init.error.c_str());
+    return 1;
+  }
+  int failed_tests = 0;
+  for (const TestCase& t : tests()) {
+    current_test = t.name;
+    int before = failures;
+    try {
+      t.run();
+    } catch (...) {
+      report_failure(__FILE__, __LINE__, "a C++ exception escaped");
+    }
+    std::printf("%s %s\n", failures == before ? "ok  " : "FAIL", t.name);
+    if (failures != before) ++failed_tests;
+  }
+  F::shutdown();
+  mse::facade::desktop::stop_host();
+  std::printf("%zu tests, %d failed, %d checks, %d failed checks\n", tests().size(), failed_tests, checks, failures);
+  return failures == 0 ? 0 : 1;
+}

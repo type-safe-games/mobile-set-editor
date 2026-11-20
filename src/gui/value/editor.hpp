@@ -151,9 +151,12 @@ protected:
     } \
   public:
 
+/// Make an editor object for values using the given style
+ValueViewerP make_value_editor(DataEditor& parent, const StyleP& style);
+
 #define IMPLEMENT_VALUE_EDITOR(Type) \
-  ValueViewerP Type##Style::makeEditor(DataEditor& parent) { \
-    return ValueViewerP(new Type##ValueEditor(parent, static_pointer_cast<Type##Style>(intrusive_from_this()))); \
+  ValueViewerP make_##Type##_value_editor(DataEditor& parent, const StyleP& style) { \
+    return ValueViewerP(new Type##ValueEditor(parent, static_pointer_cast<Type##Style>(style))); \
   } \
   Type##ValueEditor::Type##ValueEditor(DataEditor& parent, const Type##StyleP& style) \
     : Type##ValueViewer(parent, style)

@@ -1037,98 +1037,30 @@ void TextValueEditor::insert(const String& text, const String& action_name) {
   replaceSelection(text, action_name);
 }
 
-/// compare two cursor positions, determine how much the text matches before and after
-size_t match_cursor_position(size_t pos1, const String& text1, size_t pos2, const String& text2) {
-  pos1 = min(pos1, text1.size());
-  pos2 = min(pos2, text2.size());
-  size_t score = 0; // total score
-  // Match part before cursor
-  size_t before1, before2;
-  for (before1 = before2 = 0 ; before1 < pos1 && before2 < pos2 ; ++before1, ++before2) {
-    Char c1 = text1[pos1-before1-1], c2 = text2[pos2-before2-1];
-    if      (c1 == c2)                   score += 10000;
-    else if (toLower(c1) == toLower(c2)) score +=  9999;
-    else if (isPunct(c1) && isPunct(c2)) score +=     1;
-    else if (c1 == UNTAG_ATOM_KWPPH)    {score +=     1; --before2;}
-    else                                 break;
-  }
-  // bonus points for matching start of string
-  if (pos1 == before1 && pos2 == before2) score += 10000;
-  // Match part after cursor
-  size_t after1, after2;
-  for (after1 = after2 = 0 ; pos1 + after1 < text1.size() && pos2 + after2 < text2.size() ; ++after1, ++after2) {
-    Char c1 = text1[pos1+after1], c2 = text2[pos2+after2];
-    if      (c1 == c2)                   score += 10;
-    else if (toLower(c1) == toLower(c2)) score +=  9;
-    else if (isPunct(c1) && isPunct(c2)) score +=  1;
-    else if (c2 == UNTAG_ATOM_KWPPH)    {score +=  1; --after1;}
-    else                                 break;
-  }
-  // bonus points for matching end of string
-  if (pos1+after1 == text1.size() && pos2+after2 == text2.size()) score += 2;
-  // final score: matching 'before' is more important
-  return score;
+TextSelection TextValueEditor::selection() const {
+  TextSelection sel;
+  sel.start   = selection_start;   sel.end   = selection_end;
+  sel.start_i = selection_start_i; sel.end_i = selection_end_i;
+  return sel;
+}
+
+void TextValueEditor::setSelection(const TextSelection& sel) {
+  selection_start   = sel.start;   selection_end   = sel.end;
+  selection_start_i = sel.start_i; selection_end_i = sel.end_i;
 }
 
 void TextValueEditor::replaceSelection(const String& replacement, const String& name, bool allow_auto_replace, bool select_on_undo) {
-  if (replacement.empty() && selection_start == selection_end) {
-    // no text selected, nothing to delete
-    return;
-  }
-  // fix the selection, it may be changed by undo/redo
-  if (selection_end < selection_start) swap(selection_end, selection_start);
-  fixSelection();
-  // execute the action before adding it to the stack,
-  // because we want to run scripts before action listeners see the action
-  auto action = typing_action(valueP(), selection_start_i, selection_end_i, select_on_undo ? selection_start : selection_end, selection_end, replacement, name);
-  if (!action) {
+  // the typing itself, and finding the caret back, is in data/text_editing.cpp
+  // NOTE: adding the action calls our onAction, invalidating the text viewer and moving the selection around the new text
+  TextSelection sel = selection();
+  ReplaceResult result = replace_text_selection(valueP(), sel, replacement, name, select_on_undo,
+    [this](unique_ptr<ValueAction> action) { addAction(std::move(action)); });
+  if (result == ReplaceResult::NOTHING) return;
+  setSelection(sel);
+  if (result == ReplaceResult::UNCHANGED) {
     // nothing changes, but move the selection anyway
     moveSelection(TYPE_CURSOR, selection_end);
     return;
-  }
-  // what we would expect if no scripts take place
-  String expected_value  = untag_for_cursor(action->newValue());
-  size_t expected_cursor = min(selection_start, selection_end) + untag_for_cursor(replacement).size();
-  // perform the action
-  // NOTE: this calls our onAction, invalidating the text viewer and moving the selection around the new text
-  addAction(std::move(action));
-  // move cursor
-  {
-    String real_value = untag_for_cursor(value().value());
-    // where real and expected value are the same, nothing has happend, so don't look there
-    size_t start, end_min;
-    for (start = 0 ; start < min(real_value.size(), expected_value.size()) ; ++start) {
-      if (real_value[start] != expected_value[start]) break;
-    }
-    for (end_min = 0 ; end_min < min(real_value.size(), expected_value.size()) ; ++end_min) {
-      if (real_value[real_value.size() - end_min - 1] !=
-        expected_value[expected_value.size() - end_min - 1]) break;
-    }
-    // what is the best cursor position?
-    size_t best_cursor = expected_cursor;
-    if (real_value.size() < expected_value.size()
-      && expected_cursor < expected_value.size()
-      && start < real_value.size()
-      && expected_value[expected_cursor] == UNTAG_SEP
-      && real_value[start]               == UNTAG_SEP
-      && real_value.size() - end_min == start) {
-      // exception for type-over separators
-      best_cursor = start + 1;
-    } else {
-      // try to find the best match to what text we expected to be around the cursor
-      size_t best_match  = 0;
-      size_t begin = min(start, expected_cursor);
-      size_t end   = min(real_value.size() + 1, max(real_value.size() - end_min, expected_cursor) + 1);
-      for (size_t i = begin ; i < end ; ++i) {
-        size_t match = match_cursor_position(expected_cursor, expected_value, i, real_value);
-        if (match > best_match || (match == best_match && abs((int)expected_cursor - (int)i) < abs((int)expected_cursor - (int)best_cursor))) {
-          best_match = match;
-          best_cursor = i;
-        }
-      }
-    }
-    selection_end = selection_start = best_cursor;
-    fixSelection(TYPE_CURSOR, MOVE_RIGHT);
   }
   // auto replace after typing?
   if (allow_auto_replace) tryAutoReplace();
@@ -1137,24 +1069,12 @@ void TextValueEditor::replaceSelection(const String& replacement, const String& 
 }
 
 void TextValueEditor::tryAutoReplace() {
-  size_t end = selection_start_i;
   GameSettings& gs = settings.gameSettingsFor(parent.getGame());
   if (!gs.use_auto_replace) return;
-  FOR_EACH(ar, gs.auto_replaces) {
-    if (ar->enabled && ar->match.size() <= end) {
-      size_t start = end - ar->match.size();
-      if (is_substr(value().value(), start, ar->match) &&
-          (!ar->whole_word || (isWordBoundary(start) && isWordBoundary(end)))
-         ) {
-        // replace
-        selection_start_i = start;
-        selection_end_i   = end;
-        fixSelection(TYPE_INDEX);
-        replaceSelection(ar->replace, _ACTION_("auto replace"), false, false);
-        end = selection_start_i;
-      }
-    }
-  }
+  TextSelection sel = selection();
+  auto_replace_text(valueP(), sel, gs.auto_replaces,
+    [this](unique_ptr<ValueAction> action) { addAction(std::move(action)); });
+  setSelection(sel);
 }
 
 void TextValueEditor::moveSelection(IndexType t, size_t new_end, bool also_move_start, Movement dir) {
@@ -1176,40 +1096,10 @@ void TextValueEditor::moveSelectionNoRedraw(IndexType t, size_t new_end, bool al
   fixSelection(t, dir);
 }
 
-// direction of a with respect to b
-Movement direction_of(size_t a, size_t b) {
-  if (a < b) return MOVE_LEFT_OPT;
-  if (a > b) return MOVE_RIGHT_OPT;
-  else       return MOVE_MID;
-}
-
 void TextValueEditor::fixSelection(IndexType t, Movement dir) {
-  const String& val = value().value();
-  // Which type takes precedent?
-  if (t == TYPE_INDEX) {
-    selection_start = index_to_cursor(value().value(), selection_start_i, dir);
-    selection_end   = index_to_cursor(value().value(), selection_end_i,   dir);
-  }
-  // make sure the selection is at a valid position inside the text
-  // prepare to move 'inward' (i.e. from start in the direction of end and vice versa)
-  selection_start_i = cursor_to_index(val, selection_start, direction_of(selection_end, selection_start));
-  selection_end_i   = cursor_to_index(val, selection_end,   direction_of(selection_start, selection_end));
-  // start and end must be on the same side of separators
-  size_t seppos = val.find(_("<sep"));
-  while (seppos != String::npos) {
-    size_t sepend = match_close_tag_end(val, seppos);
-    if (selection_start_i <= seppos && selection_end_i > seppos) {
-        // not on same side, move selection end before sep
-      selection_end   = index_to_cursor(val, seppos, dir);
-      selection_end_i = cursor_to_index(val, selection_end, direction_of(selection_start, selection_end));
-    } else if (selection_start_i >= sepend && selection_end_i < sepend) {
-        // not on same side, move selection end after sep
-      selection_end   = index_to_cursor(val, sepend, dir);
-      selection_end_i = cursor_to_index(val, selection_end, direction_of(selection_start, selection_end));
-    }
-    // find next separator
-    seppos = val.find(_("<sep"), seppos + 1);
-  }
+  TextSelection sel = selection();
+  fix_text_selection(value().value(), sel, t, dir);
+  setSelection(sel);
 }
 
 
@@ -1220,56 +1110,14 @@ size_t TextValueEditor::nextCharBoundary(size_t pos) const {
   return min(index_to_cursor(value().value(), String::npos), pos + 1);
 }
 
-static const Char word_bound_chars[] = _(" ,.:;()\n");
-bool isWordBoundaryChar(Char c) {
-  return c == _(' ') || c == _(',') || c == _('.') || c == _(':') || c == _(';') ||
-         c == _('(') || c == _(')') || c == _('\n') || isPunct(c);
-}
-
 size_t TextValueEditor::prevWordBoundary(size_t pos_i) const {
-  const String& val = value().value();
-  size_t p = val.find_last_not_of(word_bound_chars, max(0, (int)pos_i - 1));
-  if (p == String::npos) return 0;
-  p = val.find_last_of(word_bound_chars, p);
-  if (p == String::npos) return 0;
-  return p + 1;
+  return prev_word_boundary(value().value(), pos_i);
 }
 size_t TextValueEditor::nextWordBoundary(size_t pos_i) const {
-  const String& val = value().value();
-  size_t p = val.find_first_of(word_bound_chars, pos_i);
-  if (p == String::npos) return val.size();
-  p = val.find_first_not_of(word_bound_chars, p);
-  if (p == String::npos) return val.size();
-  return p;
+  return next_word_boundary(value().value(), pos_i);
 }
 bool TextValueEditor::isWordBoundary(size_t pos_i) const {
-  const String& val = value().value();
-  // boundary after?
-  size_t pos = pos_i;
-  while (true) {
-    if (pos >= val.size()) return true;
-    Char c = val[pos];
-    if (c == _('<')) pos = skip_tag(val,pos); // skip tags
-    else if (isWordBoundaryChar(c)) return true;
-    else break;
-  }
-  // boundary before?
-  pos = pos_i;
-  while (true) {
-    if (pos == 0) return true;
-    Char c = val[pos - 1];
-    if (c == _('>')) {
-      // (try to) skip tags in reverse
-      while (true) {
-        if (pos == 0) return false; // not a tag
-        --pos;
-        c = val[pos - 1];
-        if      (c == _('<')) { --pos; break; } // was a tag
-        else if (c == _('>')) return false; // was not a tag
-      }
-    }
-    else return isWordBoundaryChar(c);
-  }
+  return is_word_boundary(value().value(), pos_i);
 }
 
 void TextValueEditor::doSelectAll() {

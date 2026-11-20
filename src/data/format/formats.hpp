@@ -11,8 +11,10 @@
 #include <util/prec.hpp>
 #include <util/error.hpp>
 #include <data/settings.hpp>
+#include <util/real_point.hpp>
 
 class Game;
+class Canvas;
 DECLARE_POINTER_TYPE(Set);
 DECLARE_POINTER_TYPE(Card);
 
@@ -96,7 +98,9 @@ enum class ExportImageMode {
 };
 
 /// Generate an image of one or more cards
-Image export_image(const SetP& set, const CardP& card, bool write_metadata = true, const Settings::ExportSettings& card_settings = Settings::ExportSettings());
+/** The other face of a front/back pair (if card_settings.dfc_export) uses the app's export settings
+ *  for its Style, or card_settings too if other_face_same_settings. */
+Image export_image(const SetP& set, const CardP& card, bool write_metadata = true, const Settings::ExportSettings& card_settings = Settings::ExportSettings(), bool other_face_same_settings = false);
 Image export_image(const SetP& set, const vector<CardP>& cards, int padding = 2, ExportImageMode mode = ExportImageMode::EXPORT);
 
 /// Export the image of one or more cards to a given filename, using the app's zoom, rotation and bleed settings, and including metadata
@@ -106,6 +110,22 @@ void export_image(const SetP& set, const vector<CardP>& cards, const String& pat
 /// Render a card the way export_image does (zoom 1, no rotation or bleed) and describe its layout:
 /// each field's region, and each laid-out text line. Deterministic, for exact comparison (ADR 0010).
 String card_layout_dump(const SetP& set, const CardP& card);
+
+/// A visible field's region on a card drawn by render_card
+struct CardFieldRegion {
+  String   field;    ///< the field's name
+  RealRect rect = RealRect(0, 0, 0, 0); ///< the box the field occupies (its style's left, top, width, height), in canvas pixels
+  double   angle = 0; ///< the field's rotation in degrees, counter clockwise, as in the Style
+  int      z_index = 0; ///< drawing order, higher is on top
+  bool     editable = false; ///< can the user edit this field?
+};
+
+/// The size of a card drawn by render_card at zoom 1 (as export_image draws it, unrotated)
+RealSize card_render_size(const SetP& set, const CardP& card);
+
+/// Draw a card unrotated at the given zoom onto a canvas of (about) card_render_size times zoom,
+/// exactly like export_image without bleed, and report the visible fields' regions from the same pass.
+void render_card(const SetP& set, const CardP& card, Canvas& canvas, double zoom, vector<CardFieldRegion>* regions = nullptr);
 
 /// Write the metadata for a card
 // Assuming first the zoom is applied, then the rotation, then the offset.
