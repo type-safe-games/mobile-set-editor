@@ -136,9 +136,25 @@ class StaleCollector : public ActionListener {
 public:
   bool  collecting = false;
   Stale stale;
+  set<const StyleSheet*> changed_styles; ///< stylesheets with styles that scripts invalidated
 
   void onAction(const Action& action, bool undone) override {
-    if (!collecting || stale.all) return;
+    if (!collecting) return;
+    if (const CardListAction* a = dynamic_cast<const CardListAction*>(&action)) {
+      stale.card_list = true;
+      // added cards, and removed ones that are put back, have no up to date render
+      if (const AddCardAction* add = dynamic_cast<const AddCardAction*>(a)) {
+        if (add->action.adding != undone) {
+          for (const auto& step : add->action.steps) addCard(step.item->uid);
+        }
+      }
+      return;
+    }
+    if (const ScriptStyleEvent* e = dynamic_cast<const ScriptStyleEvent*>(&action)) {
+      changed_styles.insert(e->stylesheet);
+      return;
+    }
+    if (stale.all) return;
     if (const ScriptValueEvent* e = dynamic_cast<const ScriptValueEvent*>(&action)) {
       if (e->card) addCard(e->card->uid); else stale.all = true;
     } else if (const ValueAction* a = dynamic_cast<const ValueAction*>(&action)) {
@@ -146,17 +162,28 @@ public:
       if (a->card) addCard(a->card->uid); else stale.all = true;
     } else if (const OneWayLinkCardsAction* a = dynamic_cast<const OneWayLinkCardsAction*>(&action)) {
       addCard(a->card->uid);
-    } else if (dynamic_cast<const BulkAction*>(&action) || dynamic_cast<const ScriptStyleEvent*>(&action)) {
+    } else if (dynamic_cast<const BulkAction*>(&action)) {
       // a BulkAction's parts are reported one by one
-      // a ScriptStyleEvent comes from drawing, not from an action
     } else {
-      // display changes, card list changes, keywords, ...
+      // display changes, keywords, ...
       stale.all = true;
     }
   }
 
+  /// After a card list change, scripts in a Style that depend on the card list (e.g. a card
+  /// number drawn by the Style) may have changed: every card with that Style is stale
+  void addStyleDependentCards(Set& set) {
+    if (stale.card_list && !stale.all && !changed_styles.empty()) {
+      for (const CardP& c : set.cards) {
+        if (changed_styles.count(&set.stylesheetFor(c))) addCard(c->uid);
+      }
+    }
+    changed_styles.clear();
+  }
+
 private:
   void addCard(const String& uid) {
+    if (stale.all) return;
     std::string u = to_utf8(uid);
     if (std::find(stale.card_uids.begin(), stale.card_uids.end(), u) == stale.card_uids.end()) {
       stale.card_uids.push_back(u);
@@ -203,6 +230,7 @@ static CardP find_card(Set& set, const std::string& uid) {
 /// Start collecting stale cards for an action
 static void begin_action(Session& s) {
   s.stale.stale = Stale();
+  s.stale.changed_styles.clear();
   s.stale.collecting = true;
 }
 
@@ -219,6 +247,7 @@ static void fill_undo_state(Session& s, ActionResult& r) {
 /// Finish an action call: stale cards and undo state
 static void end_action(Session& s, ActionResult& r) {
   s.stale.collecting = false;
+  s.stale.addStyleDependentCards(*s.set);
   r.stale = s.stale.stale;
   s.stale.stale = Stale();
   fill_undo_state(s, r);
@@ -376,6 +405,120 @@ CardList listCards(SessionHandle h) {
       }
       r.cards.push_back(std::move(info));
     }
+  });
+}
+
+// ----------------------------------------------------------------------------- : Changing the card list
+
+/// The cards with the given uids, in the Set's order
+static vector<CardP> find_cards(Set& set, const std::vector<std::string>& uids) {
+  if (uids.empty()) fail(Status::InvalidArgument, "no cards given");
+  unordered_set<String> wanted;
+  for (const std::string& uid : uids) {
+    find_card(set, uid);
+    if (!wanted.insert(from_utf8(uid)).second) fail(Status::InvalidArgument, "card '" + uid + "' is given twice");
+  }
+  vector<CardP> cards;
+  for (const CardP& c : set.cards) {
+    if (wanted.count(c->uid)) cards.push_back(c);
+  }
+  return cards;
+}
+
+/// Add cards to the end of the card list, then move them to `position` (if they don't go at the end)
+/** One undo step, named after the add. */
+static void add_cards_at(Session& s, const vector<CardP>& cards, size_t position) {
+  Set& set = *s.set;
+  vector<ActionP> actions;
+  actions.push_back(make_intrusive<AddCardAction>(ADD, set, cards)); // gives new uids to copies
+  if (position < set.cards.size()) {
+    vector<CardP> order = set.cards;
+    order.insert(order.begin() + position, cards.begin(), cards.end());
+    actions.push_back(make_intrusive<MoveCardsAction>(set, order));
+  }
+  set.actions.addAction(make_unique<BulkAction>(actions, s.set, false), false);
+}
+
+NewCardsResult addCard(SessionHandle h, int position) {
+  return guarded<NewCardsResult>("", "", [&](NewCardsResult& r) {
+    Session& s = get_session(h);
+    if (position < -1 || position > (int)s.set->cards.size()) fail(Status::InvalidArgument, "position out of range");
+    // as the desktop's "add card": the Game's initial values, no Style of its own
+    CardP card = make_intrusive<Card>(*s.set->game);
+    with_action(s, r, [&] { add_cards_at(s, {card}, position < 0 ? s.set->cards.size() : (size_t)position); });
+    r.uids.push_back(to_utf8(card->uid));
+  });
+}
+
+NewCardsResult duplicateCards(SessionHandle h, const std::vector<std::string>& card_uids) {
+  return guarded<NewCardsResult>("", "", [&](NewCardsResult& r) {
+    Session& s = get_session(h);
+    Set& set = *s.set;
+    vector<CardP> selected = find_cards(set, card_uids);
+    // with the cards linked to them, as the desktop copies cards
+    unordered_set<String> to_copy;
+    for (const CardP& c : selected) {
+      to_copy.insert(c->uid);
+      for (const auto& linked : c->getLinkedCards(set)) to_copy.insert(linked.first->uid);
+    }
+    vector<CardP> copies;
+    size_t after = 0;
+    for (size_t i = 0 ; i < set.cards.size() ; ++i) {
+      const CardP& c = set.cards[i];
+      if (!to_copy.count(c->uid)) continue;
+      // a deep copy with the same uid and links; adding it gives it a new uid and relinks the copies
+      CardP copy = make_intrusive<Card>(&set, c);
+      copy->stylesheet = c->stylesheet; // keep following the Set's Style if the card does
+      copies.push_back(copy);
+      after = i + 1;
+    }
+    with_action(s, r, [&] { add_cards_at(s, copies, after); });
+    for (const CardP& c : copies) r.uids.push_back(to_utf8(c->uid));
+  });
+}
+
+ActionResult removeCards(SessionHandle h, const std::vector<std::string>& card_uids) {
+  return guarded<ActionResult>("", "", [&](ActionResult& r) {
+    Session& s = get_session(h);
+    Set& set = *s.set;
+    vector<CardP> cards = find_cards(set, card_uids);
+    unordered_set<String> removed;
+    for (const CardP& c : cards) removed.insert(c->uid);
+    // first unlink the cards that stay from the removed ones, so that undo puts the cards back
+    // before their links (and scripts that follow links see the linked card)
+    vector<ActionP> actions;
+    for (CardP c : set.cards) {
+      if (removed.count(c->uid)) continue;
+      for (int i = 0 ; i < Card::MAX_LINKS ; ++i) {
+        if (removed.count(c->getLinkedUID(i))) {
+          actions.push_back(make_intrusive<OneWayLinkCardsAction>(c, _(""), _(""), i));
+        }
+      }
+    }
+    ActionP removal = make_intrusive<AddCardAction>(REMOVE, set, cards);
+    actions.push_back(removal);
+    with_action(s, r, [&] { set.actions.addAction(make_unique<BulkAction>(actions, s.set, *removal), false); });
+  });
+}
+
+ActionResult moveCards(SessionHandle h, const std::vector<std::string>& card_uids, int position) {
+  return guarded<ActionResult>("", "", [&](ActionResult& r) {
+    Session& s = get_session(h);
+    Set& set = *s.set;
+    vector<CardP> moved = find_cards(set, card_uids);
+    if (position < 0 || position > (int)(set.cards.size() - moved.size())) fail(Status::InvalidArgument, "position out of range");
+    unordered_set<String> moving;
+    for (const CardP& c : moved) moving.insert(c->uid);
+    vector<CardP> order;
+    for (const CardP& c : set.cards) {
+      if (!moving.count(c->uid)) order.push_back(c);
+    }
+    order.insert(order.begin() + position, moved.begin(), moved.end());
+    if (order == set.cards) {
+      fill_undo_state(s, r); // already there: no undo step
+      return;
+    }
+    with_action(s, r, [&] { set.actions.addAction(make_unique<MoveCardsAction>(set, order), false); });
   });
 }
 

@@ -134,6 +134,19 @@ void ReorderCardsAction::perform(bool to_undo) {
   swap(set.cards[card_id1], set.cards[card_id2]);
 }
 
+MoveCardsAction::MoveCardsAction(Set& set, const vector<CardP>& new_order)
+  : CardListAction(set), order(new_order)
+{}
+
+String MoveCardsAction::getName(bool to_undo) const {
+  return _ACTION_("reorder cards");
+}
+
+void MoveCardsAction::perform(bool to_undo) {
+  assert(order.size() == set.cards.size());
+  swap(set.cards, order);
+}
+
 // ----------------------------------------------------------------------------- : Link cards
 
 OneWayLinkCardsAction::OneWayLinkCardsAction(CardP& card, const String& uid, const String& relation, int index)

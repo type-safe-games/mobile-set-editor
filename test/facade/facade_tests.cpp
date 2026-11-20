@@ -446,6 +446,324 @@ TEST(link_and_unlink_are_one_undo_step_each) {
   F::closeSession(s);
 }
 
+// ----------------------------------------------------------------------------- : Changing the card list
+
+/// The uids of a session's cards, in order
+static std::vector<std::string> card_order(F::SessionHandle s) {
+  std::vector<std::string> uids;
+  for (const F::CardInfo& c : F::listCards(s).cards) uids.push_back(c.uid);
+  return uids;
+}
+static std::vector<std::string> uids(std::initializer_list<std::string> l) { return l; }
+static std::string to_s(const std::vector<std::string>& v) {
+  std::string out = "[";
+  for (const std::string& x : v) out += (out.size() > 1 ? ", " : "") + x;
+  return out + "]";
+}
+
+/// The fixture's `number` field: the card's position in the set, from a card list script
+static std::string card_number(F::SessionHandle s, const std::string& uid) {
+  return F::getValue(s, F::Target::card(uid), "number").value;
+}
+
+TEST(add_card) {
+  F::SessionHandle s = open_fixture();
+  F::NewCardsResult a = F::addCard(s);
+  REQUIRE_OK(a);
+  CHECK_EQ(a.uids.size(), (size_t)1);
+  if (a.uids.size() != 1) return;
+  std::string added = a.uids[0];
+  CHECK_EQ(card_order(s), uids({"fixture-wrap", "fixture-front", "fixture-back", added}));
+  CHECK(a.stale.card_list);
+  CHECK(!a.stale.all);
+  CHECK_EQ(a.stale.card_uids, uids({added})); // the other cards keep their number
+  CHECK(a.dirty);
+  CHECK(!a.undo_name.empty());
+  // the Game's initial values, with the Set's Style
+  CHECK_EQ(F::getValue(s, F::Target::card(added), "frame").value, "grey");
+  CHECK_EQ(F::getValue(s, F::Target::card(added), "name").value, "");
+  CHECK_EQ(card_number(s, added), "4");
+  F::CardList listed = F::listCards(s);
+  CHECK_EQ(listed.cards[3].stylesheet, "fixture-standard.mse-style");
+  // undo and redo
+  F::ActionResult u = F::undo(s);
+  REQUIRE_OK(u);
+  CHECK(u.stale.card_list);
+  CHECK(!u.can_undo);
+  CHECK(!u.dirty);
+  CHECK_EQ(card_order(s), uids({"fixture-wrap", "fixture-front", "fixture-back"}));
+  F::ActionResult r = F::redo(s);
+  REQUIRE_OK(r);
+  CHECK(r.stale.card_list);
+  CHECK(contains(r.stale.card_uids, added));
+  CHECK_EQ(card_order(s), uids({"fixture-wrap", "fixture-front", "fixture-back", added}));
+  // at a position: the cards after it get a new number, and are stale
+  F::NewCardsResult first = F::addCard(s, 0);
+  REQUIRE_OK(first);
+  std::string at0 = first.uids.empty() ? "" : first.uids[0];
+  CHECK_EQ(card_order(s), uids({at0, "fixture-wrap", "fixture-front", "fixture-back", added}));
+  CHECK(!first.stale.all);
+  for (const std::string& uid : card_order(s)) CHECK(contains(first.stale.card_uids, uid));
+  CHECK_EQ(card_number(s, at0), "1");
+  CHECK_EQ(card_number(s, "fixture-wrap"), "2");
+  CHECK_EQ(card_number(s, added), "5");
+  F::ActionResult u0 = F::undo(s); // one undo step
+  CHECK(u0.can_undo);
+  CHECK_EQ(card_order(s), uids({"fixture-wrap", "fixture-front", "fixture-back", added}));
+  CHECK_EQ(card_number(s, "fixture-wrap"), "1");
+  CHECK(contains(u0.stale.card_uids, "fixture-wrap"));
+  F::NewCardsResult middle = F::addCard(s, 2);
+  REQUIRE_OK(middle);
+  std::vector<std::string> order = card_order(s);
+  CHECK_EQ(order[2], middle.uids.at(0));
+  // errors
+  CHECK_EQ(F::addCard(s, 6).status, F::Status::InvalidArgument);
+  CHECK_EQ(F::addCard(s, -2).status, F::Status::InvalidArgument);
+  CHECK_EQ(F::addCard(999).status, F::Status::NotFound);
+  CHECK_EQ(card_order(s).size(), (size_t)5);
+  F::closeSession(s);
+}
+
+TEST(duplicate_cards) {
+  F::SessionHandle s = open_fixture();
+  CHECK_OK(F::setValue(s, F::Target::card("fixture-wrap"), "frame", "blue"));
+  F::NewCardsResult d = F::duplicateCards(s, {"fixture-wrap"});
+  REQUIRE_OK(d);
+  CHECK_EQ(d.uids.size(), (size_t)1);
+  if (d.uids.size() != 1) return;
+  std::string copy = d.uids[0];
+  CHECK(copy != "fixture-wrap");
+  CHECK_EQ(card_order(s), uids({"fixture-wrap", copy, "fixture-front", "fixture-back"}));
+  for (const char* field : {"name", "rules", "frame", "level", "picture"}) {
+    CHECK_EQ(F::getValue(s, F::Target::card(copy), field).value, F::getValue(s, F::Target::card("fixture-wrap"), field).value);
+  }
+  CHECK(d.stale.card_list);
+  CHECK(!d.stale.all);
+  CHECK(contains(d.stale.card_uids, copy));
+  CHECK(contains(d.stale.card_uids, "fixture-back")); // its number changed
+  CHECK(!contains(d.stale.card_uids, "fixture-wrap"));
+  CHECK_EQ(card_number(s, "fixture-back"), "4");
+  // the copy is a card of its own
+  CHECK_OK(F::setValue(s, F::Target::card(copy), "frame", "red"));
+  CHECK_EQ(F::getValue(s, F::Target::card("fixture-wrap"), "frame").value, "blue");
+  CHECK_OK(F::undo(s));
+  F::ActionResult u = F::undo(s);
+  REQUIRE_OK(u);
+  CHECK(u.stale.card_list);
+  CHECK_EQ(card_order(s), uids({"fixture-wrap", "fixture-front", "fixture-back"}));
+  CHECK_EQ(card_number(s, "fixture-back"), "3");
+  F::ActionResult r = F::redo(s);
+  REQUIRE_OK(r);
+  CHECK_EQ(card_order(s), uids({"fixture-wrap", copy, "fixture-front", "fixture-back"}));
+  CHECK_OK(F::undo(s));
+  // a Linked card comes with the card it is linked to, and the copies are linked to each other
+  F::NewCardsResult pair = F::duplicateCards(s, {"fixture-front"});
+  REQUIRE_OK(pair);
+  CHECK_EQ(pair.uids.size(), (size_t)2);
+  if (pair.uids.size() != 2) return;
+  CHECK_EQ(card_order(s), uids({"fixture-wrap", "fixture-front", "fixture-back", pair.uids[0], pair.uids[1]}));
+  F::CardList cards = F::listCards(s);
+  const F::CardInfo* front = find_card(cards, "fixture-front");
+  const F::CardInfo* back  = find_card(cards, "fixture-back");
+  const F::CardInfo* front2 = find_card(cards, pair.uids[0]);
+  const F::CardInfo* back2  = find_card(cards, pair.uids[1]);
+  CHECK(front && front->links.size() == 1 && front->links[0].uid == "fixture-back");
+  CHECK(back && back->links.size() == 1 && back->links[0].uid == "fixture-front");
+  CHECK(front2 && front2->name == "Front Face" && front2->links.size() == 1 && front2->links[0].uid == pair.uids[1] && front2->links[0].relation == "Back Face");
+  CHECK(back2 && back2->name == "Back Face" && back2->links.size() == 1 && back2->links[0].uid == pair.uids[0] && back2->links[0].relation == "Front Face");
+  CHECK_OK(F::undo(s));
+  CHECK_EQ(card_order(s).size(), (size_t)3);
+  // several cards at once, one undo step: the copies go after the last of them
+  F::NewCardsResult two = F::duplicateCards(s, {"fixture-back", "fixture-wrap"});
+  REQUIRE_OK(two);
+  CHECK_EQ(two.uids.size(), (size_t)3); // fixture-front is linked to fixture-back
+  CHECK_EQ(card_order(s).size(), (size_t)6);
+  F::CardList listed = F::listCards(s);
+  CHECK_EQ(listed.cards[3].name, "Long Wrapping Text");
+  CHECK_OK(F::undo(s));
+  CHECK_EQ(card_order(s).size(), (size_t)3);
+  // errors
+  CHECK_EQ(F::duplicateCards(s, {}).status, F::Status::InvalidArgument);
+  CHECK_EQ(F::duplicateCards(s, {"nope"}).status, F::Status::NotFound);
+  CHECK_EQ(F::duplicateCards(s, {"fixture-wrap", "fixture-wrap"}).status, F::Status::InvalidArgument);
+  CHECK_EQ(card_order(s).size(), (size_t)3);
+  F::closeSession(s);
+}
+
+TEST(remove_cards) {
+  F::SessionHandle s = open_fixture();
+  F::ActionResult r = F::removeCards(s, {"fixture-wrap"});
+  REQUIRE_OK(r);
+  CHECK_EQ(card_order(s), uids({"fixture-front", "fixture-back"}));
+  CHECK(r.stale.card_list);
+  CHECK(!r.stale.all);
+  CHECK(!r.undo_name.empty());
+  CHECK(contains(r.stale.card_uids, "fixture-front")); // renumbered
+  CHECK_EQ(card_number(s, "fixture-front"), "1");
+  CHECK(r.dirty);
+  F::ActionResult u = F::undo(s);
+  REQUIRE_OK(u);
+  CHECK(!u.dirty);
+  CHECK(contains(u.stale.card_uids, "fixture-wrap")); // back again
+  CHECK_EQ(card_order(s), uids({"fixture-wrap", "fixture-front", "fixture-back"}));
+  CHECK_EQ(card_number(s, "fixture-front"), "2");
+  CHECK_OK(F::redo(s));
+  CHECK_EQ(card_order(s), uids({"fixture-front", "fixture-back"}));
+  CHECK_OK(F::undo(s));
+  // several cards in one step
+  F::ActionResult two = F::removeCards(s, {"fixture-back", "fixture-wrap"});
+  REQUIRE_OK(two);
+  CHECK_EQ(card_order(s), uids({"fixture-front"}));
+  CHECK(!two.undo_name.empty());
+  F::ActionResult u2 = F::undo(s);
+  CHECK(!u2.can_undo);
+  CHECK_EQ(card_order(s), uids({"fixture-wrap", "fixture-front", "fixture-back"}));
+  CHECK_EQ(find_card(F::listCards(s), "fixture-front")->links.size(), (size_t)1);
+  // errors
+  CHECK_EQ(F::removeCards(s, {}).status, F::Status::InvalidArgument);
+  CHECK_EQ(F::removeCards(s, {"fixture-wrap", "nope"}).status, F::Status::NotFound);
+  CHECK_EQ(card_order(s).size(), (size_t)3);
+  CHECK(!F::sessionInfo(s).can_undo);
+  F::closeSession(s);
+}
+
+TEST(remove_linked_card) {
+  F::SessionHandle s = open_fixture();
+  F::ActionResult r = F::removeCards(s, {"fixture-back"});
+  REQUIRE_OK(r);
+  CHECK_EQ(card_order(s), uids({"fixture-wrap", "fixture-front"}));
+  // no dangling link on the card that stays, which is stale
+  CHECK(find_card(F::listCards(s), "fixture-front")->links.empty());
+  CHECK(contains(r.stale.card_uids, "fixture-front"));
+  CHECK_EQ(r.undo_name, F::removeCards(s, {"fixture-wrap"}).undo_name); // named as a removal, not as unlinking
+  CHECK_OK(F::undo(s));
+  // undo brings back the card and the link
+  F::ActionResult u = F::undo(s);
+  REQUIRE_OK(u);
+  CHECK(!u.can_undo);
+  CHECK(contains(u.stale.card_uids, "fixture-back"));
+  CHECK(contains(u.stale.card_uids, "fixture-front"));
+  F::CardList cards = F::listCards(s);
+  CHECK_EQ(card_order(s), uids({"fixture-wrap", "fixture-front", "fixture-back"}));
+  const F::CardInfo* front = find_card(cards, "fixture-front");
+  const F::CardInfo* back  = find_card(cards, "fixture-back");
+  CHECK(front && front->links.size() == 1 && front->links[0].uid == "fixture-back" && front->links[0].relation == "Back Face");
+  CHECK(back && back->links.size() == 1 && back->links[0].uid == "fixture-front" && back->links[0].relation == "Front Face");
+  CHECK_OK(F::redo(s));
+  CHECK(find_card(F::listCards(s), "fixture-front")->links.empty());
+  // and the link stays gone in the saved set
+  fs::path out = work_dir / "removed-linked.mse-set";
+  int fd = ::open(out.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
+  REQUIRE_OK(F::saveTo(s, fd));
+  ::close(fd);
+  F::OpenResult again = F::openSession(out.string(), "");
+  REQUIRE_OK(again);
+  CHECK(find_card(F::listCards(again.session), "fixture-front")->links.empty());
+  F::closeSession(again.session);
+  // removing both cards of a pair
+  CHECK_OK(F::undo(s));
+  CHECK_OK(F::removeCards(s, {"fixture-front", "fixture-back"}));
+  CHECK_EQ(card_order(s), uids({"fixture-wrap"}));
+  CHECK_OK(F::undo(s));
+  CHECK_EQ(find_card(F::listCards(s), "fixture-front")->links.size(), (size_t)1);
+  CHECK_EQ(find_card(F::listCards(s), "fixture-back")->links.size(), (size_t)1);
+  F::closeSession(s);
+}
+
+TEST(move_cards) {
+  F::SessionHandle s = open_fixture();
+  F::ActionResult m = F::moveCards(s, {"fixture-back"}, 0);
+  REQUIRE_OK(m);
+  CHECK_EQ(card_order(s), uids({"fixture-back", "fixture-wrap", "fixture-front"}));
+  CHECK(m.stale.card_list);
+  CHECK(!m.stale.all);
+  for (const std::string& uid : card_order(s)) CHECK(contains(m.stale.card_uids, uid)); // all renumbered
+  CHECK_EQ(card_number(s, "fixture-back"), "1");
+  CHECK(m.dirty);
+  CHECK(!m.undo_name.empty());
+  F::ActionResult u = F::undo(s);
+  REQUIRE_OK(u);
+  CHECK(!u.can_undo);
+  CHECK(!u.dirty);
+  CHECK(u.stale.card_list);
+  CHECK_EQ(card_order(s), uids({"fixture-wrap", "fixture-front", "fixture-back"}));
+  CHECK_EQ(card_number(s, "fixture-back"), "3");
+  CHECK_OK(F::redo(s));
+  CHECK_EQ(card_order(s), uids({"fixture-back", "fixture-wrap", "fixture-front"}));
+  CHECK_OK(F::undo(s));
+  // several cards, in their order in the Set, one undo step; cards that keep their number aren't stale
+  F::ActionResult two = F::moveCards(s, {"fixture-back", "fixture-wrap"}, 1);
+  REQUIRE_OK(two);
+  CHECK_EQ(card_order(s), uids({"fixture-front", "fixture-wrap", "fixture-back"}));
+  CHECK(!contains(two.stale.card_uids, "fixture-back"));
+  CHECK(contains(two.stale.card_uids, "fixture-wrap"));
+  CHECK_OK(F::undo(s));
+  CHECK_EQ(card_order(s), uids({"fixture-wrap", "fixture-front", "fixture-back"}));
+  // to where they are: no undo step
+  F::ActionResult same = F::moveCards(s, {"fixture-front", "fixture-back"}, 1);
+  REQUIRE_OK(same);
+  CHECK(same.stale.empty());
+  CHECK(!same.can_undo);
+  // links follow the cards
+  CHECK_OK(F::moveCards(s, {"fixture-front"}, 2));
+  CHECK_EQ(find_card(F::listCards(s), "fixture-front")->links.size(), (size_t)1);
+  // errors
+  CHECK_EQ(F::moveCards(s, {"fixture-wrap"}, 3).status, F::Status::InvalidArgument);
+  CHECK_EQ(F::moveCards(s, {"fixture-wrap", "fixture-back"}, 2).status, F::Status::InvalidArgument);
+  CHECK_EQ(F::moveCards(s, {"fixture-wrap"}, -1).status, F::Status::InvalidArgument);
+  CHECK_EQ(F::moveCards(s, {}, 0).status, F::Status::InvalidArgument);
+  CHECK_EQ(F::moveCards(s, {"nope"}, 0).status, F::Status::NotFound);
+  F::closeSession(s);
+}
+
+/// Edit the card list, save with saveTo and check that the saved set has the same cards in the same
+/// order. The test `facade-card-list-desktop` then opens the saved set in the desktop build and
+/// runs the commands written here, which check the same.
+TEST(card_list_edits_save_and_reopen) {
+  F::SessionHandle s = open_fixture();
+  F::NewCardsResult added = F::addCard(s, 1);
+  REQUIRE_OK(added);
+  CHECK_OK(F::setValue(s, F::Target::card(added.uids.at(0)), "name", "Added Card"));
+  F::NewCardsResult copies = F::duplicateCards(s, {"fixture-front"});
+  REQUIRE_OK(copies);
+  CHECK_OK(F::removeCards(s, {"fixture-wrap"}));
+  CHECK_OK(F::moveCards(s, {copies.uids.at(1)}, 0));
+  CHECK(F::sessionInfo(s).dirty);
+  fs::path out = work_dir / "card-list-edits.mse-set";
+  int fd = ::open(out.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
+  F::ActionResult saved = F::saveTo(s, fd);
+  ::close(fd);
+  REQUIRE_OK(saved);
+  CHECK(!saved.dirty);
+  F::CardList a = F::listCards(s);
+  REQUIRE_OK(a);
+  CHECK_EQ(a.cards.size(), (size_t)5);
+  F::OpenResult again = F::openSession(out.string(), "");
+  REQUIRE_OK(again);
+  F::CardList b = F::listCards(again.session);
+  CHECK_EQ(card_order(s), card_order(again.session));
+  for (size_t i = 0 ; i < a.cards.size() && i < b.cards.size() ; ++i) {
+    CHECK_EQ(a.cards[i].name, b.cards[i].name);
+    CHECK_EQ(a.cards[i].links.size(), b.cards[i].links.size());
+    for (size_t j = 0 ; j < a.cards[i].links.size() && j < b.cards[i].links.size() ; ++j) {
+      CHECK_EQ(a.cards[i].links[j].uid, b.cards[i].links[j].uid);
+      CHECK_EQ(a.cards[i].links[j].relation, b.cards[i].links[j].relation);
+    }
+  }
+  F::closeSession(again.session);
+  // the same checks for the desktop build, as commands for `magicseteditor --cli`
+  std::ofstream cli(work_dir / "card-list-edits.mse-cli", std::ios::binary);
+  cli << "assert(length(set.cards) == " << a.cards.size() << ")\n";
+  for (size_t i = 0 ; i < a.cards.size() ; ++i) {
+    const F::CardInfo& c = a.cards[i];
+    std::string card = "set.cards[" + std::to_string(i) + "]";
+    cli << "assert(" << card << ".uid == \"" << c.uid << "\")\n";
+    cli << "assert(" << card << ".name == \"" << c.name << "\")\n";
+    cli << "assert(" << card << ".linked_card_1 == \"" << (c.links.empty() ? "" : c.links[0].uid) << "\")\n";
+  }
+  F::closeSession(s);
+}
+
 // ----------------------------------------------------------------------------- : Saving
 
 TEST(save_to_fd_and_reopen) {

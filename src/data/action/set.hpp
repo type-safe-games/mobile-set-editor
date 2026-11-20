@@ -76,6 +76,19 @@ public:
   const size_t card_id1, card_id2;  ///< Positions of the two cards to swap
 };
 
+/// Change the order of the card list: any reordering of the same cards, as one action
+class MoveCardsAction : public CardListAction {
+public:
+  /// new_order: the cards the set has when this action is performed, in their new order
+  MoveCardsAction(Set& set, const vector<CardP>& new_order);
+
+  String getName(bool to_undo) const override;
+  void perform(bool to_undo) override;
+
+private:
+  vector<CardP> order; ///< The order to switch to: the new one before perform, the old one after
+};
+
 // ----------------------------------------------------------------------------- : Link cards
 
 /// Add a link between two or more cards

@@ -55,4 +55,14 @@ add_test(
   NAME facade
   COMMAND facade_tests ${test_dir}/fixture ${PROJECT_BINARY_DIR}/test-output/facade ${FIXTURE_GOLDENS_DIR}
 )
-set_tests_properties(facade PROPERTIES ENVIRONMENT "${fixture_env}")
+set_tests_properties(facade PROPERTIES ENVIRONMENT "${fixture_env}" FIXTURES_SETUP facade-output)
+
+# A Set whose card list the facade edited and saved opens in the desktop build with the same cards
+set(facade_output "${PROJECT_BINARY_DIR}/test-output/facade")
+add_test(
+  NAME facade-card-list-desktop
+  COMMAND ${CMAKE_COMMAND} -DMSE=$<TARGET_FILE:magicseteditor> -DSET=${facade_output}/card-list-edits.mse-set
+          -DCOMMANDS=${facade_output}/card-list-edits.mse-cli -DWORKDIR=${PROJECT_BINARY_DIR}/test-output
+          -P ${test_dir}/run_cli.cmake
+)
+set_tests_properties(facade-card-list-desktop PROPERTIES ENVIRONMENT "${fixture_env}" FIXTURES_REQUIRED facade-output)

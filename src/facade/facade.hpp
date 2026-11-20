@@ -62,11 +62,19 @@ struct Result {
   bool ok() const { return status == Status::Ok; }
 };
 
-/// Which rendered cards an action made stale
+/// What an action made stale, for the host's render cache and card grid
+/** - all: re-render every card (after display, style or set info changes).
+ *  - card_uids: otherwise, re-render these cards. They include the cards an action added or put
+ *    back (undoing a removal), and every card whose rendering depends on the card list (e.g. a card
+ *    number) and changed with it.
+ *  - card_list: the list of cards changed (cards added, removed or moved). Call listCards() again
+ *    to rebuild the grid, and drop cached renders of uids that are no longer listed. Cards that
+ *    only moved keep their renders unless they are also in card_uids. */
 struct Stale {
-  bool all = false;                   ///< every card (after display, style or set info changes)
-  std::vector<std::string> card_uids; ///< otherwise these cards
-  bool empty() const { return !all && card_uids.empty(); }
+  bool all = false;
+  std::vector<std::string> card_uids;
+  bool card_list = false;
+  bool empty() const { return !all && card_uids.empty() && !card_list; }
 };
 
 /// The result of anything that changes the Set
@@ -144,6 +152,35 @@ struct CardList : Result {
   std::vector<CardInfo> cards; ///< in the Set's order
 };
 CardList listCards(SessionHandle session);
+
+// ----------------------------------------------------------------------------- : Changing the card list
+
+// Each call is one undo step, and reports `stale.card_list` (see Stale). Positions are indexes in
+// the Set's card order, as listCards() gives it.
+
+/// The cards a call made
+struct NewCardsResult : ActionResult {
+  std::vector<std::string> uids; ///< the new cards, in the Set's order
+};
+
+/// Add a new card: the Game's initial values, rendered with the Set's Style.
+/** It goes at `position` (0 = first), or at the end when position is -1. uids holds its uid. */
+NewCardsResult addCard(SessionHandle session, int position = -1);
+
+/// Duplicate cards. As the desktop's copy and paste does, the cards linked to them are duplicated
+/** too, and the copies are linked to each other the way the originals are (the originals' links
+ *  don't change). The copies get new uids and go right after the last of the cards copied, in the
+ *  same order as those. */
+NewCardsResult duplicateCards(SessionHandle session, const std::vector<std::string>& card_uids);
+
+/// Remove cards. A card left in the Set that was linked to a removed card loses that link; undo
+/** brings back both the cards and the links. */
+ActionResult removeCards(SessionHandle session, const std::vector<std::string>& card_uids);
+
+/// Move cards, in the order they have in the Set, so that the first of them ends up at
+/** `position` in the new order (0 <= position <= number of cards - number moved). Moving cards to
+ *  where they already are changes nothing and adds no undo step. */
+ActionResult moveCards(SessionHandle session, const std::vector<std::string>& card_uids, int position);
 
 // ----------------------------------------------------------------------------- : Fields and values
 

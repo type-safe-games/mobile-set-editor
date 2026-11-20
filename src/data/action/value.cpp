@@ -394,6 +394,11 @@ BulkAction::BulkAction(const vector<ActionP>& actions, const SetP& set, bool cha
     name_undo = actions.front()->getName(true);
   }
 }
+BulkAction::BulkAction(const vector<ActionP>& actions, const SetP& set, const Action& named_like)
+  : name_do(named_like.getName(false)), name_undo(named_like.getName(true)), actions(actions), set(set)
+{
+  if (actions.empty()) throw ScriptError(_("BulkAction created with no actions"));
+}
 BulkAction::~BulkAction() {}
 
 String BulkAction::getName(bool to_undo) const {

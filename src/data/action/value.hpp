@@ -257,6 +257,8 @@ public:
 class BulkAction : public Action {
 public:
   BulkAction(const vector<ActionP>& actions, const SetP& set, bool change_name);
+  /// A BulkAction with the name of one of its actions
+  BulkAction(const vector<ActionP>& actions, const SetP& set, const Action& named_like);
   ~BulkAction() override;
 
   String getName(bool to_undo) const override;

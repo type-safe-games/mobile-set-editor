@@ -42,3 +42,9 @@ card field:
 	name: rules
 	multi line: true
 	show statistics: false
+card field:
+	type: text
+	name: number
+	editable: false
+	show statistics: false
+	script: position(of: card, in: set) + 1

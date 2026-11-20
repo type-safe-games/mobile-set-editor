@@ -15,6 +15,7 @@ A tiny Game, Style and symbol font that public CI renders instead of the private
 | Slider field       | `level`, 0 to 5                                                       |
 | Image field        | `picture` (`image1.png` on the first card; empty on the others)       |
 | Linked card pair   | *Front Face* ↔ *Back Face*, through the game's `Front Face`/`Back Face` card link |
+| Card list script   | `number` (the card's position in the set; not drawn), for stale cards after card list changes |
 
 ## How the tests use it
 
