@@ -7,6 +7,7 @@
 // ----------------------------------------------------------------------------- : Includes
 
 #include <util/prec.hpp>
+#include <gfx/wx_image_adapter.hpp>
 #include <gui/symbol/select_editor.hpp>
 #include <gui/symbol/window.hpp>
 #include <gui/util.hpp>
@@ -28,14 +29,14 @@ SymbolSelectEditor::SymbolSelectEditor(SymbolControl* control, bool rotate)
 {
   // Load resource images
   Image rot = load_resource_image(_("handle_rotate"));
-  handleRotateTL = wxBitmap(rot);
-  handleRotateTR = wxBitmap(rotate_image(rot,rad90));
-  handleRotateBR = wxBitmap(rotate_image(rot,rad180));
-  handleRotateBL = wxBitmap(rotate_image(rot,rad270));
+  handleRotateTL = to_bitmap(rot);
+  handleRotateTR = to_bitmap(rotate_image(rot,rad90));
+  handleRotateBR = to_bitmap(rotate_image(rot,rad180));
+  handleRotateBL = to_bitmap(rotate_image(rot,rad270));
   Image shear = load_resource_image(_("handle_shear_x"));
-  handleShearX = wxBitmap(shear);
-  handleShearY = wxBitmap(rotate_image(shear,rad90));
-  handleCenter = wxBitmap(load_resource_image(_("handle_center")));
+  handleShearX = to_bitmap(shear);
+  handleShearY = to_bitmap(rotate_image(shear,rad90));
+  handleCenter = to_bitmap(load_resource_image(_("handle_center")));
   // Make sure all parts have updated bounds
   getSymbol()->updateBounds();
   resetActions();

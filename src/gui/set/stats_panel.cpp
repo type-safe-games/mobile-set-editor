@@ -7,6 +7,7 @@
 // ----------------------------------------------------------------------------- : Includes
 
 #include <util/prec.hpp>
+#include <gfx/wx_image_adapter.hpp>
 #include <gui/set/stats_panel.hpp>
 #include <gui/control/graph.hpp>
 #include <gui/control/gallery_list.hpp>
@@ -258,7 +259,7 @@ void StatDimensionList::drawItem(DC& dc, int x, int y, size_t item) {
       if (img.HasMask()) img.InitAlpha(); // we can't handle masks
       Image resampled(21, 21);
       resample_preserve_aspect(img, resampled);
-      if (img.Ok()) dim.icon = Bitmap(resampled);
+      if (img.Ok()) dim.icon = to_bitmap(resampled);
     }
   }
   if (dim.icon.Ok()) {

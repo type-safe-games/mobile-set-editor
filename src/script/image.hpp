@@ -105,7 +105,7 @@ public:
    */
   void generateCached(const GeneratedImage::Options& img_options,
                       CachedScriptableMask* mask,
-                      ImageCombine* combine, wxBitmap* bitmap, wxImage* image, RealSize* size);
+                      ImageCombine* combine, wxBitmap* bitmap, Image* image, RealSize* size);
   
   /// Update the script, returns true if the value has changed
   bool update(Context& ctx);

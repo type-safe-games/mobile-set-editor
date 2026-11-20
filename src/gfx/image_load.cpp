@@ -10,23 +10,23 @@
 #include <gfx/image_load.hpp>
 #include <util/error.hpp>
 #include <util/file_utils.hpp>
-#include <wx/mstream.h>
+#include <gfx/image_codec.hpp>
 
 // ----------------------------------------------------------------------------- : Image related
 
-// Image codec adapter (wx boundary, until images move off wx in #31):
-// wxImage decodes from a wxInputStream, and its format detection seeks around in it.
-// So the MSE stream is read into memory, and handed to wx as a seekable wxMemoryInputStream.
 bool image_load_file(Image& image, InputStream& stream) {
-  wxLogNull noLog; // prevent wx from showing popups about sRGB profiles and other notices
   std::string data = stream.readAll(); // (on a read error, decode what was read, as before)
-  wxMemoryInputStream wx_stream(data.data(), data.size());
-  return image.LoadFile(wx_stream);
+  return image_codec().decode(data.data(), data.size(), image);
 }
 
 bool image_load_file(Image& image, const String& name) {
-  wxLogNull noLog;
-  return retry_io([&]{ return image.LoadFile(name); });
+  return retry_io([&]{
+    FileInputStream stream(name);
+    if (!stream.ok()) return false;
+    std::string data = stream.readAll();
+    if (stream.error()) return false;
+    return image_codec().decode(data.data(), data.size(), image);
+  });
 }
 
 // ----------------------------------------------------------------------------- : Resource related
@@ -46,14 +46,14 @@ Image load_resource_image(const String& name) {
     if ( !data ) throw InternalError(format_string(_("Resource cannot be locked: %s"), name));
     
     int len = ::SizeofResource(wxGetInstance(), hResource);
-    wxMemoryInputStream stream(data, len);
 
-    wxLogNull noLog;
-    return wxImage(stream);
+    Image image;
+    image_codec().decode(data, len, image);
+    return image;
   #elif defined(__GNUC__)
     static String path = app_data_dir() + _("/resource/");
     String file = path + name;
-    wxImage resource;
+    Image resource;
     if (file_exists(file + _(".png"))) image_load_file(resource, file + _(".png"));
     else if (file_exists(file + _(".bmp"))) image_load_file(resource, file + _(".bmp"));
     else if (file_exists(file + _(".ico"))) image_load_file(resource, file + _(".ico"));

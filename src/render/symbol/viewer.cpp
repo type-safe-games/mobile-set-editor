@@ -7,6 +7,7 @@
 // ----------------------------------------------------------------------------- : Includes
 
 #include <util/prec.hpp>
+#include <gfx/wx_image_adapter.hpp>
 #include <render/symbol/viewer.hpp>
 #include <util/error.hpp> // clearDC_black
 #include <gfx/dc_util.hpp>
@@ -38,7 +39,7 @@ Image render_symbol(const SymbolP& symbol, double border_radius, int width, int 
   clearDC(dc, Color(0,128,0));
   viewer.draw(dc);
   dc.SelectObject(wxNullBitmap);
-  return bmp.ConvertToImage();
+  return from_bitmap(bmp);
 }
 
 // ----------------------------------------------------------------------------- : Constructor
@@ -85,7 +86,7 @@ static Image dc_to_image(DC& from) {
   tmpDC.SelectObject(bmp);
   tmpDC.Blit(0, 0, size.GetWidth(), size.GetHeight(), &from, 0, 0, wxCOPY);
   tmpDC.SelectObject(wxNullBitmap);
-  return bmp.ConvertToImage();
+  return from_bitmap(bmp);
 }
 
 // Combine all the temporary DCs with the main DC.
@@ -153,7 +154,7 @@ void SymbolViewer::combineBuffers(DC& dc, Buffers& b) {
     }
   }
 
-  Bitmap finalBmp(out);
+  Bitmap finalBmp = to_bitmap(out);
   dc.DrawBitmap(finalBmp, 0, 0, false);
 }
 
@@ -412,9 +413,9 @@ void SymbolViewer::combineBorderShape(const SymbolShape& shape, DC* border, DC* 
           if (accentData) accentData[k] = 0;
         }
       }
-      extra_border.DrawBitmap(Bitmap(extraImg), 0, 0, false);
-      if (border)        border       ->DrawBitmap(Bitmap(borderImg), 0, 0, false);
-      if (accent_border) accent_border->DrawBitmap(Bitmap(accentImg), 0, 0, false);
+      extra_border.DrawBitmap(to_bitmap(extraImg), 0, 0, false);
+      if (border)        border       ->DrawBitmap(to_bitmap(borderImg), 0, 0, false);
+      if (accent_border) accent_border->DrawBitmap(to_bitmap(accentImg), 0, 0, false);
       break;
     }
   }

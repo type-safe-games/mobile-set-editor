@@ -16,7 +16,7 @@
 
 AboutWindow::AboutWindow(Window* parent)
   : wxDialog(parent, wxID_ANY, _TITLE_("about"), wxDefaultPosition, wxSize(510,460), wxCLIP_CHILDREN | wxDEFAULT_DIALOG_STYLE | wxTAB_TRAVERSAL)
-  , logo(load_resource_image(settings.darkModePrefix() + _("about")))
+  , logo(load_resource_wx_image(settings.darkModePrefix() + _("about")))
 {
   // init controls
   wxControl* ok_button = new HoverButton(this, wxID_OK, _("btn_ok"));
@@ -183,10 +183,10 @@ HoverButton::HoverButton(Window* parent, int id, const String& name, const Color
 void HoverButton::loadBitmaps(const String& name) {
   if (bitmaps == name) return;
   bitmaps = name;
-  bg_normal = Bitmap(load_resource_image(name + _("_normal")));
-  bg_hover  = Bitmap(load_resource_image(name + _("_hover")));
-  bg_focus  = Bitmap(load_resource_image(name + _("_focus")));
-  bg_down   = Bitmap(load_resource_image(name + _("_down")));
+  bg_normal = Bitmap(load_resource_wx_image(name + _("_normal")));
+  bg_hover  = Bitmap(load_resource_wx_image(name + _("_hover")));
+  bg_focus  = Bitmap(load_resource_wx_image(name + _("_focus")));
+  bg_down   = Bitmap(load_resource_wx_image(name + _("_down")));
   Refresh(false);
 }
 

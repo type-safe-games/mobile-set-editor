@@ -7,6 +7,7 @@
 // ----------------------------------------------------------------------------- : Includes
 
 #include <util/prec.hpp>
+#include <gfx/wx_image_adapter.hpp>
 #include <render/value/image.hpp>
 #include <render/card/viewer.hpp>
 #include <gfx/dc_util.hpp>
@@ -46,7 +47,7 @@ void ImageValueViewer::draw(RotatedDC& dc) {
       if ((what & DRAW_EDITING) && field().editable) {
         bitmap = imagePlaceholder(dc, w, h, image, true);
         if (alpha_mask.isLoaded() || !is_rad0(a)) {
-          image = bitmap.ConvertToImage(); // we need to convert back to an image
+          image = from_bitmap(bitmap); // we need to convert back to an image
         } else {
           image = Image();
         }
@@ -55,10 +56,10 @@ void ImageValueViewer::draw(RotatedDC& dc) {
     // checkerboard placeholder
     if (!image.Ok() && !bitmap.Ok() && style().width > 40) {
       // placeholder bitmap
-      bitmap = imagePlaceholder(dc, w, h, wxNullImage, (what & DRAW_EDITING) && field().editable);
+      bitmap = imagePlaceholder(dc, w, h, Image(), (what & DRAW_EDITING) && field().editable);
       if (alpha_mask.isLoaded() || !is_rad0(a)) {
         // we need to convert back to an image
-        image = bitmap.ConvertToImage();
+        image = from_bitmap(bitmap);
       }
     }
     // done
@@ -67,7 +68,7 @@ void ImageValueViewer::draw(RotatedDC& dc) {
       alpha_mask.setAlpha(image);
       size = RealSize(image);
       image = rotate_image(image, angle);
-      bitmap = Bitmap(image);
+      bitmap = to_bitmap(image);
     }
   }
   // border

@@ -7,6 +7,7 @@
 // ----------------------------------------------------------------------------- : Includes
 
 #include <util/prec.hpp>
+#include <gfx/wx_image_adapter.hpp>
 #include <gui/package_update_list.hpp>
 #include <gui/thumbnail_thread.hpp>
 #include <gui/util.hpp>
@@ -116,10 +117,10 @@ void PackageUpdateList::TreeItem::setIcon(const Image& img) {
   }
   if (package) package->description->icon = image;
   Image resampled = resample_preserve_aspect(image,16,16);
-  icon = Bitmap(resampled);
+  icon = to_bitmap(resampled);
   saturate(resampled, -.75);
   set_alpha(resampled,0.5);
-  icon_grey = Bitmap(resampled);
+  icon_grey = to_bitmap(resampled);
 }
 
 
@@ -180,7 +181,7 @@ public:
     if (!result) return Image();
     wxInputStream* is(request.GetResponse().GetStream());
     if (!is) return Image();
-    Image img(*is);
+    Image img = from_wx_image(wxImage(*is));
     if (!img.IsOk()) return Image();
     ti->setIcon(img);
     return img;

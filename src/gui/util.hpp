@@ -38,7 +38,7 @@ function<bool(int done, int total)> import_cards_progress();
 // ----------------------------------------------------------------------------- : Tool/menu bar
 
 /// Generate an image to use for the disabled state of menu and toolbar items
-Image generate_disabled_image(Image const& image);
+wxImage generate_disabled_image(wxImage const& image);
 
 void set_menu_item_image(wxMenuItem* item, const String& resource);
 
@@ -62,6 +62,9 @@ wxCursor load_resource_cursor(const String& name);
 
 /// Load an icon from a resource
 wxIcon load_resource_icon(const String& name);
+
+/// Load an image from the program's resources, as a wxImage
+wxImage load_resource_wx_image(const String& name);
 
 /// Load an image for use in a toolbar (filename: tool/...) from a resource
 wxImage load_resource_tool_image(const String& name);

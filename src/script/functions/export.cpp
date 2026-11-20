@@ -7,6 +7,7 @@
 // ----------------------------------------------------------------------------- : Includes
 
 #include <util/prec.hpp>
+#include <gfx/image_load.hpp>
 #include <script/functions/functions.hpp>
 #include <script/functions/util.hpp>
 #include <script/image.hpp>
@@ -197,7 +198,7 @@ String symbols_to_html(const String& str, SymbolFont& symbol_font, double size) 
       // save symbol image
       Image img = symbol_font.getImage(size, sym);
       String out_path = join_path(ei.directory_absolute, filename);
-      if (!retry_io([&]{ return img.SaveFile(out_path); })) {
+      if (!retry_io([&]{ return image_save_file(img, out_path); })) {
         throw Error(_("Unable to write symbol image file '") + out_path + _("'"));
       }
       it = ei.exported_images.insert(make_pair(filename, wxSize(img.GetWidth(), img.GetHeight()))).first;
@@ -479,7 +480,7 @@ SCRIPT_FUNCTION(write_image_file) {
   if (!img.Ok()) throw Error(_("Unable to generate image for file ") + file);
   // write
   ensure_dir_valid(out_path);
-  if (!retry_io([&]{ return img.SaveFile(out_path); })) {
+  if (!retry_io([&]{ return image_save_file(img, out_path); })) {
     throw Error(_("Unable to write image file '") + out_path + _("'"));
   }
   ei.exported_images.insert(make_pair(file, wxSize(img.GetWidth(), img.GetHeight())));

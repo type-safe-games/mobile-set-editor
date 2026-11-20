@@ -17,7 +17,7 @@
 IMPLEMENT_VALUE_EDITOR(Symbol)
   , button_down(-2)
 {
-  button_images[0] = Bitmap(load_resource_image(_("edit_symbol")));
+  button_images[0] = Bitmap(load_resource_wx_image(_("edit_symbol")));
 }
 
 void SymbolValueEditor::draw(RotatedDC& dc) {

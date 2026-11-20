@@ -74,7 +74,7 @@ void linear_blend(Image& img1, const Image& img2, double x1,double y1, double x2
   }
 
   //transfer metadata
-  img1.SetOption(wxIMAGE_OPTION_PNG_DESCRIPTION, metadata_merge(img1, img2));
+  img1.SetMetadata(metadata_merge(img1, img2));
 }
 
 // ----------------------------------------------------------------------------- : Mask Blend
@@ -108,7 +108,7 @@ void mask_blend(Image& light, const Image& dark, const Image& mask) {
   }
 
   //transfer metadata
-  light.SetOption(wxIMAGE_OPTION_PNG_DESCRIPTION, metadata_merge(light, dark));
+  light.SetMetadata(metadata_merge(light, dark));
 }
 
 // ----------------------------------------------------------------------------- : Alpha

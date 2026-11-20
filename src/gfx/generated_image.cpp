@@ -339,9 +339,9 @@ Image EnlargeImage::generate(const Options& opt) {
     }
   }
   // transfer metadata
-  if (img.HasOption(wxIMAGE_OPTION_PNG_DESCRIPTION)) {
-    String metadata = transformAllEncodedRects(img.GetOption(wxIMAGE_OPTION_PNG_DESCRIPTION).ToStdWstring(), RealRect::translate, dw, dh);
-    larger.SetOption(wxIMAGE_OPTION_PNG_DESCRIPTION, metadata);
+  if (img.HasMetadata()) {
+    String metadata = transformAllEncodedRects(img.GetMetadata(), RealRect::translate, dw, dh);
+    larger.SetMetadata(metadata);
   }
   // done
   return larger;
@@ -389,7 +389,7 @@ Image StrokeImage::generate(const Options& opt) {
   Image s_img = make_stroke_image(base_img, color, radius, blur);
   if (include_image) {
     int offset = radius + blur;
-    s_img.Paste(base_img, offset, offset, wxIMAGE_ALPHA_BLEND_COMPOSE);
+    s_img.Paste(base_img, offset, offset, IMAGE_ALPHA_BLEND_COMPOSE);
   }
   return s_img;
 }
@@ -417,7 +417,7 @@ Image BleedEdgedImage::generate(const Options& opt) {
   }
   int width = w + dw + dw, height = h + dh + dh;
   UInt size = width * height;
-  Image img = wxImage(width, height, false);
+  Image img = Image(width, height, false);
   img.InitAlpha();
   Byte* pixels = img.GetData();
   Byte* alpha = img.GetAlpha();
@@ -429,13 +429,13 @@ Image BleedEdgedImage::generate(const Options& opt) {
     alpha[i] = background_color.Alpha();
   }
   // paste original image
-  img.Paste(base_img, dw, dh, wxIMAGE_ALPHA_BLEND_COMPOSE);
+  img.Paste(base_img, dw, dh, IMAGE_ALPHA_BLEND_COMPOSE);
   // add bleed edge
   if (!mirror_bleed_edge(img, dw, dh)) return base_img; // too small, error already reported
   // transfer metadata
-  if (base_img.HasOption(wxIMAGE_OPTION_PNG_DESCRIPTION)) {
-    String metadata = transformAllEncodedRects(base_img.GetOption(wxIMAGE_OPTION_PNG_DESCRIPTION).ToStdWstring(), RealRect::translate, dw, dh);
-    img.SetOption(wxIMAGE_OPTION_PNG_DESCRIPTION, metadata);
+  if (base_img.HasMetadata()) {
+    String metadata = transformAllEncodedRects(base_img.GetMetadata(), RealRect::translate, dw, dh);
+    img.SetMetadata(metadata);
   }
   // done
   return img;
@@ -475,7 +475,7 @@ Image InsertedImage::generate(const Options& opt) {
   if (height <= 0) throw ScriptError(_ERROR_1_("negative image height", _("insert_image")));
 
   UInt size = width * height;
-  Image img = wxImage(width, height, false);
+  Image img = Image(width, height, false);
   img.InitAlpha();
   Byte* data = img.GetData();
   Byte* alpha = img.GetAlpha();
@@ -492,11 +492,11 @@ Image InsertedImage::generate(const Options& opt) {
     alpha += 1;
   }
 
-  img.Paste(base_img, base_x, base_y, wxIMAGE_ALPHA_BLEND_COMPOSE);
-  img.Paste(inserted_img, inserted_x, inserted_y, wxIMAGE_ALPHA_BLEND_COMPOSE);
+  img.Paste(base_img, base_x, base_y, IMAGE_ALPHA_BLEND_COMPOSE);
+  img.Paste(inserted_img, inserted_x, inserted_y, IMAGE_ALPHA_BLEND_COMPOSE);
 
   // transfer metadata
-  img.SetOption(wxIMAGE_OPTION_PNG_DESCRIPTION, metadata_merge(base_img, inserted_img, base_x, base_y, inserted_x, inserted_y));
+  img.SetMetadata(metadata_merge(base_img, inserted_img, base_x, base_y, inserted_x, inserted_y));
   return img;
 }
 
@@ -734,7 +734,7 @@ bool ImageValueToImage::operator == (const GeneratedImage& that) const {
 
 Image SetMetadataImage::generate(const Options& opt) {
   Image img = image->generate(opt);
-  img.SetOption(wxIMAGE_OPTION_PNG_DESCRIPTION, metadata);
+  img.SetMetadata(metadata);
   return img;
 }
 bool SetMetadataImage::operator == (const GeneratedImage& that) const {
@@ -752,7 +752,7 @@ ScriptedImage::ScriptedImage(Set* set, const GeneratedImageP& image) {
   // add the file to the set
   LocalFileName new_image_file = set->newFileName(_("scripted_image"), _(".png"));
   String out_path = set->nameOut(new_image_file);
-  if (!retry_io([&]{ return img.SaveFile(out_path, wxBITMAP_TYPE_PNG); })) {
+  if (!retry_io([&]{ return image_save_file(img, out_path, _("png")); })) {
     throw ScriptError(_ERROR_1_("can't write image to set", out_path));
   }
   savename = new_image_file.toStringForWriting();
@@ -797,7 +797,7 @@ ImportedImage::ImportedImage(Set* set, const String& filepath) {
   // add the file to the set
   LocalFileName new_image_file = set->newFileName(savename, _(".png"));
   String out_path = set->nameOut(new_image_file);
-  if (!retry_io([&]{ return img.SaveFile(out_path, wxBITMAP_TYPE_PNG); })) {
+  if (!retry_io([&]{ return image_save_file(img, out_path, _("png")); })) {
     throw ScriptError(_ERROR_1_("can't write image to set", out_path));
   }
   savename = new_image_file.toStringForWriting();
@@ -842,7 +842,7 @@ DownloadedImage::DownloadedImage(Set* set, const String& url) {
   // add the file to the set
   LocalFileName new_image_file = set->newFileName(savename, _(".png"));
   String out_path = set->nameOut(new_image_file);
-  if (!retry_io([&]{ return download.image.SaveFile(out_path, wxBITMAP_TYPE_PNG); })) {
+  if (!retry_io([&]{ return image_save_file(download.image, out_path, _("png")); })) {
     throw ScriptError(_ERROR_1_("can't write image to set", out_path));
   }
   savename = new_image_file.toStringForWriting();

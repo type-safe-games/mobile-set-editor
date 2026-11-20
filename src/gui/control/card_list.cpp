@@ -7,6 +7,7 @@
 // ----------------------------------------------------------------------------- : Includes
 
 #include <util/prec.hpp>
+#include <gfx/wx_image_adapter.hpp>
 #include <util/uid.hpp>
 #include <gui/control/card_list.hpp>
 #include <gui/control/card_list_column_select.hpp>
@@ -288,7 +289,7 @@ void CardListBase::parseImageMetadata(CardP& card, const Image& image) {
           img = rotate_image(img, deg_to_rad(360 - degrees));
           LocalFileName filename = set->newFileName(_("cropped_image"), _(".png")); // a new unique name in the package
           String out_path = set->nameOut(filename);
-          if (retry_io([&]{ return img.SaveFile(out_path, wxBITMAP_TYPE_PNG); })) {
+          if (retry_io([&]{ return image_save_file(img, out_path, _("png")); })) {
             value->filename = filename;
           } else {
             value->filename = LocalFileName();
@@ -312,7 +313,7 @@ void CardListBase::parseImageMetadata(CardP& card) {
         if (img.IsOk()) {
           LocalFileName filename = set->newFileName(_("decoded_image"), _(".png")); // a new unique name in the package
           String out_path = set->nameOut(filename);
-          if (retry_io([&]{ return img.SaveFile(out_path, wxBITMAP_TYPE_PNG); })) {
+          if (retry_io([&]{ return image_save_file(img, out_path, _("png")); })) {
             value->filename = filename;
           } else {
             value->filename = LocalFileName();
@@ -357,7 +358,6 @@ bool CardListBase::parseFiles(wxArrayString& filenames, vector<CardP>& out) {
     if (wxImage::CanRead(filenames[i])) {
       // if it's an image file, try to get meta_data
       Image image_file;
-      image_file.SetLoadFlags(image_file.GetLoadFlags() & ~wxImage::Load_Verbose);
       if (image_load_file(image_file, filenames[i].ToStdWstring())) {
         parseImage(image_file, out);
       }
@@ -385,8 +385,8 @@ bool CardListBase::parseFiles(wxArrayString& filenames, vector<CardP>& out) {
 
 bool CardListBase::parseImage(Image& image, vector<CardP>& out) {
   size_t j = out.size();
-  if (image.HasOption(wxIMAGE_OPTION_PNG_DESCRIPTION)) {
-    String text = image.GetOption(wxIMAGE_OPTION_PNG_DESCRIPTION).ToStdWstring();
+  if (image.HasMetadata()) {
+    String text = image.GetMetadata();
     parseText(text, out);
 
     // crop image rects to populate image fields
@@ -481,7 +481,7 @@ bool CardListBase::parseData(bool ignore_cards_from_own_card_list) {
           return false;
         }
         try {
-          Image image = image_data->GetImage();
+          Image image = from_wx_image(image_data->GetImage());
           if (!image.IsOk() || image.GetWidth() > 20000 || image.GetHeight() > 20000) {
             queue_message(MESSAGE_ERROR, _("Image too large or corrupted"));
             return false;
@@ -515,7 +515,7 @@ bool CardListBase::parseData(bool ignore_cards_from_own_card_list) {
             queue_message(MESSAGE_ERROR, _("Bitmap too large or corrupted"));
             return false;
           }
-          Image image = bitmap.ConvertToImage();
+          Image image = from_bitmap(bitmap);
           parseImage(image, new_cards);
         } catch (const std::bad_alloc&) {
           //queue_message(MESSAGE_ERROR, _("Bitmap or Image couldn't be allocated"));

@@ -7,6 +7,7 @@
 // ----------------------------------------------------------------------------- : Includes
 
 #include <util/prec.hpp>
+#include <gfx/wx_image_adapter.hpp>
 #include <data/format/image_encoding.hpp>
 #include <gfx/gfx.hpp>
 #include <util/reflect.hpp>
@@ -594,12 +595,12 @@ void combine_image(Image& a, const Image& b, ImageCombine combine) {
   }
 
   //transfer metadata
-  a.SetOption(wxIMAGE_OPTION_PNG_DESCRIPTION, metadata_merge(a, b));
+  a.SetMetadata(metadata_merge(a, b));
 }
 
 void draw_combine_image(DC& dc, UInt x, UInt y, const Image& img, ImageCombine combine) {
   if (combine <= COMBINE_NORMAL) {
-    dc.DrawBitmap(img, x, y);
+    dc.DrawBitmap(to_bitmap(img), x, y);
   } else {
     // Capture the current image in the target rectangle
     Bitmap sourceB(img.GetWidth(), img.GetHeight());
@@ -607,9 +608,9 @@ void draw_combine_image(DC& dc, UInt x, UInt y, const Image& img, ImageCombine c
     sourceDC.SelectObject(sourceB);
     sourceDC.Blit(0, 0, img.GetWidth(), img.GetHeight(), &dc, x, y);
     sourceDC.SelectObject(wxNullBitmap);
-    Image source = sourceB.ConvertToImage();
+    Image source = from_bitmap(sourceB);
     // Combine and draw
     combine_image(source, img, combine);
-    dc.DrawBitmap(source, x, y);
+    dc.DrawBitmap(to_bitmap(source), x, y);
   }
 }

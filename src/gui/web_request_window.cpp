@@ -7,6 +7,7 @@
 // ----------------------------------------------------------------------------- : Includes
 
 #include <util/prec.hpp>
+#include <gfx/wx_image_adapter.hpp>
 #include <gui/web_request_window.hpp>
 #include <gui/window_id.hpp>
 #include <wx/mstream.h>
@@ -90,7 +91,7 @@ void WebRequestWindow::onComplete(wxWebRequestEvent& evt) {
 
   content_type = response.GetHeader(_("Content-Type")); // GetContentType() is wx >= 3.3
   if (starts_with(content_type, _("image/"))) {
-    image_out = Image(*stream);
+    image_out = from_wx_image(wxImage(*stream));
     if (!image_out.IsOk()) {
       onFail(_ERROR_("web request corrupted"));
       return;

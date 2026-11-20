@@ -7,6 +7,7 @@
 // ----------------------------------------------------------------------------- : Includes
 
 #include <util/prec.hpp>
+#include <gfx/wx_image_adapter.hpp>
 #include <gui/image_slice_window.hpp>
 #include <gui/util.hpp>
 #include <gui/window_id.hpp>
@@ -205,17 +206,17 @@ ImageSliceWindow::ImageSliceWindow(Window* parent, const Image& source, const St
 
           s7->Add(new wxStaticText(this, wxID_ANY, _LABEL_("selection center")), 0, wxALIGN_CENTER_VERTICAL);
           wxBoxSizer* s7A = new wxBoxSizer(wxHORIZONTAL);
-            wxBitmapButton* center_vertically_button = new wxBitmapButton(this, ID_SELECTION_CENTER_VERTICALLY, wxBitmap(load_resource_image(_("shape_align_middle"))));
+            wxBitmapButton* center_vertically_button = new wxBitmapButton(this, ID_SELECTION_CENTER_VERTICALLY, wxBitmap(load_resource_wx_image(_("shape_align_middle"))));
             center_vertically_button->SetToolTip(_LABEL_("selection center vertically"));
             s7A->Add(center_vertically_button);
             s7A->AddStretchSpacer();
 
-            wxBitmapButton* center_horizontally_button = new wxBitmapButton(this, ID_SELECTION_CENTER_HORIZONTALLY, wxBitmap(load_resource_image(_("shape_align_center"))));
+            wxBitmapButton* center_horizontally_button = new wxBitmapButton(this, ID_SELECTION_CENTER_HORIZONTALLY, wxBitmap(load_resource_wx_image(_("shape_align_center"))));
             center_horizontally_button->SetToolTip(_LABEL_("selection center horizontally"));
             s7A->Add(center_horizontally_button);
             s7A->AddStretchSpacer();
 
-            wxBitmapButton* center_button = new wxBitmapButton(this, ID_SELECTION_CENTER, wxBitmap(load_resource_image(_("shape_align_both"))));
+            wxBitmapButton* center_button = new wxBitmapButton(this, ID_SELECTION_CENTER, wxBitmap(load_resource_wx_image(_("shape_align_both"))));
             center_button->SetToolTip(_LABEL_("selection center both"));
             s7A->Add(center_button);
           s7->Add(s7A, 1, wxEXPAND, 0);
@@ -528,7 +529,7 @@ void ImageSlicePreview::draw(DC& dc) {
       rdc.DrawImage(image, RealPoint(0,0));
       mdc.SelectObject(wxNullBitmap);
     } else {
-      bitmap = Bitmap(image);
+      bitmap = to_bitmap(image);
     }
 
     // Rescale the bitmap based on the available size.
@@ -733,7 +734,7 @@ void ImageSliceSelector::createBitmap() {
   wxSize s = GetClientSize();
   int width = s.GetWidth() - 2*border, height = s.GetHeight() - 2*border;
   Image img = resample(slice.source, width, height);
-  bitmap = Bitmap(img);
+  bitmap = to_bitmap(img);
   scaleX = (double)width  / slice.source.GetWidth();
   scaleY = (double)height / slice.source.GetHeight();
   // Initialize bitmap_no_sel to be the same bitmap, only with a faded color and blurred
@@ -747,7 +748,7 @@ void ImageSliceSelector::createBitmap() {
     img_no_sel.InitAlpha();
     memcpy(img_no_sel.GetAlpha(), img.GetAlpha(), img.GetWidth() * img.GetHeight());
   }
-  bitmap_no_sel = Bitmap(img_no_sel);
+  bitmap_no_sel = to_bitmap(img_no_sel);
 }
 
 // ----------------------------------------------------------------------------- : ImageSliceSelector : Mouse

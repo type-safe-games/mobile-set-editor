@@ -63,13 +63,13 @@ Color ui_color(UIColor which);
 
 // -----------------------------------------------------------------------------
 // RGB Color, packed into 3 bytes
-// These are used for arrays in wxImage
+// These are used for arrays in Image
 // -----------------------------------------------------------------------------
 
 // stupid headers stealing useful names
 #undef RGB
 
-// it is important to pack this into 3 bytes, so we can directly convert from wxImage data
+// it is important to pack this into 3 bytes, so we can directly convert from Image data
 #if defined(_MSC_VER)
   #pragma pack(push, 1)
   #define MAKE_PACKED

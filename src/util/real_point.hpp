@@ -46,7 +46,7 @@ public:
     : width(v.x), height(v.y)
   {}
   /// size of an image
-  inline explicit RealSize(const wxImage& img)
+  inline explicit RealSize(const Image& img)
     : width(img.GetWidth()), height(img.GetHeight())
   {}
   /// size of a bitmap

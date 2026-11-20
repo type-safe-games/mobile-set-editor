@@ -14,6 +14,7 @@
 
 #include <util/prec.hpp>
 #include <util/io/stream.hpp>
+#include <gfx/image_codec.hpp>
 
 // ----------------------------------------------------------------------------- : Image loading
 

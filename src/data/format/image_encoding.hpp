@@ -11,6 +11,7 @@
 #include <util/prec.hpp>
 #include <util/real_point.hpp>
 #include <util/file_utils.hpp>
+#include <gfx/image_load.hpp>
 #include <boost/json.hpp>
 #include <fstream>
 #include <filesystem>
@@ -192,9 +193,8 @@ inline static bool UTF8ToFile(const String& filepath, std::string& data) {
 
 /// Encode an image in a string
 inline static std::string encodeImageInString(const Image& img) {
-  wxLogNull noLog; // suppress popups from cleaning up a possibly-missing temp file below
   String temppath = make_temp_file_name(_("mse")) + _(".png");
-  retry_io([&]{ return img.SaveFile(temppath, wxBITMAP_TYPE_PNG); });
+  retry_io([&]{ return image_save_file(img, temppath, _("png")); });
   std::string s = "<mse-image-data>" + fileToUTF8(temppath) + "</mse-image-data>";
   remove_file(temppath);
   remove_file(temppath.substr(0, temppath.size() - 4));
@@ -210,10 +210,9 @@ inline static bool decodeImageFromString(const String& string, Image& img_out) {
   std::string s = encode_utf8(string.substr(first + 16, last - (first + 16)));
   if (s.empty()) return true;
 
-  wxLogNull noLog; // suppress popups from cleaning up a possibly-missing temp file below
   String temppath = make_temp_file_name(_("mse")) + _(".png");
   if (UTF8ToFile(temppath, s)) {
-    retry_io([&]{ return img_out.LoadFile(temppath, wxBITMAP_TYPE_PNG); });
+    retry_io([&]{ return image_load_file(img_out, temppath); });
   }
   remove_file(temppath);
   remove_file(temppath.substr(0, temppath.size() - 4));
@@ -224,11 +223,11 @@ inline static bool decodeImageFromString(const String& string, Image& img_out) {
 
 inline static String metadata_merge(const Image& img1, const Image& img2, int offset_x1 = 0, int offset_y1 = 0, int offset_x2 = 0, int offset_y2 = 0)
 {
-  if (img1.HasOption(wxIMAGE_OPTION_PNG_DESCRIPTION)) {
-    String metadata1 = img1.GetOption(wxIMAGE_OPTION_PNG_DESCRIPTION).ToStdWstring();
+  if (img1.HasMetadata()) {
+    String metadata1 = img1.GetMetadata();
     if (offset_x1 != 0 || offset_y1 != 0) metadata1 = transformAllEncodedRects(metadata1, RealRect::translate, offset_x1, offset_y1);
-    if (img2.HasOption(wxIMAGE_OPTION_PNG_DESCRIPTION)) {
-      String metadata2 = img2.GetOption(wxIMAGE_OPTION_PNG_DESCRIPTION).ToStdWstring();
+    if (img2.HasMetadata()) {
+      String metadata2 = img2.GetMetadata();
       if (offset_x2 != 0 || offset_y2 != 0) metadata2 = transformAllEncodedRects(metadata2, RealRect::translate, offset_x2, offset_y2);
       size_t end1 = metadata1.find(_("</mse-card-data>"));
       size_t start2 = metadata2.find(_("<mse-card-data>"));
@@ -238,8 +237,8 @@ inline static String metadata_merge(const Image& img1, const Image& img2, int of
     }
     return metadata1;
   }
-  else if (img2.HasOption(wxIMAGE_OPTION_PNG_DESCRIPTION)) {
-    String metadata2 = img2.GetOption(wxIMAGE_OPTION_PNG_DESCRIPTION).ToStdWstring();
+  else if (img2.HasMetadata()) {
+    String metadata2 = img2.GetMetadata();
     if (offset_x2 != 0 || offset_y2 != 0) metadata2 = transformAllEncodedRects(metadata2, RealRect::translate, offset_x2, offset_y2);
     return metadata2;
   }

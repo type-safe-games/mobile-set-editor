@@ -7,6 +7,8 @@
 // ----------------------------------------------------------------------------- : Includes
 
 #include <util/prec.hpp>
+#include <gfx/wx_image_adapter.hpp>
+#include <gfx/image_load.hpp>
 #include <util/tagged_string.hpp>
 #include <data/format/formats.hpp>
 #include <data/game.hpp>
@@ -105,7 +107,7 @@ static Image render_face(const SetP& set, const ExportPart& part) {
   dc.SelectObject(bitmap);
   viewer.draw(dc);
   dc.SelectObject(wxNullBitmap);
-  Image img = bitmap.ConvertToImage();
+  Image img = from_bitmap(bitmap);
   // rotate
   img = rotate_image(img, face_settings.angle_radians);
   // add print bleed edge (reports an error and leaves the image as is if it is too small)
@@ -264,12 +266,12 @@ static Image render_row(const SetP& set, const vector<ExportPart>& parts, int pa
   vector<int> offsets;
   Image img = stitch_row(imgs, padding, offsets);
   if (write_metadata) {
-    img.SetOption(wxIMAGE_OPTION_PNG_DESCRIPTION, row_metadata(set, parts, imgs, offsets));
+    img.SetMetadata(row_metadata(set, parts, imgs, offsets));
   }
   return img;
 }
 
-// ----------------------------------------------------------------------------- : wxImage export
+// ----------------------------------------------------------------------------- : Image export
 
 Image export_image(const SetP& set, const CardP& card, bool write_metadata, const Settings::ExportSettings& card_settings) {
   if (!set) throw Error(_("no set"));
@@ -296,7 +298,7 @@ Image export_image(const SetP& set, const vector<CardP>& cards, int padding, Exp
 // ----------------------------------------------------------------------------- : File export
 
 static void save_image(const Image& img, const String& filename) {
-  if (!retry_io([&]{ return img.SaveFile(filename); })) {
+  if (!retry_io([&]{ return image_save_file(img, filename); })) {
     throw Error(_("Unable to write image file '") + filename + _("'"));
   }
 }

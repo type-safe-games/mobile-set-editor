@@ -7,6 +7,7 @@
 // ----------------------------------------------------------------------------- : Includes
 
 #include <util/prec.hpp>
+#include <gfx/wx_image_adapter.hpp>
 #include <gui/set/console_panel.hpp>
 #include <gui/set/window.hpp>
 #include <gui/control/text_ctrl.hpp>
@@ -53,11 +54,11 @@ public:
     // icons
     static_assert(MESSAGE_TYPE_MAX == 7);
     icons[MESSAGE_NONE]    = wxBitmap();
-    icons[MESSAGE_INPUT]   = wxBitmap(load_resource_image(_("message_input")));
+    icons[MESSAGE_INPUT]   = wxBitmap(load_resource_wx_image(_("message_input")));
     icons[MESSAGE_OUTPUT]  = wxBitmap();
-    icons[MESSAGE_INFO]    = wxBitmap(load_resource_image(_("message_information")));
-    icons[MESSAGE_WARNING] = wxBitmap(load_resource_image(_("message_warning")));
-    icons[MESSAGE_ERROR]   = wxBitmap(load_resource_image(_("message_error")));
+    icons[MESSAGE_INFO]    = wxBitmap(load_resource_wx_image(_("message_information")));
+    icons[MESSAGE_WARNING] = wxBitmap(load_resource_wx_image(_("message_warning")));
+    icons[MESSAGE_ERROR]   = wxBitmap(load_resource_wx_image(_("message_error")));
     icons[MESSAGE_FATAL_ERROR] = icons[MESSAGE_ERROR];
     // color
     colors[MESSAGE_INPUT]   = wxColour(0,80,0);
@@ -626,15 +627,15 @@ void ConsolePanel::exec(String const& command) {
     ScriptType type = result->type();
     if (type == SCRIPT_IMAGE) {
       GeneratedImage::Options options(0,0, card->stylesheet ? card->stylesheet.get() : set->stylesheet.get(), set.get());
-      wxImage image = result->toImage()->generate(options);
-      message->bitmap = wxBitmap(image);
+      Image image = result->toImage()->generate(options);
+      message->bitmap = to_bitmap(image);
     } else if (type == SCRIPT_COLOR) {
       message->text = result->toCode();
       Color color = result->toColor();
-      wxImage image(30,20);
+      Image image(30,20);
       fill_image(image,color);
       set_alpha(image, color.Alpha() / 255.0);
-      message->bitmap = wxBitmap(image);
+      message->bitmap = to_bitmap(image);
     } else {
       try {
         boost::json::value jresult = mse_to_json(result, set.get(), true);
@@ -697,12 +698,12 @@ void ConsolePanel::onTimer(wxTimerEvent&) {
 void ConsolePanel::update_blinker() {
   SetWindow* parent = static_cast<SetWindow*>(GetParent());
   if (blinker_state % 2 == 1 || !new_errors_since_last_view) {
-    parent->setPanelIcon(this, load_resource_image(_("tool/window_console")));
+    parent->setPanelIcon(this, load_resource_wx_image(_("tool/window_console")));
   } else if (new_errors_since_last_view == MESSAGE_INFO) {
-    parent->setPanelIcon(this, load_resource_image(_("message_information")));
+    parent->setPanelIcon(this, load_resource_wx_image(_("message_information")));
   } else if (new_errors_since_last_view == MESSAGE_WARNING) {
-    parent->setPanelIcon(this, load_resource_image(_("message_warning")));
+    parent->setPanelIcon(this, load_resource_wx_image(_("message_warning")));
   } else {
-    parent->setPanelIcon(this, load_resource_image(_("message_error")));
+    parent->setPanelIcon(this, load_resource_wx_image(_("message_error")));
   }
 }

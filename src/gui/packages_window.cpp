@@ -7,6 +7,7 @@
 // ----------------------------------------------------------------------------- : Includes
 
 #include <util/prec.hpp>
+#include <gfx/wx_image_adapter.hpp>
 #include <gui/packages_window.hpp>
 #include <gui/package_update_list.hpp>
 #include <gui/downloadable_installers.hpp>
@@ -90,7 +91,7 @@ void PackageInfoPanel::draw(DC& dc) {
       icon_w = icon.GetWidth();
       icon_h = icon.GetHeight();
     }
-    dc.DrawBitmap(icon, x+(max_size-icon_w)/2, y+(max_size-icon_h)/2 + 2);
+    dc.DrawBitmap(to_bitmap(icon), x+(max_size-icon_w)/2, y+(max_size-icon_h)/2 + 2);
     x += max_size;
   }
   // package info

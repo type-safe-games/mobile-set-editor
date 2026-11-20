@@ -7,6 +7,7 @@
 // ----------------------------------------------------------------------------- : Includes
 
 #include <util/prec.hpp>
+#include <gfx/wx_image_adapter.hpp>
 #include <gfx/gfx.hpp>
 #include <data/symbol_font.hpp>
 #include <data/stylesheet.hpp>
@@ -141,7 +142,7 @@ Bitmap SymbolInFont::getBitmap(Package& pkg, double size) {
   Bitmap& bmp = bitmaps[size];
   if (!bmp.Ok()) {
     // generate image, convert to bitmap, store for later use
-    bmp = Bitmap(getImage(pkg, size));
+    bmp = to_bitmap(getImage(pkg, size));
   }
   return bmp;
 }
@@ -150,7 +151,7 @@ Bitmap SymbolInFont::getBitmap(Package& pkg, wxSize size) {
   if (!image.isReady()) {
     throw Error(_("No image specified for symbol with code '") + code + _("' in symbol font."));
   }
-  return Bitmap( image.generate(GeneratedImage::Options(size.x, size.y, &pkg, local_package, ASPECT_BORDER)) );
+  return to_bitmap( image.generate(GeneratedImage::Options(size.x, size.y, &pkg, local_package, ASPECT_BORDER)) );
 }
 
 RealSize SymbolInFont::size(Package& pkg, double size) {
@@ -320,7 +321,7 @@ void SymbolFont::draw(RotatedDC& dc, RealRect rect, double scale, const SymbolFo
     SymbolInFont& sym = *dsym.symbol;
     Bitmap bmp = sym.getBitmap(*this, font_size_ext);
     if (!almost_equal(stretch, 1.0)) {
-      bmp = Bitmap(resample(bmp.ConvertToImage(), lround(bmp.GetWidth() * stretch), bmp.GetHeight()));
+      bmp = to_bitmap(resample(from_bitmap(bmp), lround(bmp.GetWidth() * stretch), bmp.GetHeight()));
     }
     RealSize  bmp_size = dc.trInvS(RealSize(bmp));
     RealPoint bmp_pos  = align_in_rect(font.alignment(), bmp_size, sym_rect);
@@ -328,7 +329,7 @@ void SymbolFont::draw(RotatedDC& dc, RealRect rect, double scale, const SymbolFo
     if (font.hasStroke()) {
       int blur_radius = lround(font.stroke_blur() * s_scale);
       int stroke_radius = lround(font.stroke_radius() * s_scale);
-      Image s_img = bmp.ConvertToImage();
+      Image s_img = from_bitmap(bmp);
       s_img = make_stroke_image(s_img, font.stroke_color(), stroke_radius, blur_radius);
       RealSize  s_size = dc.trInvS(RealSize(s_img));
       RealPoint s_pos(bmp_pos.x - (s_size.width - bmp_size.width)/2, bmp_pos.y - (s_size.height - bmp_size.height)/2);
@@ -336,7 +337,7 @@ void SymbolFont::draw(RotatedDC& dc, RealRect rect, double scale, const SymbolFo
     }
     else if (font.hasShadow()) {
       int blur_radius = lround(font.shadow_blur() * s_scale);
-      Image s_img = bmp.ConvertToImage();
+      Image s_img = from_bitmap(bmp);
       s_img = make_stroke_image(s_img, font.shadow_color(), 0, blur_radius);
       RealSize  s_size = dc.trInvS(RealSize(s_img));
       RealPoint s_pos(bmp_pos.x - (s_size.width - bmp_size.width)/2, bmp_pos.y - (s_size.height - bmp_size.height)/2);
@@ -400,7 +401,7 @@ Image SymbolFont::getImage(double font_size, const DrawableSymbol& sym) {
   if (!sym.symbol) return Image(1,1);
   if (sym.draw_text.empty() || !sym.symbol->text_font) return sym.symbol->getImage(*this, font_size);
   // with text
-  Bitmap bmp(sym.symbol->getImage(*this, font_size));
+  Bitmap bmp = to_bitmap(sym.symbol->getImage(*this, font_size));
   // memory dc to work with
   wxMemoryDC dc;
   dc.SelectObject(bmp);
@@ -437,7 +438,7 @@ Image SymbolFont::getImage(double font_size, const DrawableSymbol& sym) {
   rdc.DrawTextWithShadowOrStroke(sym.draw_text, *sym.symbol->text_font, text_pos, font_size, text_stretch);
   // done
   dc.SelectObject(wxNullBitmap);
-  return bmp.ConvertToImage();
+  return from_bitmap(bmp);
 }
 
 // ----------------------------------------------------------------------------- : SymbolFont : sizes

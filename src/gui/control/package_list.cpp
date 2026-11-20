@@ -7,6 +7,7 @@
 // ----------------------------------------------------------------------------- : Includes
 
 #include <util/prec.hpp>
+#include <gfx/wx_image_adapter.hpp>
 #include <gui/control/package_list.hpp>
 #include <util/io/package_manager.hpp>
 #include <util/alignment.hpp>
@@ -92,7 +93,7 @@ void PackageList::showData(const String& pattern) {
     Image img;
     Bitmap bmp;
     if (stream && image_load_file(img, *stream)) {
-      bmp = Bitmap(img);
+      bmp = to_bitmap(img);
       if (bmp.GetWidth() > 150 || bmp.GetHeight() > 150) {
         queue_message(MESSAGE_WARNING, _ERROR_1_("icon too large", p->relativeFilename()));
       }

@@ -327,7 +327,7 @@ bool canonical_name_compare(StringView a, const Char* b);
  *    wxSscanf, wxStrchr        swscanf (beware: locale dependent), wcschr
  *    String(p, wxConvUTF8)     decode_utf8; wxConvWhateverWorks / wxConvFileName: decode_utf8_or_latin1
  *
- * At the boundary with wx (GUI, and wxImage options / the colour database in the core), std::wstring
+ * At the boundary with wx (GUI, and the wx image adapter / the colour database in the core), std::wstring
  * converts implicitly to wxString; the other way is wxString::ToStdWstring().
  */
 

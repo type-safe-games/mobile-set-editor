@@ -241,7 +241,7 @@ void fill_alpha(Image& img, int w, int h) {
       memset(copy.GetData(), 255, 3 * w * h);
       memset(pixels,         0,   3 * w * h);
       memset(alpha,          255,     w * h);
-      img.Paste(copy, 0, 0, wxIMAGE_ALPHA_BLEND_COMPOSE);
+      img.Paste(copy, 0, 0, IMAGE_ALPHA_BLEND_COMPOSE);
       return;
     }
   }

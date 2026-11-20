@@ -7,6 +7,7 @@
 // ----------------------------------------------------------------------------- : Includes
 
 #include <util/prec.hpp>
+#include <gfx/wx_image_adapter.hpp>
 #include <gui/value/image.hpp>
 #include <gui/image_slice_window.hpp>
 #include <gui/clipboard.hpp>
@@ -63,8 +64,9 @@ void ImageValueEditor::updatePreview(int w, int h) {
     double scale = min(w / (double)image.GetWidth(), h / (double)image.GetHeight());
     int new_w = max(1, (int)(image.GetWidth()  * scale));
     int new_h = max(1, (int)(image.GetHeight() * scale));
-    image.Rescale(new_w, new_h, wxIMAGE_QUALITY_HIGH);
-    preview_bitmap = Bitmap(image);
+    wxImage preview = to_wx_image(image);
+    preview.Rescale(new_w, new_h, wxIMAGE_QUALITY_HIGH);
+    preview_bitmap = Bitmap(preview);
   } catch (const Error& e) {
     handle_error(e);
   }
@@ -102,7 +104,7 @@ bool ImageValueEditor::onLeftDClick(const RealPoint&, wxMouseEvent&) {
   if (dlg.ShowModal() == wxID_OK) {
     filename = dlg.GetPath();
     settings.default_image_dir = wxPathOnly(filename);
-    wxImage image;
+    Image image;
     if (!image_load_file(image, filename)) queue_message(MESSAGE_ERROR, _ERROR_("can't load image"));
     else sliceImage(image, filename, cardname);
   }
@@ -134,7 +136,7 @@ void ImageValueEditor::sliceImage(const Image& image, const String& filename, co
     Image img = s.getImage();
     String out_path = getLocalPackage().nameOut(new_image_file);
     // always use PNG images, see #69. Disk space is cheap anyway.
-    if (!retry_io([&]{ return img.SaveFile(out_path, wxBITMAP_TYPE_PNG); })) {
+    if (!retry_io([&]{ return image_save_file(img, out_path, _("png")); })) {
       queue_message(MESSAGE_ERROR, _ERROR_1_("can't write image to set", out_path));
       return;
     }
@@ -162,8 +164,8 @@ bool ImageValueEditor::doCopy() {
   // set data
   if (!wxTheClipboard->Open()) return false;
   wxDataObjectComposite* composite = new wxDataObjectComposite();
-  composite->Add(new wxImageDataObject(image), true);
-  composite->Add(new wxBitmapDataObject(image));
+  composite->Add(new wxImageDataObject(to_wx_image(image)), true);
+  composite->Add(new wxBitmapDataObject(to_bitmap(image)));
   bool ok = wxTheClipboard->SetData(composite);
   wxTheClipboard->Flush();
   wxTheClipboard->Close();
@@ -176,11 +178,11 @@ bool ImageValueEditor::doPaste() {
   Image image;
   wxImageDataObject image_data;
   if (wxTheClipboard->IsSupported(image_data.GetFormat()) && wxTheClipboard->GetData(image_data)) {
-    image = image_data.GetImage();
+    image = from_wx_image(image_data.GetImage());
   } else {
     wxBitmapDataObject bitmap_data;
     if (wxTheClipboard->GetData(bitmap_data)) {
-      image = bitmap_data.GetBitmap().ConvertToImage();
+      image = from_bitmap(bitmap_data.GetBitmap());
     }
   }
   wxTheClipboard->Flush();

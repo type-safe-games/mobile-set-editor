@@ -17,11 +17,6 @@
 
 #if !wxCHECK_VERSION(3,3,0)
 
-// wx 3.3 reads/writes a PNG tEXt "Description" chunk through this image option.
-// On 3.2 the PNG handler ignores it, so the metadata still flows between in-memory
-// images but is not saved to or loaded from PNG files.
-#define wxIMAGE_OPTION_PNG_DESCRIPTION wxS("PngDescription")
-
 // wx 3.3 dark-mode switch (wxApp::SetAppearance). Unqualified calls inside wxApp
 // members find this free function because wx 3.2's wxApp has no such member.
 enum Appearance { Appearance_System, Appearance_Light, Appearance_Dark };

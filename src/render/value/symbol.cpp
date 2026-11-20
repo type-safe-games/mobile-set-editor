@@ -7,6 +7,7 @@
 // ----------------------------------------------------------------------------- : Includes
 
 #include <util/prec.hpp>
+#include <gfx/wx_image_adapter.hpp>
 #include <util/io/package.hpp>
 #include <render/value/symbol.hpp>
 #include <render/symbol/filter.hpp>
@@ -36,7 +37,7 @@ void SymbolValueViewer::draw(RotatedDC& dc) {
         Image img = render_symbol(symbol, *variation->filter, variation->border_radius, int(200 * ar), 200);
         Image resampled(int(wh * ar), int(wh), false);
         resample(img, resampled);
-        symbols.push_back(Bitmap(resampled));
+        symbols.push_back(to_bitmap(resampled));
       }
     } catch (const Error& e) {
       handle_error(e);

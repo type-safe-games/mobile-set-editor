@@ -7,6 +7,7 @@
 // ----------------------------------------------------------------------------- : Includes
 
 #include <util/prec.hpp>
+#include <gfx/wx_image_adapter.hpp>
 #include <data/format/image_encoding.hpp>
 #include <gfx/gfx.hpp>
 #include <util/error.hpp>
@@ -352,7 +353,7 @@ void downsample_to_alpha(Bitmap& bmp_in, Image& img_out) {
   // we created a bitmap with depth 24, so that is what we should have here
   if (img_in.GetDepth() != 24) throw InternalError(_("DIB has wrong bit depth"));
 #else
-  Image img_in = bmp_in.ConvertToImage();
+  Image img_in = from_bitmap(bmp_in);
 #endif
   Byte* in  = img_in.GetData();
   Byte* out = img_in.GetData();
@@ -469,7 +470,7 @@ Image make_stroke_image(Image& img, Color stroke_color, int stroke_radius, int b
   int s_width = img.GetWidth() + 2 * margin, s_height = img.GetHeight() + 2 * margin;
   int x_end = s_width - margin;
   int y_end = s_height - margin;
-  wxImage s_img(s_width, s_height, false);
+  Image s_img(s_width, s_height, false);
   s_img.InitAlpha();
   // convert to stroke color
   Byte* s_data = s_img.GetData();
@@ -503,9 +504,9 @@ Image make_stroke_image(Image& img, Color stroke_color, int stroke_radius, int b
     blur_image_alpha(s_img, 3);
   }
   // transfer metadata
-  if (img.HasOption(wxIMAGE_OPTION_PNG_DESCRIPTION)) {
-    String metadata = transformAllEncodedRects(img.GetOption(wxIMAGE_OPTION_PNG_DESCRIPTION).ToStdWstring(), RealRect::translate, margin, margin);
-    s_img.SetOption(wxIMAGE_OPTION_PNG_DESCRIPTION, metadata);
+  if (img.HasMetadata()) {
+    String metadata = transformAllEncodedRects(img.GetMetadata(), RealRect::translate, margin, margin);
+    s_img.SetMetadata(metadata);
   }
   return s_img;
 }

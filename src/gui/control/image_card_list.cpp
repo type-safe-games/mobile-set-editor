@@ -7,6 +7,7 @@
 // ----------------------------------------------------------------------------- : Includes
 
 #include <util/prec.hpp>
+#include <gfx/wx_image_adapter.hpp>
 #include <gui/control/image_card_list.hpp>
 #include <gui/thumbnail_thread.hpp>
 #include <data/field/image.hpp>
@@ -77,7 +78,7 @@ public:
     ImageCardList* parent = (ImageCardList*)owner;
     if (img.Ok()) {
       wxImageList* il = parent->GetImageList(wxIMAGE_LIST_SMALL);
-      int id = il->Add(wxBitmap(img));
+      int id = il->Add(to_bitmap(img));
       parent->thumbnails.insert(make_pair(filename.toStringForKey(), id));
       parent->Refresh(false);
     }

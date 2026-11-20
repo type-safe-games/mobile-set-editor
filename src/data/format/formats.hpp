@@ -95,7 +95,7 @@ enum class ExportImageMode {
   DEFAULT,
 };
 
-/// Generate a wxImage of one or more cards
+/// Generate an image of one or more cards
 Image export_image(const SetP& set, const CardP& card, bool write_metadata = true, const Settings::ExportSettings& card_settings = Settings::ExportSettings());
 Image export_image(const SetP& set, const vector<CardP>& cards, int padding = 2, ExportImageMode mode = ExportImageMode::EXPORT);
 

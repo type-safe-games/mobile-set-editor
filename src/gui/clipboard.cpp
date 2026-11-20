@@ -7,6 +7,7 @@
 // ----------------------------------------------------------------------------- : Includes
 
 #include <util/prec.hpp>
+#include <gfx/wx_image_adapter.hpp>
 #include <gui/clipboard.hpp>
 #include <data/format/formats.hpp>
 #include <data/card.hpp>
@@ -195,10 +196,10 @@ CardsOnClipboard::CardsOnClipboard(const SetP& set, const String id, vector<Card
     //fileData->AddFile(temp_path);
     //Add(fileData);
     wxImageDataObject* imgData = new wxImageDataObject(); // needed for metadata
-    imgData->SetImage(img);
+    imgData->SetImage(to_wx_image(img));
     Add(imgData);
     wxBitmapDataObject* bmpData = new wxBitmapDataObject(); // needed for pasting in MSPaint
-    bmpData->SetBitmap(Bitmap(img));
+    bmpData->SetBitmap(to_bitmap(img));
     Add(bmpData);
   }
   // Conversion to serialized card format (preferred)

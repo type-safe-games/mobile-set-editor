@@ -7,6 +7,7 @@
 // ----------------------------------------------------------------------------- : Includes
 
 #include <util/prec.hpp>
+#include <gfx/wx_image_adapter.hpp>
 #include <gfx/gfx.hpp>
 #include <util/error.hpp>
 #include <gfx/dc_util.hpp>
@@ -52,11 +53,11 @@ void draw_resampled_text(DC& dc, const String& text, const RealPoint& pos, const
         set_alpha(img, color.Alpha() / 255.);
       }
       fill_image(img, color);
-      dc.DrawBitmap(img, xi, yi);
+      dc.DrawBitmap(to_bitmap(img), xi, yi);
     }
     else {
       Image s_img = make_stroke_image(img, color, 0, blur_radius);
-      dc.DrawBitmap(s_img, xi-blur_radius, yi-blur_radius);
+      dc.DrawBitmap(to_bitmap(s_img), xi-blur_radius, yi-blur_radius);
     }
   }
   // otherwise add stroke effect, add copy of text on top, draw
@@ -68,9 +69,9 @@ void draw_resampled_text(DC& dc, const String& text, const RealPoint& pos, const
       if (color.Alpha() != 255) {
         set_alpha(img, color.Alpha() / 255.);
       }
-      s_img.Paste(img, radius, radius, wxIMAGE_ALPHA_BLEND_COMPOSE);
+      s_img.Paste(img, radius, radius, IMAGE_ALPHA_BLEND_COMPOSE);
     }
-    dc.DrawBitmap(s_img, xi-radius, yi-radius);
+    dc.DrawBitmap(to_bitmap(s_img), xi-radius, yi-radius);
   }
 }
 

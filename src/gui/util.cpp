@@ -16,6 +16,7 @@
 #include <wx/stdpaths.h>
 #include <wx/mstream.h>
 #include <gfx/gfx.hpp>
+#include <gfx/wx_image_adapter.hpp>
 
 #if wxUSE_UXTHEME && defined(__WXMSW__)
   #include <wx/msw/uxtheme.h>
@@ -116,17 +117,17 @@ function<bool(int done, int total)> import_cards_progress() {
 
 // ----------------------------------------------------------------------------- : Tool/menu bar
 
-Image generate_disabled_image(Image const& image) {
-  Image imgOut = image.ConvertToGreyscale();
+wxImage generate_disabled_image(wxImage const& image) {
+  Image imgOut = from_wx_image(image.ConvertToGreyscale());
   set_alpha(imgOut, 0.33);
-  return imgOut;
+  return to_wx_image(imgOut);
 }
 
 void set_menu_item_image(wxMenuItem* item, const String& resource) {
   #if defined(__WXGTK__)
     if (item->GetKind() == wxITEM_CHECK) return; // check items can't have icons
   #endif
-  Image bitmap = load_resource_tool_image(resource);
+  wxImage bitmap = load_resource_tool_image(resource);
   item->SetBitmap(bitmap);
 }
 
@@ -156,7 +157,7 @@ wxToolBarToolBase* add_tool(wxToolBar* toolbar, int id, const String& resource, 
     // Note: the bitmap must match the toolbar bitmap size, otherwise disabled and normal bitmap look different
     // if the size doesn't match, we center the image
     auto size = toolbar->GetToolBitmapSize();
-    Image bitmap = load_resource_tool_image(resource);
+    wxImage bitmap = load_resource_tool_image(resource);
     if (bitmap.GetSize() != size) {
       wxPoint pos((size.GetWidth() - bitmap.GetWidth()) / 2, (size.GetHeight() - bitmap.GetHeight()) / 2);
       bitmap.Resize(size, pos);
@@ -164,7 +165,7 @@ wxToolBarToolBase* add_tool(wxToolBar* toolbar, int id, const String& resource, 
     #if defined(__WXGTK__)
       wxBitmap disabled_bitmap = wxNullBitmap; // gtk can produce decent disabled bitmaps by itself
     #else
-      Image disabled_bitmap = generate_disabled_image(bitmap);
+      wxImage disabled_bitmap = generate_disabled_image(bitmap);
     #endif
     return toolbar->AddTool(id, label, bitmap, disabled_bitmap, kind, tooltip, help);
   } else {
@@ -183,7 +184,7 @@ wxCursor load_resource_cursor(const String& name) {
     wxLogNull noLog;
     return wxCursor(_("cursor/") + name, wxBITMAP_TYPE_CUR_RESOURCE);
   #else
-    return wxCursor(load_resource_image(_("cursor/") + name));
+    return wxCursor(load_resource_wx_image(_("cursor/") + name));
   #endif
 }
 
@@ -201,8 +202,12 @@ wxIcon load_resource_icon(const String& name) {
   #endif
 }
 
+wxImage load_resource_wx_image(const String& name) {
+  return to_wx_image(load_resource_image(name));
+}
+
 wxImage load_resource_tool_image(const String& name) {
-  return load_resource_image(_("tool/") + name);
+  return load_resource_wx_image(_("tool/") + name);
 }
 
 

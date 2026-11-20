@@ -7,6 +7,7 @@
 // ----------------------------------------------------------------------------- : Includes
 
 #include <util/prec.hpp>
+#include <gfx/wx_image_adapter.hpp>
 #include <gui/symbol/part_list.hpp>
 #include <gui/symbol/selection.hpp>
 #include <gui/util.hpp>
@@ -33,15 +34,15 @@ SymbolPartList::SymbolPartList(Window* parent, int id, SymbolPartsSelection& sel
 {
   SetScrollRate(0, ITEM_HEIGHT+1);
   // NOTE: this is based on the order of the SymbolShapeCombine and SymbolSymmetryType enums!
-  state_icons.Add(load_resource_image(_("icon_combine_merge")));
-  state_icons.Add(load_resource_image(_("icon_combine_subtract")));
-  state_icons.Add(load_resource_image(_("icon_combine_intersection")));
-  state_icons.Add(load_resource_image(_("icon_combine_difference")));
-  state_icons.Add(load_resource_image(_("icon_combine_overlap")));
-  state_icons.Add(load_resource_image(_("icon_combine_border")));
-  state_icons.Add(load_resource_image(_("icon_symmetry_rotation")));
-  state_icons.Add(load_resource_image(_("icon_symmetry_reflection")));
-  state_icons.Add(load_resource_image(_("icon_symbol_group")));
+  state_icons.Add(load_resource_wx_image(_("icon_combine_merge")));
+  state_icons.Add(load_resource_wx_image(_("icon_combine_subtract")));
+  state_icons.Add(load_resource_wx_image(_("icon_combine_intersection")));
+  state_icons.Add(load_resource_wx_image(_("icon_combine_difference")));
+  state_icons.Add(load_resource_wx_image(_("icon_combine_overlap")));
+  state_icons.Add(load_resource_wx_image(_("icon_combine_border")));
+  state_icons.Add(load_resource_wx_image(_("icon_symmetry_rotation")));
+  state_icons.Add(load_resource_wx_image(_("icon_symmetry_reflection")));
+  state_icons.Add(load_resource_wx_image(_("icon_symbol_group")));
   // view symbol
   setSymbol(symbol);
 }
@@ -471,8 +472,8 @@ void SymbolPartList::drawItem(DC& dc, int x, int& i, bool parent_active, const S
     // draw item : icon
     dc.SetBrush(lerp(background,wxColour(0,128,0),0.7));
     dc.DrawRectangle(x,y,ITEM_HEIGHT,ITEM_HEIGHT);
-    dc.DrawBitmap(symbolPreview(),     x, y);
-    dc.DrawBitmap(itemPreview(i,part), x, y);
+    dc.DrawBitmap(to_bitmap(symbolPreview()),     x, y);
+    dc.DrawBitmap(to_bitmap(itemPreview(i,part)), x, y);
     // draw item : border
     dc.SetPen(line_pen);
     dc.DrawLine(x+ITEM_HEIGHT, y, x+ITEM_HEIGHT, y + ITEM_HEIGHT + 1); // line after image

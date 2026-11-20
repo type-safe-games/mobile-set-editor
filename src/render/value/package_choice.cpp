@@ -7,6 +7,7 @@
 // ----------------------------------------------------------------------------- : Includes
 
 #include <util/prec.hpp>
+#include <gfx/wx_image_adapter.hpp>
 #include <gfx/color.hpp>
 #include <render/value/package_choice.hpp>
 #include <util/io/package_manager.hpp>
@@ -37,7 +38,7 @@ void PackageChoiceValueViewer::initItems() {
     Image image;
     auto stream = p->openIconFile();
     if (stream && image_load_file(image, *stream)) {
-      i.image = Bitmap(resample(image, 16,16));
+      i.image = to_bitmap(resample(image, 16,16));
     }
     items.push_back(i);
   }

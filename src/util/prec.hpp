@@ -27,7 +27,6 @@
 #include <wx/setup.h>
 #include <wx/wxprec.h>
 #include <wx/wx.h>
-#include <wx/image.h>
 #include <wx/datetime.h>
 
 #if defined(__WXMSW__)
@@ -51,7 +50,6 @@ using namespace std;
 typedef wxWindow Window;
 
 typedef wxBitmap Bitmap;
-typedef wxImage  Image;
 typedef wxDC     DC;
 
 // ----------------------------------------------------------------------------- : Compatability fixes
@@ -87,6 +85,7 @@ typedef unsigned int  UInt;
 // MSE utility headers (ones unlikely to change and used everywhere)
 #include "for_each.hpp"
 #include "string.hpp"
+#include <gfx/image.hpp>
 #include "date_time.hpp"
 #include "smart_ptr.hpp"
 #include "index_map.hpp"

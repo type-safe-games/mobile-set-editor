@@ -7,6 +7,7 @@
 // ----------------------------------------------------------------------------- : Includes
 
 #include <util/prec.hpp>
+#include <gfx/wx_image_adapter.hpp>
 #include <gui/value/choice.hpp>
 #include <gui/util.hpp>
 #include <gui/thumbnail_thread.hpp>
@@ -51,14 +52,14 @@ Image ChoiceThumbnailRequest::generate() {
   ScriptableImage& img = s.choice_images[name];
   return img.isReady()
     ? img.generate(GeneratedImage::Options(thumbnail_size, thumbnail_size, &viewer().getStylePackage(), &viewer().getLocalPackage(), ASPECT_BORDER, true))
-    : wxImage();
+    : Image();
 }
 
 void ChoiceThumbnailRequest::store(const Image& img) {
   if (img.Ok()) {
     ChoiceThumbnail& thumbnail = style().thumbnails[id];
     ChoiceThumbnailLock lock(thumbnail.mutex);
-    thumbnail.bitmap = img;
+    thumbnail.bitmap = to_bitmap(img);
     thumbnail.status = THUMB_OK;
   }
 }
@@ -208,10 +209,10 @@ DropDownChoiceList::DropDownChoiceList(Window* parent, bool is_submenu, ValueVie
     if (!slider_loaded) {
       slider_loaded = true;
       try {
-        slider_left = load_resource_image(_("slider_left"));
-        slider_right = load_resource_image(_("slider_right"));
-        slider_center = load_resource_image(_("slider_center"));
-        slider_tick = load_resource_image(_("slider_tick"));
+        slider_left = load_resource_wx_image(_("slider_left"));
+        slider_right = load_resource_wx_image(_("slider_right"));
+        slider_center = load_resource_wx_image(_("slider_center"));
+        slider_tick = load_resource_wx_image(_("slider_tick"));
       }
       catch (...) {
         throw InternalError(_("Can't load slider resources"));

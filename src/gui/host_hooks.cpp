@@ -17,6 +17,7 @@
 #include <data/installer.hpp>
 #include <gfx/generated_image.hpp>
 #include <gfx/color.hpp>
+#include <gfx/wx_image_codec.hpp>
 #include <util/error.hpp>
 #include <wx/webrequest.h>
 #include <wx/evtloop.h>
@@ -105,6 +106,7 @@ static int run_program(const vector<String>& arguments, bool wait) {
 // ----------------------------------------------------------------------------- : Installing hooks
 
 void install_desktop_hooks() {
+  set_image_codec(make_wx_image_codec()); // (needs wxInitAllImageHandlers)
   error_sink = [](MessageType type, String const& msg) {
     if (cli.haveConsole()) {
       // always write to stderr if possible

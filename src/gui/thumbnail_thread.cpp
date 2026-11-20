@@ -7,6 +7,8 @@
 // ----------------------------------------------------------------------------- : Includes
 
 #include <util/prec.hpp>
+#include <gfx/wx_image_adapter.hpp>
+#include <gfx/image_load.hpp>
 #include <gui/thumbnail_thread.hpp>
 #include <util/platform.hpp>
 #include <util/error.hpp>
@@ -80,7 +82,7 @@ wxThread::ExitCode ThumbnailThreadWorker::Entry() {
     // store in cache
     if (img.Ok()) {
       String filename = image_cache_dir() + safe_filename(current->cache_name) + _(".png");
-      img.SaveFile(filename, wxBITMAP_TYPE_PNG);
+      image_save_file(img, filename, _("png"));
       // set modification time
       wxFileName fn(filename);
       fn.SetTimes(0, &current->modified, 0);
@@ -123,7 +125,8 @@ void ThumbnailThread::request(const ThumbnailRequestP& request) {
     wxDateTime modified;
     if (fn.GetTimes(0, &modified, 0) && modified >= request->modified) {
       // yes it is
-      Image img(filename);
+      Image img;
+      image_load_file(img, filename);
       request->store(img);
       return;
     }
@@ -152,7 +155,7 @@ void ThumbnailThread::request(const ThumbnailRequestP& request) {
     // store in cache
     if (img.Ok()) {
       String filename = image_cache_dir() + safe_filename(request->cache_name) + _(".png");
-      img.SaveFile(filename, wxBITMAP_TYPE_PNG);
+      image_save_file(img, filename, _("png"));
       // set modification time
       wxFileName fn(filename);
       fn.SetTimes(0, &request->modified, 0);

@@ -29,21 +29,21 @@ bool __compare_package_name(const PackagedP& a, const PackagedP& b) {
 }
 WelcomeWindow::WelcomeWindow()
   : wxFrame(nullptr, wxID_ANY, _TITLE_("magic set editor"), wxDefaultPosition, wxSize(520,380), wxDEFAULT_DIALOG_STYLE | wxTAB_TRAVERSAL | wxCLIP_CHILDREN )
-  , logo (load_resource_image(settings.darkModePrefix() + _("about")))
+  , logo (load_resource_wx_image(settings.darkModePrefix() + _("about")))
 {
   SetIcon(load_resource_icon(_("app")));
 
   SetBackgroundStyle(wxBG_STYLE_PAINT);
 
   // init controls
-  wxControl* new_set   = new HoverButtonExt(this, ID_FILE_NEW,           load_resource_image(_("welcome_new")),     _BUTTON_("new set"),       _HELP_("new set"));
-  wxControl* open_set  = new HoverButtonExt(this, ID_FILE_OPEN,          load_resource_image(_("welcome_open")),    _BUTTON_("open set"),      _HELP_("open set"));
+  wxControl* new_set   = new HoverButtonExt(this, ID_FILE_NEW,           load_resource_wx_image(_("welcome_new")),     _BUTTON_("new set"),       _HELP_("new set"));
+  wxControl* open_set  = new HoverButtonExt(this, ID_FILE_OPEN,          load_resource_wx_image(_("welcome_open")),    _BUTTON_("open set"),      _HELP_("open set"));
   wxControl* open_last = nullptr;
   if (!settings.recent_sets.empty()) {
     const String& filename = settings.recent_sets.front();
     if (wxFileName::FileExists(filename) || wxFileName::DirExists(filename + _("/"))) {
       wxFileName n(filename);
-      open_last = new HoverButtonExt(this, ID_FILE_RECENT, load_resource_image(_("welcome_last")), _BUTTON_("last opened set"), _HELP_1_("last opened set", n.GetName()));
+      open_last = new HoverButtonExt(this, ID_FILE_RECENT, load_resource_wx_image(_("welcome_last")), _BUTTON_("last opened set"), _HELP_1_("last opened set", n.GetName()));
     }
   }
 

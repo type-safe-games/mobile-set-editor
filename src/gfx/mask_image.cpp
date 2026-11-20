@@ -7,6 +7,7 @@
 // ----------------------------------------------------------------------------- : Includes
 
 #include <util/prec.hpp>
+#include <gfx/wx_image_adapter.hpp>
 #include <gfx/gfx.hpp>
 #include <util/error.hpp>
 
@@ -53,9 +54,9 @@ void AlphaMask::setAlpha(Image& img) const {
 
 void AlphaMask::setAlpha(Bitmap& bmp) const {
   if (!alpha) return;
-  Image img = bmp.ConvertToImage();
+  Image img = from_bitmap(bmp);
   setAlpha(img);
-  bmp = Bitmap(img);
+  bmp = to_bitmap(img);
 }
 
 bool AlphaMask::isOpaque(int x, int y) const {
