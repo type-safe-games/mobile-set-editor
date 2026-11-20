@@ -258,7 +258,7 @@ SymbolPartP SymbolSymmetry::clone() const {
 
 String SymbolSymmetry::expectedName() const {
   return capitalize(kind == SYMMETRY_ROTATION ? _TYPE_("rotation") : _TYPE_("reflection"))
-       + String::Format(_(" (%d)"), copies);
+       + format_string(_(" (%d)"), copies);
 }
 
 Bounds SymbolSymmetry::calculateBounds(const Vector2D& origin, const Matrix2D& m, bool is_identity) {

@@ -27,7 +27,7 @@ void Updater::updateApplication(String argv) {
     run_command(args, false);
   }
   else {
-    queue_message(MESSAGE_ERROR, _("Executable file '" + path + "' not found!"));
+    queue_message(MESSAGE_ERROR, _("Executable file '") + path + _("' not found!"));
   }
 }
 

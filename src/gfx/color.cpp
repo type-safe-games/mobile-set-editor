@@ -41,9 +41,9 @@ int parse_hex(Char c1, Char c2) {
 
 optional<Color> parse_color(const String& v) {
   UInt r,g,b,a;
-  if (wxSscanf(v.c_str(),_("rgb(%u,%u,%u)"),&r,&g,&b)) {
+  if (swscanf(v.c_str(),_("rgb(%u,%u,%u)"),&r,&g,&b)) {
     return Color(r, g, b);
-  } else if (wxSscanf(v.c_str(),_("rgba(%u,%u,%u,%u)"),&r,&g,&b,&a)) {
+  } else if (swscanf(v.c_str(),_("rgba(%u,%u,%u,%u)"),&r,&g,&b,&a)) {
     return Color(r, g, b, a);
   } else if (v.size() > 0 && v[0] == '#') {
     if (v.size() == 4) {
@@ -92,9 +92,9 @@ Color ui_color(UIColor which) {
 
 String format_color(Color col) {
   if (col.Alpha() == 255) {
-    return String::Format(_("rgb(%u,%u,%u)"), col.Red(), col.Green(), col.Blue());
+    return format_string(_("rgb(%u,%u,%u)"), col.Red(), col.Green(), col.Blue());
   } else {
-    return String::Format(_("rgba(%u,%u,%u,%u)"), col.Red(), col.Green(), col.Blue(), col.Alpha());
+    return format_string(_("rgba(%u,%u,%u,%u)"), col.Red(), col.Green(), col.Blue(), col.Alpha());
   }
 }
 

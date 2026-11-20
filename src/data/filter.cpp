@@ -16,7 +16,7 @@ vector<QuickFilterPart> parse_quicksearch_query(String const& query) {
   vector<QuickFilterPart> parts;
   QuickFilterPart part;
   bool quoted = false;
-  for (wxUniChar c : query) {
+  for (Char c : query) {
     if (isSpace(c) && !quoted) {
       if (!part.query.empty()) {
         parts.push_back(part);

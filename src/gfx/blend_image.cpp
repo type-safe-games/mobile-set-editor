@@ -19,7 +19,7 @@ template <typename T> inline T sqr(T x) { return x * x; }
 void linear_blend(Image& img1, const Image& img2, double x1,double y1, double x2,double y2) {
   int width = img1.GetWidth(), height = img1.GetHeight();
   if (img2.GetWidth() != width || img2.GetHeight() != height) {
-    throw Error(_ERROR_3_("blending different sizes", "linear_blend", String()<<width<<_("x")<<height, String()<<img2.GetWidth()<<_("x")<<img2.GetHeight()));
+    throw Error(_ERROR_3_("blending different sizes", _("linear_blend"), int_to_string(width) + _("x") + int_to_string(height), int_to_string(img2.GetWidth()) + _("x") + int_to_string(img2.GetHeight())));
   }
   
   const int fixed = 1<<16; // fixed point multiplier
@@ -82,10 +82,10 @@ void linear_blend(Image& img1, const Image& img2, double x1,double y1, double x2
 void mask_blend(Image& light, const Image& dark, const Image& mask) {
   int width = light.GetWidth(), height = light.GetHeight();
   if (dark.GetWidth() != width || dark.GetHeight() != height) {
-    throw Error(_ERROR_3_("blending different sizes", "masked_blend", String()<<width<<_("x")<<height, String()<<dark.GetWidth()<<_("x")<<dark.GetHeight()));
+    throw Error(_ERROR_3_("blending different sizes", _("masked_blend"), int_to_string(width) + _("x") + int_to_string(height), int_to_string(dark.GetWidth()) + _("x") + int_to_string(dark.GetHeight())));
   }
   if (mask.GetWidth() != width || mask.GetHeight() != height) {
-    throw Error(_ERROR_3_("blending different mask", "masked_blend", String()<<width<<_("x")<<height, String()<<mask.GetWidth()<<_("x")<<mask.GetHeight()));
+    throw Error(_ERROR_3_("blending different mask", _("masked_blend"), int_to_string(width) + _("x") + int_to_string(height), int_to_string(mask.GetWidth()) + _("x") + int_to_string(mask.GetHeight())));
   }
 
   UInt size = width * height;
@@ -126,7 +126,7 @@ void set_alpha(Image& img, const Image& img_alpha) {
 void set_alpha(Image& img, Byte* al, const wxSize& alpha_size) {
   int width = img.GetWidth(), height = img.GetHeight();
   if (width != alpha_size.GetWidth() || height != alpha_size.GetHeight()) {
-    throw Error(_ERROR_3_("blending different mask", "set_alpha", String()<<width<<_("x")<<height, String()<<alpha_size.GetWidth()<<_("x")<<alpha_size.GetHeight()));
+    throw Error(_ERROR_3_("blending different mask", _("set_alpha"), int_to_string(width) + _("x") + int_to_string(height), int_to_string(alpha_size.GetWidth()) + _("x") + int_to_string(alpha_size.GetHeight())));
   }
   if (!img.HasAlpha()) {
     // copy

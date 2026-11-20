@@ -120,18 +120,18 @@ static String layout_number(double x) {
   long long milli = llround(x * 1000.0);
   String sign = milli < 0 ? _("-") : _("");
   if (milli < 0) milli = -milli;
-  return sign + String::Format(_("%lld.%03lld"), milli / 1000, milli % 1000);
+  return sign + format_string(_("%lld.%03lld"), milli / 1000, milli % 1000);
 }
 
 /// A JSON string literal
 static String layout_string(const String& s) {
   String out = _("\"");
-  for (wxUniChar c : s) {
+  for (Char c : s) {
     if      (c == '"')  out += _("\\\"");
     else if (c == '\\') out += _("\\\\");
     else if (c == '\n') out += _("\\n");
     else if (c == '\t') out += _("\\t");
-    else if (c < 0x20)  out += String::Format(_("\\u%04x"), (int)c.GetValue());
+    else if (c < 0x20)  out += format_string(_("\\u%04x"), (int)c);
     else                out += c;
   }
   return out + _("\"");
@@ -174,7 +174,7 @@ String card_layout_dump(const SetP& set, const CardP& card) {
     out += _(", \"top\": ")    + layout_number(style.top);
     out += String(_(", \"visible\": ")) + (v->isVisible() ? _("true") : _("false"));
     out += _(", \"width\": ")  + layout_number(style.width);
-    out += _(", \"z\": ")      + String::Format(_("%d"), style.z_index);
+    out += _(", \"z\": ")      + format_string(_("%d"), style.z_index);
     const TextValueViewer* tv = dynamic_cast<const TextValueViewer*>(v.get());
     if (tv && v->isVisible()) {
       out += _(", \"text_scale\": ") + layout_number(tv->getTextViewer().getScale());
@@ -183,10 +183,10 @@ String card_layout_dump(const SetP& set, const CardP& card) {
       for (const TextViewer::LineGeometry& l : tv->getTextViewer().lineGeometry()) {
         out += first_line ? _("\n") : _(",\n");
         first_line = false;
-        out += _("      {\"end\": ")   + String::Format(_("%d"), (int)l.end);
+        out += _("      {\"end\": ")   + format_string(_("%d"), (int)l.end);
         out += _(", \"height\": ")     + layout_number(l.height);
         out += _(", \"left\": ")       + layout_number(l.left);
-        out += _(", \"start\": ")      + String::Format(_("%d"), (int)l.start);
+        out += _(", \"start\": ")      + format_string(_("%d"), (int)l.start);
         out += _(", \"top\": ")        + layout_number(l.top);
         out += _(", \"width\": ")      + layout_number(l.width);
         out += _("}");
@@ -312,7 +312,7 @@ static String export_filename(const SetP& set, const ExportGroup& group, const S
   for (size_t i = 0; i < group.size(); ++i) {
     Context& ctx = set->getContext(group[i].card);
     String name = clean_filename(untag(ctx.eval(filename_script)->toString()));
-    if (!name) return String(); // no filename -> no saving
+    if (name.empty()) return String(); // no filename -> no saving
     if (i == 0) ext = file_ext(name); else result += _(" -- ");
     result += file_name_no_ext(name);
   }
@@ -328,7 +328,7 @@ void export_image(const SetP& set, const vector<CardP>& cards, const String& pat
   for (const ExportGroup& group : group_faces(set, cards, settings_for_mode(set, ExportImageMode::EXPORT))) {
     // filename for this group
     String name = export_filename(set, group, *filename_script);
-    if (!name) continue; // no filename -> no saving
+    if (name.empty()) continue; // no filename -> no saving
     // full path
     String filename = replace_file_name(path, name);
     // does the file exist?
@@ -368,7 +368,7 @@ String export_metadata(const SetP& set, const CardP& card, double zoom, Radians 
         // store the entire image in the metadata
         if (style->store_in_metadata() && settings.stylesheetSettingsFor(*stylesheet).card_metaimage_export()) {
           Image img = value->getImage(set);
-          cardv_data[field->name.ToStdString()] = encodeImageInString(img);
+          cardv_data[encode_utf8(field->name)] = encodeImageInString(img);
         }
         // store only crop coordinates
         else {
@@ -377,7 +377,7 @@ String export_metadata(const SetP& set, const CardP& card, double zoom, Radians 
           RealRect::scale(rect, degrees, zoom, zoom);
           RealRect::rotate(rect, degrees, width, height, lround(rad_to_deg(angle_radians))); // width and height are already scaled
           RealRect::translate(rect, degrees, offset_x, offset_y); // offset_x and offset_y are already scaled and rotated
-          cardv_data[field->name.ToStdString()] = encodeRectInStdString(rect, degrees);
+          cardv_data[encode_utf8(field->name)] = encodeRectInStdString(rect, degrees);
         }
       }
     }

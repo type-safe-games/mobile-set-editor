@@ -179,8 +179,8 @@ SetP MtgEditorFileFormat::importSet(const String& filename) {
     FOR_EACH(card, set->cards) {
       Defaultable<String>& card_artist    = card->value<TextValue>(_("illustrator")).value;
       Defaultable<String>& card_copyright = card->value<TextValue>(_("copyright"))  .value;
-      if (card_artist    == artist)    card_artist.makeDefault();
-      if (card_copyright == copyright) card_copyright.makeDefault();
+      if (card_artist()    == artist)    card_artist.makeDefault();
+      if (card_copyright() == copyright) card_copyright.makeDefault();
     }
   }
   
@@ -240,21 +240,21 @@ void MtgEditorFileFormat::translateTags(String& value) {
   String ret;
   size_t pos = 0;
   while (pos < value.size()) {
-    Char c = value.GetChar(pos);
+    Char c = value[pos];
     ++pos;
     if (c == _('<')) {
       String tag;
       while (pos < value.size()) {
-        c = value.GetChar(pos);
+        c = value[pos];
         ++pos;
         if (c == _('>'))  break;
         else tag += c;
       }
-      tag.MakeUpper();
+      tag = to_upper(tag);
       unsigned long number;
       if (tag==_("W") || tag==_("U") || tag==_("B") || tag==_("R") || tag==_("G") || tag==_("X") || tag==_("Y") || tag==_("Z")) {
         ret += _("<sym>") + tag + _("</sym>");
-      } else if (tag.ToULong(&number)) {
+      } else if (parse_ulong(tag, number)) {
         ret += _("<sym>") + tag + _("</sym>");
       } else if (tag==_("T") || tag==_("TAP")) {
         ret += _("<sym>T</sym>");

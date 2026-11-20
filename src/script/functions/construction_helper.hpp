@@ -55,15 +55,15 @@ inline static Value* get_container(IndexMap<FieldP, ValueP>& map, const String& 
 
 inline static bool looks_like_url(const String& s) {
   // only the schemes we actually know how to fetch
-  return s.starts_with(_("http://")) || s.starts_with(_("https://"))
-      || s.starts_with(_("ftp://"))  || s.starts_with(_("ftps://"));
+  return starts_with(s, _("http://")) || starts_with(s, _("https://"))
+      || starts_with(s, _("ftp://"))  || starts_with(s, _("ftps://"));
 }
 
 inline static bool looks_like_local_path(const String& s) {
   // unix absolute path
-  if (s.starts_with(_("/"))) return true;
+  if (starts_with(s, _("/"))) return true;
   // windows UNC / extended-length path:   \\server\share\... or \\?\C:\...
-  if (s.starts_with(_("\\\\"))) return true;
+  if (starts_with(s, _("\\\\"))) return true;
   // windows absolute path
   if (s.size() >= 3 && iswalpha(s[0]) && s[1] == _(':') && (s[2] == _('\\') || s[2] == _('/'))) return true;
   return false;
@@ -99,7 +99,7 @@ inline static void set_container(Set* set, Value* container, String type, Script
   }
   else if (PackageChoiceValue* pvalue = dynamic_cast<PackageChoiceValue*>(container)) {
     String package_name = value->toString();
-    while (package_name.starts_with(_("/"))) package_name = package_name.substr(1);
+    while (starts_with(package_name, _("/"))) package_name = package_name.substr(1);
     pvalue->package_name = package_name;
   }
   else if (ColorValue* cvalue = dynamic_cast<ColorValue*>(container)) {

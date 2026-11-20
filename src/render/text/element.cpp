@@ -69,7 +69,7 @@ private:
     size_t text_start = start;
     // for each character...
     for (size_t pos = start ; pos < end ; ) {
-      Char c = text.GetChar(pos);
+      Char c = text[pos];
       if (c == _('<')) {
         if (text_start < pos) {
           // text element before this tag?
@@ -109,7 +109,7 @@ private:
         else if (is_tag(text, tag_start, _("</code")))       code          -= 1;
         else if (is_tag(text, tag_start, _( "<color"))) {
           size_t colon = text.find_first_of(_(">:"), tag_start);
-          if (colon < pos - 1 && text.GetChar(colon) == _(':')) {
+          if (colon < pos - 1 && text[colon] == _(':')) {
             auto c = parse_color(text.substr(colon+1, pos-colon-2));
             if (c) {
               colors.push_back(*c);
@@ -123,7 +123,7 @@ private:
         }
         else if (is_tag(text, tag_start, _( "<font"))) {
           size_t colon = text.find_first_of(_(">:"), tag_start);
-          if (colon < pos - 1 && text.GetChar(colon) == _(':')) {
+          if (colon < pos - 1 && text[colon] == _(':')) {
             fonts.push_back(text.substr(colon+1, pos-colon-2));
           }
         } else if (is_tag(text, tag_start, _("</font"))) {
@@ -131,10 +131,10 @@ private:
         }
         else if (is_tag(text, tag_start, _( "<size"))) {
           size_t colon = text.find_first_of(_(">:"), tag_start);
-          if (colon < pos - 1 && text.GetChar(colon) == _(':')) {
+          if (colon < pos - 1 && text[colon] == _(':')) {
             double size = style.font.size;
             String v = text.substr(colon+1, pos-colon-2);
-            v.ToDouble(&size);
+            parse_double(v, size);
             sizes.push_back(size);
           }
         } else if (is_tag(text, tag_start, _("</size"))) {
@@ -146,7 +146,7 @@ private:
           if (pos != String::npos) {
             String ref = text.substr(tag_start + 10, pos - tag_start - 11);
             long ref_n;
-            if (ref.ToLong(&ref_n)) {
+            if (parse_long(ref, ref_n)) {
               param_id = (ref_n - 1)%param_colors_count + param_colors_count;
             }
           }
@@ -198,13 +198,13 @@ private:
           }
         } else if (is_tag(text, tag_start, _("<margin"))) {
           size_t colon = text.find_first_of(_(">:"), tag_start);
-          if (colon < pos - 1 && text.GetChar(colon) == _(':')) {
+          if (colon < pos - 1 && text[colon] == _(':')) {
             size_t colon2 = text.find_first_of(_(">:"), colon + 1);
             size_t colon3 = colon2 < pos-1 ? text.find_first_of(_(">:"), colon2 + 1) : colon2;
             Margins m = {0.,0.,0.};
-            text.substr(colon  + 1, colon2 - colon  - 2).ToDouble(&m.left);
-            text.substr(colon2 + 1, colon3 - colon2 - 2).ToDouble(&m.right);
-            text.substr(colon3 + 1, pos    - colon3 - 2).ToDouble(&m.top);
+            parse_double(text.substr(colon  + 1, colon2 - colon  - 2), m.left);
+            parse_double(text.substr(colon2 + 1, colon3 - colon2 - 2), m.right);
+            parse_double(text.substr(colon3 + 1, pos    - colon3 - 2), m.top);
             if (!margins.empty()) {
               m.left  += margins.back().left;
               m.right += margins.back().right;
@@ -219,7 +219,7 @@ private:
           if (!margins.empty()) margins.pop_back();
         } else if (is_tag(text, tag_start, _("<align"))) {
           size_t colon = text.find_first_of(_(">:"), tag_start);
-          if (colon < pos - 1 && text.GetChar(colon) == _(':')) {
+          if (colon < pos - 1 && text[colon] == _(':')) {
             Alignment align = alignment_from_string(text.substr(colon+1, pos-colon-2));
             aligns.push_back(align);
             paragraphs.back().alignment = align;
@@ -299,7 +299,7 @@ private:
   // Find clause and paragraph breaks in text
   void addClausesAndParagraphs(const String& text, size_t start, size_t end) {
     for (size_t i = start; i < end; ++i) {
-      wxUniChar c = text.GetChar(i);
+      Char c = text[i];
       if (c == '\n') {
         clauses.back().end = i + 1;
         clauses.emplace_back();

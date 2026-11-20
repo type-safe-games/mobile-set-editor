@@ -471,8 +471,8 @@ Image InsertedImage::generate(const Options& opt) {
     inserted_y = offset_y;
   }
 
-  if (width <= 0)  throw ScriptError(_ERROR_1_("negative image width", "insert_image"));
-  if (height <= 0) throw ScriptError(_ERROR_1_("negative image height", "insert_image"));
+  if (width <= 0)  throw ScriptError(_ERROR_1_("negative image width", _("insert_image")));
+  if (height <= 0) throw ScriptError(_ERROR_1_("negative image height", _("insert_image")));
 
   UInt size = width * height;
   Image img = wxImage(width, height, false);
@@ -516,8 +516,8 @@ bool InsertedImage::operator == (const GeneratedImage& that) const {
 // ----------------------------------------------------------------------------- : CropImage
 
 Image CropImage::generate(const Options& opt) {
-  if (width <= 0) throw ScriptError(_ERROR_1_("negative image width", "crop_image"));
-  if (height <= 0) throw ScriptError(_ERROR_1_("negative image height", "crop_image"));
+  if (width <= 0) throw ScriptError(_ERROR_1_("negative image width", _("crop_image")));
+  if (height <= 0) throw ScriptError(_ERROR_1_("negative image height", _("crop_image")));
   Image base_img = image->generate(opt);
   Image img = crop(base_img, (int)width, (int)height, (int)offset_x, (int)offset_y, background_color);
   return img;
@@ -780,9 +780,9 @@ ImportedImage::ImportedImage(Set* set, const String& filepath) {
   // determine save name
   loadpath = filepath;
   savename = normalize_internal_filename(loadpath);
-  savename.Replace(_(":"),  _("-"));
-  savename.Replace(_("/"),  _("-"));
-  savename.Replace(_("\\"), _("-"));
+  savename = replace_all(savename, _(":"),  _("-"));
+  savename = replace_all(savename, _("/"),  _("-"));
+  savename = replace_all(savename, _("\\"), _("-"));
 
   // does the file pointed to by filepath exist?
   if (!file_exists(loadpath)) {
@@ -826,8 +826,8 @@ DownloadedImage::DownloadedImage(Set* set, const String& url) {
   // determine save name
   loadpath = url;
   savename = normalize_internal_filename(loadpath);
-  savename.Replace(":",  "-");
-  savename.Replace("/",  "-");
+  savename = replace_all(savename, _(":"),  _("-"));
+  savename = replace_all(savename, _("/"),  _("-"));
 
   // can we download the data?
   ImageDownload download;
@@ -837,7 +837,7 @@ DownloadedImage::DownloadedImage(Set* set, const String& url) {
   }
 
   // is the data an image?
-  if (!download.content_type.StartsWith(_("image/"))) throw ScriptError(_ERROR_1_("download not image", loadpath));
+  if (!starts_with(download.content_type, _("image/"))) throw ScriptError(_ERROR_1_("download not image", loadpath));
   
   // add the file to the set
   LocalFileName new_image_file = set->newFileName(savename, _(".png"));

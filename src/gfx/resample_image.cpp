@@ -362,7 +362,7 @@ Image crop(const Image& base_img, int width, int height, int offset_x, int offse
     for (size_t i = 0; i < cardsv.size(); i++) {
       boost::json::object cardv = cardsv[i].as_object();
       if (cardv.contains("bounds")) {
-        String bounds = String(cardv["bounds"].as_string().c_str());
+        String bounds = decode_utf8(cardv["bounds"].as_string().data(), cardv["bounds"].as_string().size());
         RealRect rect(0.0, 0.0, 0.0, 0.0);
         int degrees = 0;
         if (decodeRectFromString(bounds, rect, degrees)) {

@@ -21,7 +21,7 @@
 bool image_load_file(Image& image, InputStream& stream);
 
 /// Load an image from a file
-bool image_load_file(Image& image, const wxString &name);
+bool image_load_file(Image& image, const String& name);
 
 /// Load an image from the program's resources
 Image load_resource_image(const String& name);

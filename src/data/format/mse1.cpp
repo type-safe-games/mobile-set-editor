@@ -96,7 +96,7 @@ void read_mse1_card(Set& set, InputStream& f) {
     // read a line
     String line = read_locale_line(f);
     if (line.empty()) continue;
-    Char type = line.GetChar(0);
+    Char type = line[0];
     line = line.substr(1);
     // interpret this line
     switch (type) {

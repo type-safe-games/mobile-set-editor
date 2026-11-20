@@ -405,6 +405,9 @@ namespace string_format_detail {
   inline const wchar_t* format_arg(const wchar_t* s) { return s; }
   template <typename T, typename = std::enable_if_t<std::is_arithmetic<T>::value || std::is_enum<T>::value>>
   inline T format_arg(T x) { return x; }
+  /// Other pointers are formatted with %p
+  template <typename T, typename = std::enable_if_t<!std::is_same<std::remove_cv_t<T>, char>::value && !std::is_same<std::remove_cv_t<T>, wchar_t>::value>>
+  inline const void* format_arg(T* p) { return p; }
   #if wxUSE_UNICODE
   inline wchar_t format_arg(wxUniChar c) { return c; }
   inline wchar_t format_arg(wxUniCharRef c) { return c; }

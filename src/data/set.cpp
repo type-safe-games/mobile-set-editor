@@ -247,7 +247,7 @@ void reflect_version_check(Reader& handler, const Char* key, intrusive_ptr<Packa
   Version v = package->version;
   handler.handle(key, v);
   if (package->version < v) {
-    queue_message(MESSAGE_WARNING, "This set file is made with a newer version of the '" + package->name() + "' template. Please update the template files.");
+    queue_message(MESSAGE_WARNING, _("This set file is made with a newer version of the '") + package->name() + _("' template. Please update the template files."));
   }
 }
 void reflect_version_check(Writer& handler, const Char* key, intrusive_ptr<Packaged> const& package) {
@@ -315,7 +315,7 @@ void Set::reflect_cards<Writer> (Writer& handler) {
       int i = 0;
 
       while (used.find(full_name) != used.end()) {
-        full_name = String(filename) << _(".") << ++i;
+        full_name = filename + _(".") + int_to_string(++i);
       }
       used.insert(full_name);
 

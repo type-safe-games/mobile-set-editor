@@ -99,7 +99,7 @@ void MultipleChoiceValue::normalForm() {
   // which choices are active?
   vector<bool> seen(field().choices->lastId());
   for (size_t pos = 0 ; pos < val.size() ; ) {
-    if (val.GetChar(pos) == _(' ')) {
+    if (val[pos] == _(' ')) {
       ++pos; // ingore whitespace
     } else {
       // does this choice match the one asked about?

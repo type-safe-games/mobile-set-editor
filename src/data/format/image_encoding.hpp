@@ -27,13 +27,13 @@ inline static std::string encodeRectInStdString(RealRect rect, int degrees) {
          "</mse-crop-data>";
 }
 
-/// Encode a rect in a wxString
+/// Encode a rect in a String
 inline static String encodeRectInWxString(RealRect rect, int degrees) {
-  return _("<mse-crop-data>") + wxString::Format(wxT("%i"), (int)std::ceil (rect.x)) +
-         _(";")               + wxString::Format(wxT("%i"), (int)std::ceil (rect.y)) +
-         _(";")               + wxString::Format(wxT("%i"), (int)std::floor(rect.width)) +
-         _(";")               + wxString::Format(wxT("%i"), (int)std::floor(rect.height)) +
-         _(";")               + wxString::Format(wxT("%i"), degrees) +
+  return _("<mse-crop-data>") + format_string(_("%i"), (int)std::ceil (rect.x)) +
+         _(";")               + format_string(_("%i"), (int)std::ceil (rect.y)) +
+         _(";")               + format_string(_("%i"), (int)std::floor(rect.width)) +
+         _(";")               + format_string(_("%i"), (int)std::floor(rect.height)) +
+         _(";")               + format_string(_("%i"), degrees) +
          _("</mse-crop-data>");
 }
 
@@ -50,31 +50,31 @@ inline static bool decodeRectFromString(const String& rectString, RealRect& rect
   if (divider == String::npos) return true;
   if (divider == 0) return true;
   int x;
-  if(!string.substr(0, divider).ToInt(&x)) return true;
+  if(!parse_int(string.substr(0, divider), x)) return true;
   string = string.substr(divider + 1);
 
   divider = string.find(_(";"));
   if (divider == String::npos) return true;
   if (divider == 0) return true;
   int y;
-  if(!string.substr(0, divider).ToInt(&y)) return true;
+  if(!parse_int(string.substr(0, divider), y)) return true;
   string = string.substr(divider + 1);
 
   divider = string.find(_(";"));
   if (divider == String::npos) return true;
   if (divider == 0) return true;
   int width;
-  if(!string.substr(0, divider).ToInt(&width)) return true;
+  if(!parse_int(string.substr(0, divider), width)) return true;
   string = string.substr(divider + 1);
 
   divider = string.find(_(";"));
   if (divider == String::npos) return true;
   if (divider == 0) return true;
   int height;
-  if(!string.substr(0, divider).ToInt(&height)) return true;
+  if(!parse_int(string.substr(0, divider), height)) return true;
   string = string.substr(divider + 1);
 
-  if(!string.ToInt(&degrees_out)) return true;
+  if(!parse_int(string, degrees_out)) return true;
 
   rect_out = RealRect(x, y, width, height);
   return true;
@@ -124,13 +124,13 @@ inline static const std::vector<int> Base64ReverseAlphabet = [] {
 }();
 
 /// Encode a file in a string
-inline static std::string fileToUTF8(const std::string& filepath) {
+inline static std::string fileToUTF8(const String& filepath) {
   std::vector<uint8_t> data;
   bool ok = retry_io([&]{
-    std::ifstream file(filepath, std::ios::binary);
+    std::ifstream file(to_fs_path(filepath), std::ios::binary);
     if (!file) return false;
     try {
-      size_t size = std::filesystem::file_size(filepath);
+      size_t size = std::filesystem::file_size(to_fs_path(filepath));
       data.resize(size);
       file.read(reinterpret_cast<char*>(data.data()), size);
       return !file.fail();
@@ -139,7 +139,7 @@ inline static std::string fileToUTF8(const std::string& filepath) {
     }
   });
   if (!ok) {
-    queue_message(MESSAGE_WARNING, _("Could not find file: ") + String(filepath));
+    queue_message(MESSAGE_WARNING, _("Could not find file: ") + filepath);
     return "";
   }
   // Base64 encode
@@ -166,7 +166,7 @@ inline static std::string fileToUTF8(const std::string& filepath) {
 }
 
 /// Retreive a file encoded in a string, return true if successful
-inline static bool UTF8ToFile(const std::string& filepath, std::string& data) {
+inline static bool UTF8ToFile(const String& filepath, std::string& data) {
   // Base64 decode
   std::string out;
   out.reserve(data.size() * 3 / 4);
@@ -183,7 +183,7 @@ inline static bool UTF8ToFile(const std::string& filepath, std::string& data) {
   }
   // Save file
   return retry_io([&]{
-    std::ofstream file(filepath, std::ios::binary);
+    std::ofstream file(to_fs_path(filepath), std::ios::binary);
     if (!file) return false;
     file.write(out.data(), out.size());
     return !file.fail();
@@ -195,7 +195,7 @@ inline static std::string encodeImageInString(const Image& img) {
   wxLogNull noLog; // suppress popups from cleaning up a possibly-missing temp file below
   String temppath = make_temp_file_name(_("mse")) + _(".png");
   retry_io([&]{ return img.SaveFile(temppath, wxBITMAP_TYPE_PNG); });
-  std::string s = "<mse-image-data>" + fileToUTF8(temppath.ToStdString()) + "</mse-image-data>";
+  std::string s = "<mse-image-data>" + fileToUTF8(temppath) + "</mse-image-data>";
   remove_file(temppath);
   remove_file(temppath.substr(0, temppath.size() - 4));
   return s;
@@ -207,11 +207,11 @@ inline static bool decodeImageFromString(const String& string, Image& img_out) {
   if (first == String::npos) return false;
   size_t last = string.find(_("</mse-image-data>"), first + 16);
   if (last == String::npos) return true;
-  std::string s = string.substr(first + 16, last - (first + 16)).ToStdString();
+  std::string s = encode_utf8(string.substr(first + 16, last - (first + 16)));
   if (s.empty()) return true;
 
   wxLogNull noLog; // suppress popups from cleaning up a possibly-missing temp file below
-  const std::string& temppath = (make_temp_file_name(_("mse")) + _(".png")).ToStdString();
+  String temppath = make_temp_file_name(_("mse")) + _(".png");
   if (UTF8ToFile(temppath, s)) {
     retry_io([&]{ return img_out.LoadFile(temppath, wxBITMAP_TYPE_PNG); });
   }
@@ -256,7 +256,7 @@ inline static boost::json::array metadata_to_json(const String& metadata) {
     boost::system::error_code ec;
     boost::json::parse_options options;
     options.allow_invalid_utf8 = true;
-    boost::json::value jv = boost::json::parse(string.ToStdString(), ec, {}, options);
+    boost::json::value jv = boost::json::parse(encode_utf8(string), ec, {}, options);
     if(ec || !jv.is_array()) {
       queue_message(MESSAGE_ERROR, _ERROR_("json cant parse"));
       return boost::json::array();

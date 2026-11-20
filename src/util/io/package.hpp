@@ -60,7 +60,7 @@ public:
   inline String const& toStringForKey() const { return fn; }
 
 private:
-  LocalFileName(const wxString& fn) : fn(fn) {}
+  LocalFileName(const String& fn) : fn(fn) {}
   String fn;
   friend class Package;
 };

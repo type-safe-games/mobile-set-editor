@@ -62,7 +62,7 @@ void export_mws(const SetP& set, const String& name) {
   TextOutputStream file(f, LineEnding::DOS);
   
   // Write header
-  file.writeString(set->value<TextValue>(_("title")).value + _(" Spoiler List\n"));
+  file.writeString(set->value<TextValue>(_("title")).value() + _(" Spoiler List\n"));
   file.writeString(_("Set exported using Magic Set Editor 2, version ") + app_version.toString() + _("\n\n"));
   file.writeString(_("Spoiler List created on ") + DateTime::now().format(_("%Y-%m-%d %H:%M:%S")));
   file.writeString(_("\n\n"));

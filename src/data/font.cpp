@@ -34,7 +34,7 @@ FontRef::FontRef()
 
 bool FontRef::PreloadResourceFonts(bool recursive) {
 #if wxUSE_PRIVATE_FONTS
-  String pathSeparator(path_separator());
+  String pathSeparator(1, path_separator());
   String appPath(path_only(executable_path()));
   vector<String> folders;
   if (!list_directory(appPath, folders, LIST_DIRS)) return true;
@@ -42,7 +42,7 @@ bool FontRef::PreloadResourceFonts(bool recursive) {
   bool preloadHadErrors = false;
   for (const String& folder : folders)
   {
-    if (folder.Lower().Contains("fonts")) {
+    if (contains(to_lower(folder), _("fonts"))) {
       String folderPath = appPath + pathSeparator + folder + pathSeparator;
       
       // tally fonts
@@ -74,7 +74,7 @@ void FontRef::TallyResourceFonts(String fontsDirectoryPath, vector<String>& font
         TallyResourceFonts(fontFilePath + path_separator(), fontFilePaths, true);
       }
     }
-    else if (fontFilePath.EndsWith(_(".ttf")) || fontFilePath.EndsWith(_(".otf"))) {
+    else if (ends_with(fontFilePath, _(".ttf")) || ends_with(fontFilePath, _(".otf"))) {
       fontFilePaths.push_back(fontFilePath);
     }
   }
@@ -195,8 +195,8 @@ wxFont FontRef::toWxFont(double scale) const {
     font = make_font(size_i, wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL, weight_i, underline(), italic_name());
   } else {
     String familyName = name();
-    if(familyName.EndsWith(BOLD_STRING)) {
-      familyName = familyName.Left(familyName.length() - BOLD_STRING.length());
+    if(ends_with(familyName, BOLD_STRING)) {
+      familyName = familyName.substr(0, familyName.length() - BOLD_STRING.length());
       weight_i = wxFONTWEIGHT_BOLD;
     }
     font = make_font(size_i, wxFONTFAMILY_DEFAULT, style_i, weight_i, underline(), familyName);

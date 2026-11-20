@@ -8,7 +8,7 @@
 #include <data/card_region.hpp>
 
 CardRegion::CardRegion()
-  : name("")
+  : name(_(""))
   , x(0.0)
   , y(0.0)
   , width(0)

@@ -158,7 +158,7 @@ void Keyword::prepare(const vector<KeywordParamP>& param_types, bool force) {
   #endif
   // Parse the 'match' string
   for (size_t i = 0 ; i < match.size() ;) {
-    Char c = match.GetChar(i);
+    Char c = match[i];
     if (is_substr(match, i, _("<atom-param"))) {
       // parameter, determine type...
       size_t start = skip_tag(match, i), end = match_close_tag(match, i);
@@ -210,14 +210,6 @@ void Keyword::prepare(const vector<KeywordParamP>& param_types, bool force) {
 
 // ----------------------------------------------------------------------------- : KeywordTrie
 
-namespace std {
-  template <> struct hash<wxUniChar> {
-    inline size_t operator () (wxUniChar x) const {
-      return std::hash<wxUniChar::value_type>()(x.GetValue());
-    }
-  };
-}
-
 /// A node in a trie to match keywords
 /* The trie is used to speed up matching, by quickly finding candidate keywords.
 */
@@ -226,13 +218,13 @@ public:
   KeywordTrie();
   ~KeywordTrie();
   
-  unordered_map<wxUniChar, unique_ptr<KeywordTrie>> children; ///< children after a given character
+  unordered_map<Char, unique_ptr<KeywordTrie>> children; ///< children after a given character
   KeywordTrie* on_any_star; ///< children on /.*/ (owned or this)
   vector<const Keyword*> finished; ///< keywords that end in this node
   
   /// Insert nodes representing the given character
   /** return the node where the evaluation will be after matching the character */
-  KeywordTrie* insert(wxUniChar match);
+  KeywordTrie* insert(Char match);
   /// Insert nodes representing the given string
   /** return the node where the evaluation will be after matching the string */
   KeywordTrie* insert(const String& match);
@@ -250,7 +242,7 @@ KeywordTrie::~KeywordTrie() {
   if (on_any_star != this) delete on_any_star;
 }
 
-KeywordTrie* KeywordTrie::insert(wxUniChar c) {
+KeywordTrie* KeywordTrie::insert(Char c) {
   #if USE_CASE_INSENSITIVE_KEYWORDS
     c = toLower(c); // case insensitive matching
   #endif
@@ -260,7 +252,7 @@ KeywordTrie* KeywordTrie::insert(wxUniChar c) {
 }
 KeywordTrie* KeywordTrie::insert(const String& match) {
   KeywordTrie* cur = this;
-  for (wxUniChar c : match) {
+  for (Char c : match) {
     cur = cur->insert(c);
   }
   return cur;
@@ -306,7 +298,7 @@ void KeywordDatabase::add(const Keyword& kw) {
   size_t param = 0;
   bool only_star = true;
   for (size_t i = 0 ; i < kw.match.size() ;) {
-    Char c = kw.match.GetChar(i);
+    Char c = kw.match[i];
     if (is_substr(kw.match, i, _("<atom-param"))) {
       i = match_close_tag_end(kw.match, i);
       // parameter, is there a separator we should eat?
@@ -347,11 +339,11 @@ void KeywordDatabase::prepare_parameters(const vector<KeywordParamP>& ps, const 
 #ifdef _DEBUG
 void dump(int i, const KeywordTrie* t) {
   FOR_EACH(c, t->children) {
-    log_debug(String(i, _(' ')) + c.first + _("     ") + String::Format(_("%p"), c.second.get()));
+    log_debug(String(i, _(' ')) + c.first + _("     ") + format_string(_("%p"), c.second.get()));
     dump(i + 2, c.second.get());
   }
   if (t->on_any_star) {
-    log_debug(String(i, _(' ')) + _(".*") + _("     ") + String::Format(_("%p"), t->on_any_star));
+    log_debug(String(i, _(' ')) + _(".*") + _("     ") + format_string(_("%p"), t->on_any_star));
     if (t->on_any_star != t) dump(i + 2, t->on_any_star);
   }
 }
@@ -368,7 +360,7 @@ void closure(vector<const KeywordTrie*>& state) {
   }
 }
 
-void step_state(vector<const KeywordTrie*>& state, wxUniChar c) {
+void step_state(vector<const KeywordTrie*>& state, Char c) {
   vector<const KeywordTrie*> next;
   for(auto kt : state) {
     auto it = kt->children.find(c);
@@ -394,7 +386,7 @@ unordered_set<Keyword const*> possible_matches(String const& tagged_str, Keyword
   state.push_back(trie_root);
 
   for (String::const_iterator it = tagged_str.begin(); it != tagged_str.end();) {
-    wxUniChar c = *it;
+    Char c = *it;
     // tag?
     if (c == '<') {
       it = skip_tag(it, tagged_str.end());
@@ -649,7 +641,7 @@ tuple<bool,String::const_iterator> keyword_match_detail(String::const_iterator i
         }
       }
       part = separator_before + script_part->toString() + separator_after;
-      ctx.setVariable(String(_("param")) << (int)(sub / 2), script_param);
+      ctx.setVariable(_("param") + int_to_string((int)(sub / 2)), script_param);
 
     } else {
       // Plain text with exact match

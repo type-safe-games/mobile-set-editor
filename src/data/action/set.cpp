@@ -140,7 +140,7 @@ OneWayLinkCardsAction::OneWayLinkCardsAction(CardP& card, const String& uid, con
   : card(card), uid(uid), relation(relation)
 {
   if (index < 0 || index >= Card::MAX_LINKS) {
-    throw ScriptError(String("OneWayLinkCardsAction created with invalid index: ") << index << _(" on card: ") << card->identification());
+    throw ScriptError(_("OneWayLinkCardsAction created with invalid index: ") + int_to_string(index) + _(" on card: ") + card->identification());
   }
   linked_uid      = &card->getLinkedUID(index);
   linked_relation = &card->getLinkedRelation(index);

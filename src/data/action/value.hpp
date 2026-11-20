@@ -197,7 +197,7 @@ public:
 private:
   size_t pos;  ///< Position of "<kw-"
   bool enable; ///< Should the reminder text be turned on or off?
-  wxUniChar old; ///< Old value of the <kw- tag
+  Char old;      ///< Old value of the <kw- tag
 };
 
 // ----------------------------------------------------------------------------- : Replace all

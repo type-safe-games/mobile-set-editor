@@ -112,7 +112,8 @@ void GameSettings::initDefaults(const Game& game) {
   for (auto it = cardlist_columns.begin(); it != cardlist_columns.end(); ++it) {
     if (it->second.width < 20) it->second.width = 20;
   }
-  if (images_export_filename.Trim().empty()) images_export_filename = _("{card.name}.png");
+  images_export_filename = trim_ascii_right(images_export_filename);
+  if (images_export_filename.empty()) images_export_filename = _("{card.name}.png");
 }
 
 IMPLEMENT_REFLECTION_NO_SCRIPT(GameSettings) {
@@ -411,7 +412,8 @@ void Settings::read() {
       if (trim(it->first).empty()) it = game_settings.erase(it);
       else ++it;
     }
-    if (locale.Trim().empty()) locale = _("en");
+    locale = trim_ascii_right(locale);
+    if (locale.empty()) locale = _("en");
     if (symbol_grid_size < 30) symbol_grid_size = 30;
     if (default_stylesheet_settings.card_zoom < 0.5) default_stylesheet_settings.card_zoom = 1.0;
   }

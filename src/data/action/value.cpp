@@ -115,7 +115,7 @@ unique_ptr<TextValueAction> toggle_format_action(const TextValueP& value, vector
   // Compute the changes
   for (size_t i = 0; i < tags.size() ; ++i) {
     const String& tag = tags[i];
-    new_value = tag.Contains(":") ? compute_new_variable_value(new_value, tag,    start_i, end_i):
+    new_value = contains(tag, _(":")) ? compute_new_variable_value(new_value, tag,    start_i, end_i):
                 tag == _("li")    ? compute_new_bullet_value  (new_value, offset, start_i, end_i):
                                     compute_new_simple_value  (new_value, tag,    start_i, end_i);
     // Erase redundant tags
@@ -149,7 +149,7 @@ unique_ptr<TextValueAction> toggle_format_action(const TextValueP& value, const 
   String new_value = value->value();
   int offset = 0;
   // Compute the changes
-  new_value = tag.Contains(":") ? compute_new_variable_value(new_value, tag,    start_i, end_i):
+  new_value = contains(tag, _(":")) ? compute_new_variable_value(new_value, tag,    start_i, end_i):
               tag == _("li")    ? compute_new_bullet_value  (new_value, offset, start_i, end_i):
                                   compute_new_simple_value  (new_value, tag,    start_i, end_i);
   // Erase redundant tags
@@ -191,16 +191,16 @@ String compute_new_variable_value(const String& str, const String& tag, size_t s
   // move all instances of variants of this tag to the sides of the selection
   
   // first, include surrounding formatting tags to the selection
-  int start_temp = str.find_last_of("<", start_i - 1);
+  int start_temp = str.find_last_of(_("<"), start_i - 1);
   while (start_temp != String::npos &&
-         str.GetChar(start_i - 1) == '>' &&
+         str[start_i - 1] == '>' &&
          is_formatting_tag(str, start_temp)) {
     start_i = start_temp;
-    start_temp = str.find_last_of("<", start_i - 1);
+    start_temp = str.find_last_of(_("<"), start_i - 1);
   }
   while (end_i < str.size() &&
          is_formatting_tag(str, end_i)) {
-    end_i = str.find_first_of(">", end_i);
+    end_i = str.find_first_of(_(">"), end_i);
     if (end_i != String::npos) end_i++;
   }
   String prefix(substr(str, 0, start_i));
@@ -212,14 +212,14 @@ String compute_new_variable_value(const String& str, const String& tag, size_t s
   map<String, int> tag_map;
   int start = 0;
   int end = 0;
-  String tag_variants = _("<") + tag.substr(0, tag.find_first_of(":"));
+  String tag_variants = _("<") + tag.substr(0, tag.find_first_of(_(":")));
   size_t size = tag_variants.size();
   String temp; temp.reserve(selection.size());
   for (; end < selection.size() ; ++end) {
     if (is_substr(selection, end, tag_variants)) {
       temp += selection.substr(start, end - start);
       start = end + 1;
-      end = selection.find(">", end + size);
+      end = selection.find(_(">"), end + size);
       String new_tag = selection.substr(start, end+1 - start);
       if (tag_map.find(new_tag) != tag_map.end()) {
         tag_map[new_tag] = tag_map[new_tag]+1;
@@ -234,14 +234,14 @@ String compute_new_variable_value(const String& str, const String& tag, size_t s
   temp += selection.substr(start, end - start);
 
   // tally close tags
-  selection.Clear(); selection.reserve(temp.size());
+  selection.clear(); selection.reserve(temp.size());
   String cejected_tag = close_tag(tag_variants);
   size_t csize = size + 1;
   for (start = 0, end = 0; end < temp.size() ; ++end) {
     if (is_substr(temp, end, cejected_tag)) {
       selection += temp.substr(start, end - start);
       start = end + 2;
-      end = temp.find(">", end + csize);
+      end = temp.find(_(">"), end + csize);
       String new_tag = temp.substr(start, end+1 - start);
       if (tag_map.find(new_tag) != tag_map.end()) {
         tag_map[new_tag] = tag_map[new_tag]-1;
@@ -335,7 +335,7 @@ TextToggleReminderAction::TextToggleReminderAction(const TextValueP& value, size
   if (pos == String::npos) {
     throw InternalError(_("TextToggleReminderAction: not in <kw- tag"));
   }
-  Char c = value->value().GetChar(pos + 4);
+  Char c = value->value()[pos + 4];
   enable = !(c == _('1') || c == _('A')); // if it was not enabled, then enable it
   old = enable ? _('1') : _('0');
 }
@@ -349,7 +349,7 @@ void TextToggleReminderAction::perform(bool to_undo) {
   String& val = value.value.mutate();
   assert(pos + 4 < val.size());
   size_t end = match_close_tag(val, pos);
-  wxUniChar c = old;
+  Char c = old;
   old = val[pos + 4];
   val[pos + 4] = c;
   if (end != String::npos && end + 5 < val.size()) {

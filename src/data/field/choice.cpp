@@ -241,29 +241,29 @@ void ChoiceStyle::invalidate() {
 
 String popup_style_to_string(const ChoicePopupStyle& choice) {
   switch (choice) {
-    case POPUP_MENU:              return "menu";
-    case POPUP_DROPDOWN:          return "drop down";
-    case POPUP_DROPDOWN_IN_PLACE: return "drop down in place";
-    default:                      return "menu";
+    case POPUP_MENU:              return _("menu");
+    case POPUP_DROPDOWN:          return _("drop down");
+    case POPUP_DROPDOWN_IN_PLACE: return _("drop down in place");
+    default:                      return _("menu");
   }
 }
 
 String render_style_to_string(const ChoiceRenderStyle& choice) {
   switch (choice) {
-    case RENDER_TEXT:            return "text";
-    case RENDER_IMAGE:           return "image";
-    case RENDER_HIDDEN:          return "hidden";
-    case RENDER_CHECKLIST:       return "checklist";
-    case RENDER_LIST:            return "list";
-    case RENDER_BOTH:            return "both";
-    case RENDER_HIDDEN_IMAGE:    return "image hidden";
-    case RENDER_TEXT_CHECKLIST:  return "text checklist";
-    case RENDER_IMAGE_CHECKLIST: return "image checklist";
-    case RENDER_BOTH_CHECKLIST:  return "both checklist";
-    case RENDER_TEXT_LIST:       return "text list";
-    case RENDER_IMAGE_LIST:      return "image list";
-    case RENDER_BOTH_LIST:       return "both list";
-    default:                     return "text";
+    case RENDER_TEXT:            return _("text");
+    case RENDER_IMAGE:           return _("image");
+    case RENDER_HIDDEN:          return _("hidden");
+    case RENDER_CHECKLIST:       return _("checklist");
+    case RENDER_LIST:            return _("list");
+    case RENDER_BOTH:            return _("both");
+    case RENDER_HIDDEN_IMAGE:    return _("image hidden");
+    case RENDER_TEXT_CHECKLIST:  return _("text checklist");
+    case RENDER_IMAGE_CHECKLIST: return _("image checklist");
+    case RENDER_BOTH_CHECKLIST:  return _("both checklist");
+    case RENDER_TEXT_LIST:       return _("text list");
+    case RENDER_IMAGE_LIST:      return _("image list");
+    case RENDER_BOTH_LIST:       return _("both list");
+    default:                     return _("text");
   }
 }
 

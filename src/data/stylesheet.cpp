@@ -29,8 +29,8 @@ StyleSheetP StyleSheet::byGameAndName(const Game& game, const String& name) {
   /// Alternative stylesheets for game
   static map<String, String> stylesheet_alternatives;
   String full_name = name;
-  if (!full_name.EndsWith(_(".mse-style"))) full_name = full_name + _(".mse-style");
-  if (!full_name.StartsWith(game.name() + _("-"))) full_name = game.name() + _("-") + full_name;
+  if (!ends_with(full_name, _(".mse-style"))) full_name = full_name + _(".mse-style");
+  if (!starts_with(full_name, game.name() + _("-"))) full_name = game.name() + _("-") + full_name;
   try {
     map<String, String>::const_iterator it = stylesheet_alternatives.find(full_name);
     if (it != stylesheet_alternatives.end()) {

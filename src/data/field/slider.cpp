@@ -43,14 +43,14 @@ void SliderField::after_reading(Version ver) {
   if (increment < 1) increment = 1;
 
   for (int i = minimum; i < maximum; i += increment) {
-    choices->choices.push_back(make_intrusive<Choice>(wxString::Format(wxT("%i"), i)));
+    choices->choices.push_back(make_intrusive<Choice>(format_string(_("%i"), i)));
   }
-  choices->choices.push_back(make_intrusive<Choice>(wxString::Format(wxT("%i"), maximum)));
+  choices->choices.push_back(make_intrusive<Choice>(format_string(_("%i"), maximum)));
 
   // Move individual choices that are numbers greater than maximum to the end
   for (int i = 0; i < choice_count; ++i) {
     try {
-      int choice_int = std::stoi(choices->choices[i].get()->name.ToStdString());
+      int choice_int = std::stoi(encode_utf8(choices->choices[i].get()->name));
       if (choice_int >= maximum) {
         auto it = choices->choices.begin() + i;
         std::rotate(it, it + 1, choices->choices.end());

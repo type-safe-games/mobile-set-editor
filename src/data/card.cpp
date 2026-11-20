@@ -171,14 +171,14 @@ vector<int> Card::findRelationLinks(const String& linked_relation) {
 String& Card::getLinkedUID(int index) {
   LINK_PAIRS(linked_pairs, this);
   if (index < 0 || index >= (int)linked_pairs.size()) {
-    throw ScriptError(String("getLinkedUID called with invalid index: ") << index);
+    throw ScriptError(_("getLinkedUID called with invalid index: ") + int_to_string(index));
   }
   return linked_pairs[index].first.get();
 }
 String& Card::getLinkedRelation(int index) {
   LINK_PAIRS(linked_pairs, this);
   if (index < 0 || index >= (int)linked_pairs.size()) {
-    throw ScriptError(String("getLinkedRelation called with invalid index: ") << index);
+    throw ScriptError(_("getLinkedRelation called with invalid index: ") + int_to_string(index));
   }
   return linked_pairs[index].second.get();
 }
@@ -186,9 +186,9 @@ String& Card::getLinkedRelation(int index) {
 int Card::indexedFieldIndex(const String& key_name, const String& base_name, int max_count) {
   if (key_name == base_name) return 0;
   String prefix = base_name + _("_");
-  if (!key_name.starts_with(prefix)) return -1;
+  if (!starts_with(key_name, prefix)) return -1;
   long n = 0;
-  if (!key_name.substr(prefix.size()).ToLong(&n) || n < 1 || n > max_count) return -1;
+  if (!parse_long(key_name.substr(prefix.size()), n) || n < 1 || n > max_count) return -1;
   return (int)n - 1;
 }
 
@@ -241,11 +241,11 @@ CardP Card::getFrontFaceCard(Set& set) {
     if (ScriptObject<CardP>* ic = dynamic_cast<ScriptObject<CardP>*>(result.get())) {
       return ic->getValue();
     }
-    queue_message(MESSAGE_ERROR, _ERROR_1_("result not card or nil", "get_front_face_script"));
+    queue_message(MESSAGE_ERROR, _ERROR_1_("result not card or nil", _("get_front_face_script")));
     return CardP();
   }
   // fallback on regular Front Face/Back Face logic
-  vector<CardP> other_cards = getLinkedRelationCards(set, "Front Face");
+  vector<CardP> other_cards = getLinkedRelationCards(set, _("Front Face"));
   if (other_cards.size() == 0) return CardP();
   return other_cards[0];
 }
@@ -261,11 +261,11 @@ CardP Card::getBackFaceCard(Set& set) {
     if (ScriptObject<CardP>* ic = dynamic_cast<ScriptObject<CardP>*>(result.get())) {
       return ic->getValue();
     }
-    queue_message(MESSAGE_ERROR, _ERROR_1_("result not card or nil", "get_back_face_script"));
+    queue_message(MESSAGE_ERROR, _ERROR_1_("result not card or nil", _("get_back_face_script")));
     return CardP();
   }
   // fallback on regular Front Face/Back Face logic
-  vector<CardP> other_cards = getLinkedRelationCards(set, "Back Face");
+  vector<CardP> other_cards = getLinkedRelationCards(set, _("Back Face"));
   if (other_cards.size() == 0) return CardP();
   return other_cards[0];
 }

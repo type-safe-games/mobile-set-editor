@@ -97,7 +97,7 @@ intrusive_ptr<Field> read_new<Field>(Reader& reader) {
     reader.warning(_ERROR_1_("unsupported field type", type));
     throw ParseError(_ERROR_("aborting parsing"));
   }
-  field->package_relative_filename = reader.getPackage()->relativeFilename().Clone();
+  field->package_relative_filename = reader.getPackage()->relativeFilename();
   return field;
 }
 

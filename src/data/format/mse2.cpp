@@ -22,11 +22,11 @@ public:
   bool canImport() override            { return true; }
   bool canExport(const Game&) override { return true; }
   SetP importSet(const String& filename) override {
-    wxString set_name = filename;
+    String set_name = filename;
     // Strip "/set" or "/set.mset-set" from the end, this allows opening directories as set files
-    if (filename.EndsWith(_(".mse-set/set")) || filename.EndsWith(_(".mse-set\\set"))) {
+    if (ends_with(filename, _(".mse-set/set")) || ends_with(filename, _(".mse-set\\set"))) {
       set_name = filename.substr(0, filename.size() - 4);
-    } else if (filename.EndsWith(_(".mse-set/set.mse-set")) || filename.EndsWith(_(".mse-set\\set.mse-set"))) {
+    } else if (ends_with(filename, _(".mse-set/set.mse-set")) || ends_with(filename, _(".mse-set\\set.mse-set"))) {
       set_name = filename.substr(0, filename.size() - 12);
     }
     SetP set = make_intrusive<Set>();

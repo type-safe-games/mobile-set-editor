@@ -398,7 +398,7 @@ inline std::unordered_map<String, String> english_plural_exceptions {
 , { "zonian", "zonians" }
 };
 
-inline std::unordered_map<wxString, wxString> english_singular_exceptions {
+inline std::unordered_map<String, String> english_singular_exceptions {
   { "plains", "plains" }
 , { "advisors", "advisor" }
 , { "aetherborn", "aetherborn" }
