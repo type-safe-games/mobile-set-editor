@@ -112,7 +112,7 @@ void PackageManager::findMatching(const String& pattern, vector<PackagedP>& out)
 }
 
 bool PackageManager::existsInPackage(const String& name) {
-  if (!name.empty() && name.GetChar(0) == _('/')) {
+  if (!name.empty() && name[0] == _('/')) {
     // break name
     size_t start = name.find_first_not_of(_("/\\"), 1); // allow "//package/name" from incorrect scripts
     size_t pos = name.find_first_of(_("/\\"), start);
@@ -126,7 +126,7 @@ bool PackageManager::existsInPackage(const String& name) {
 }
 
 pair<unique_ptr<InputStream>,Packaged*> PackageManager::openFileFromPackage(Packaged* package, const String& name) {
-  if (!name.empty() && name.GetChar(0) == _('/')) {
+  if (!name.empty() && name[0] == _('/')) {
     // absolute name; break name
     size_t start = name.find_first_not_of(_("/\\"), 1); // allow "//package/name" from incorrect scripts
     size_t pos   = name.find_first_of(_("/\\"), start);
@@ -149,7 +149,7 @@ pair<unique_ptr<InputStream>, Packaged*> openFileFromPackage(Packaged* package, 
 }
 
 String PackageManager::openFilenameFromPackage(Packaged* package, const String& name) {
-  if (!name.empty() && name.GetChar(0) == _('/')) {
+  if (!name.empty() && name[0] == _('/')) {
     // absolute name; break name
     size_t start = name.find_first_not_of(_("/\\"), 1); // allow "//package/name" from incorrect scripts
     size_t pos   = name.find_first_of(_("/\\"), start);
@@ -291,7 +291,7 @@ vector<String> PackageDirectory::findMatching(const String& pattern) const {
   if (!dir_exists(directory)) return names;
   list_directory(directory, names, LIST_FILES | LIST_DIRS, pattern);
   String prefix = directory;
-  if (!prefix.EndsWith(String(path_separator()))) prefix += path_separator();
+  if (!ends_with(prefix, String(1, path_separator()))) prefix += path_separator();
   for (String& name : names) name = prefix + name;
   return names;
 }
@@ -496,14 +496,14 @@ bool PackageDirectory::actual_install(const InstallablePackage& package, const S
 // Parse the "%Y%m%dT%H%M%S" (local time) prefix of a string, as wxDateTime::ParseFormat did.
 // Returns an invalid date if the prefix is not in that format.
 static DateTime parse_compact_date_time(const String& s) {
-  if (s.size() < 15 || s.GetChar(8) != _('T')) return DateTime();
+  if (s.size() < 15 || s[8] != _('T')) return DateTime();
   int fields[6], widths[6] = {4,2,2,2,2,2};
   size_t pos = 0;
   for (int i = 0; i < 6; ++i) {
     if (i == 3) ++pos; // the 'T'
     fields[i] = 0;
     for (int j = 0; j < widths[i]; ++j, ++pos) {
-      Char c = s.GetChar(pos);
+      Char c = s[pos];
       if (c < _('0') || c > _('9')) return DateTime();
       fields[i] = fields[i] * 10 + (c - _('0'));
     }
@@ -531,19 +531,19 @@ template <> void Reader::handle(PackageVersion::FileInfo& f) {
   String s; handle(s);
   // read status
   if (s.size() < 2) {f.status = PackageVersion::FILE_ADDED; return; }
-  f.status = s.GetChar(0) == _('M') ? PackageVersion::FILE_MODIFIED
-           : s.GetChar(0) == _('A') ? PackageVersion::FILE_ADDED
-           : s.GetChar(0) == _('D') ? PackageVersion::FILE_DELETED
+  f.status = s[0] == _('M') ? PackageVersion::FILE_MODIFIED
+           : s[0] == _('A') ? PackageVersion::FILE_ADDED
+           : s[0] == _('D') ? PackageVersion::FILE_DELETED
            :                          PackageVersion::FILE_UNCHANGED;
   if (f.status == PackageVersion::FILE_DELETED) {
-    if (s.GetChar(1) != _(' ')) {f.status = PackageVersion::FILE_ADDED; return; }
+    if (s[1] != _(' ')) {f.status = PackageVersion::FILE_ADDED; return; }
     f.file = s.substr(2);
     return;
   } else if (f.status != PackageVersion::FILE_UNCHANGED) {
     s = s.substr(1);
   }
   if (s.size() < 8+1+6+1)         {f.status = PackageVersion::FILE_ADDED; return; }
-  if (s.GetChar(8+1+6) != _(' ')) {f.status = PackageVersion::FILE_ADDED; return; } // invalid format
+  if (s[8+1+6] != _(' ')) {f.status = PackageVersion::FILE_ADDED; return; } // invalid format
   // read time, filename
   DateTime time = parse_compact_date_time(s);
   if (time.isValid()) f.time = time;

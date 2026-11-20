@@ -29,7 +29,7 @@ SCRIPT_FUNCTION_WITH_DEP(combined_editor) {
   // read 'field#' arguments
   vector<TextValue*> values;
   for (int i = 0 ; ; ++i) {
-    String name = _("field"); if (i > 0) name = name << i;
+    String name = _("field"); if (i > 0) name = name + int_to_string(i);
     SCRIPT_OPTIONAL_PARAM_N(ValueP, name, value) {
       TextValue* text_value = dynamic_cast<TextValue*>(value.get());
       if (!text_value) throw ScriptError(_("Argument '")+name+_("' should be a text field")); 
@@ -42,13 +42,13 @@ SCRIPT_FUNCTION_WITH_DEP(combined_editor) {
   // read 'separator#' arguments
   vector<String> separators;
   for (int i = 0 ; ; ++i) {
-    String name = _("separator"); if (i > 0) name = name << i;
+    String name = _("separator"); if (i > 0) name = name + int_to_string(i);
     SCRIPT_OPTIONAL_PARAM_N(String, name, separator) {
       separators.push_back(separator);
     } else if (i > 0) break;
   }
   if (separators.size() < values.size() - 1) {
-    throw ScriptError(String::Format(_("Not enough separators for combine_editor, expected %d"), static_cast<int>(values.size()-1)));
+    throw ScriptError(format_string(_("Not enough separators for combine_editor, expected %d"), static_cast<int>(values.size()-1)));
   }
   // the value
   SCRIPT_PARAM_C(String, value);
@@ -147,7 +147,7 @@ SCRIPT_FUNCTION_DEPENDENCIES(combined_editor) {
   // read 'field#' arguments
   vector<FieldP> fields;
   for (int i = 0 ; ; ++i) {
-    String name = _("field"); if (i > 0) name = name << i;
+    String name = _("field"); if (i > 0) name = name + int_to_string(i);
     SCRIPT_OPTIONAL_PARAM_N(ValueP, name, value) {
       fields.push_back(value->fieldP);
     } else if (i > 0) break;
@@ -223,7 +223,7 @@ SCRIPT_FUNCTION(primary_choice) {
 bool next_choice(size_t& start, size_t& end, const String& input) {
   if (start >= input.size()) return false;
   // ingore whitespace
-  while (start < input.size() && input.GetChar(start) == _(' ')) ++start;
+  while (start < input.size() && input[start] == _(' ')) ++start;
   // find end
   end = input.find_first_of(_(','), start);
   if (end == String::npos) end = input.size();
@@ -326,7 +326,7 @@ void read_choices_param(Context& ctx, vector<String>& choices_out) {
     } else {
       for (int i = 1 ; ; ++i) {
         String name = _("choice");
-        SCRIPT_OPTIONAL_PARAM_N(String, name << i, choice) {
+        SCRIPT_OPTIONAL_PARAM_N(String, name + int_to_string(i), choice) {
           choices_out.push_back(choice);
         } else break;
       }

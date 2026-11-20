@@ -53,7 +53,7 @@ int run_command(const vector<String>& arguments, bool wait) {
 
 void log_debug(const String& msg) {
   #ifndef NDEBUG
-    fprintf(stderr, "%s\n", msg.utf8_str().data());
+    fprintf(stderr, "%s\n", encode_utf8(msg).c_str());
   #endif
 }
 
@@ -76,7 +76,7 @@ InternalError::InternalError(const String& str)
   // add a stacktrace
   const String stack_trace = get_stack_trace();
   if (!stack_trace.empty()) {
-    message << _("\n\nCall stack:\n") << stack_trace;
+    message += _("\n\nCall stack:\n") + stack_trace;
   }
 }
 
@@ -95,7 +95,7 @@ ScriptParseError::ScriptParseError(size_t pos1, size_t pos2, int line, const Str
   , start(pos1), end(pos2 + found.size()), line(line), filename(filename)
 {}
 String ScriptParseError::what() const {
-  return String(_("(")) << (int)start << _("): ") << Error::what();
+  return String(_("(")) + int_to_string((int)start) + _("): ") + Error::what();
 }
 
 String concat(const vector<ScriptParseError>& errors) {

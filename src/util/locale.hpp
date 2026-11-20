@@ -128,26 +128,5 @@ String tr(const String&, const String& subcat, const String& key, DefaultLocaleF
 /// A localized string for error messages, with 4 argument (printf style)
 #define _ERROR_4_(s,a,b,c,d) format_string(_ERROR_(s),   a, b, c, d)
 
-/// Format a string
-/** Equivalent to sprintf / String::Format, but allows strings to be passed as arguments (gcc)
- */
-inline String format_string(const String& format, ...) {
-  va_list args;
-  va_start(args, format);
-  String res = String::FormatV(format, args);
-  va_end(args);
-  return res;
-}
-inline String format_string(const String& format, const String& a0) {
-  return String::Format(format, a0.c_str());
-}
-inline String format_string(const String& format, const String& a0, const String& a1) {
-  return String::Format(format, a0.c_str(), a1.c_str());
-}
-inline String format_string(const String& format, const String& a0, const String& a1, const String& a2) {
-  return String::Format(format, a0.c_str(), a1.c_str(), a2.c_str());
-}
-inline String format_string(const String& format, const String& a0, const String& a1, const String& a2, const String& a3) {
-  return String::Format(format, a0.c_str(), a1.c_str(), a2.c_str(), a3.c_str());
-}
+// format_string is in util/string.hpp
 

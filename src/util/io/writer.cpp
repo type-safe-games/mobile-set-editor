@@ -81,7 +81,7 @@ void Writer::handle(const String& value) {
   }
   writePending();
   // write indentation and key
-  if (value.find_first_of(_('\n')) != String::npos || (!value.empty() && isSpace(value.GetChar(0)))) {
+  if (value.find_first_of(_('\n')) != String::npos || (!value.empty() && isSpace(value[0]))) {
     // multiline string, or contains leading whitespace
     stream.writeString(_(":\n"));
     indentation += 1;
@@ -97,8 +97,8 @@ void Writer::handle(const String& value) {
       stream.putChar(_('\n'));
       start = end + 1;
       if (start < size) {
-        Char c1 = value.GetChar(start - 1);
-        Char c2 = value.GetChar(start);
+        Char c1 = value[start - 1];
+        Char c2 = value[start];
         // skip second character of \r\n or \n\r
         if (c1 != c2 && (c2 == _('\r') || c2 == _('\n')))  start += 1;
       }
@@ -112,13 +112,13 @@ void Writer::handle(const String& value) {
 }
 
 template <> void Writer::handle(const int& value) {
-  handle(String() << value);
+  handle(int_to_string(value));
 }
 template <> void Writer::handle(const unsigned int& value) {
-  handle(String() << value);
+  handle(int_to_string(value));
 }
 template <> void Writer::handle(const double& value) {
-  handle(String() << value);
+  handle(double_to_string(value));
 }
 template <> void Writer::handle(const bool& value) {
   handle(value ? _("true") : _("false"));
@@ -137,7 +137,7 @@ template <> void Writer::handle(const DateTime& date) {
   }
 }
 template <> void Writer::handle(const Vector2D& vec) {
-  handle(String::Format(_("(%.10lf,%.10lf)"), vec.x, vec.y));
+  handle(format_string(_("(%.10lf,%.10lf)"), vec.x, vec.y));
 }
 
 template <> void Writer::handle(const LocalFileName& value) {

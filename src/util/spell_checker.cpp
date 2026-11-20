@@ -23,9 +23,9 @@ SpellChecker* SpellChecker::get(const String& language) {
     String aff_path = language + _(".aff");
     String dic_path = language + _(".dic");
     if (file_exists(local_dir + aff_path) && file_exists(local_dir + dic_path)) {
-      speller = make_intrusive<SpellChecker>((local_dir + aff_path).mb_str(), (local_dir + dic_path).mb_str());
+      speller = make_intrusive<SpellChecker>(to_fs_path(local_dir + aff_path).string().c_str(), to_fs_path(local_dir + dic_path).string().c_str());
     } else if (file_exists(global_dir + aff_path) && file_exists(global_dir + dic_path)) {
-      speller = make_intrusive<SpellChecker>((global_dir + aff_path).mb_str(), (global_dir + dic_path).mb_str());
+      speller = make_intrusive<SpellChecker>(to_fs_path(global_dir + aff_path).string().c_str(), to_fs_path(global_dir + dic_path).string().c_str());
     } else {
       queue_message(MESSAGE_ERROR, _("Dictionary not found for language: ") + language);
     }
@@ -43,11 +43,11 @@ SpellChecker* SpellChecker::get(const String& filename, const String& language) 
     String dic_path = language + _(".dic");
     if (file_exists(prefix + dic_path)) {
       if (file_exists(prefix + aff_path)) {
-        speller = make_intrusive<SpellChecker>((prefix + aff_path).mb_str(), (prefix + dic_path).mb_str());
+        speller = make_intrusive<SpellChecker>(to_fs_path(prefix + aff_path).string().c_str(), to_fs_path(prefix + dic_path).string().c_str());
       } else if (file_exists(local_dir + aff_path)) {
-        speller = make_intrusive<SpellChecker>((local_dir + aff_path).mb_str(), (prefix + dic_path).mb_str());
+        speller = make_intrusive<SpellChecker>(to_fs_path(local_dir + aff_path).string().c_str(), to_fs_path(prefix + dic_path).string().c_str());
       } else if (file_exists(global_dir + aff_path)) {
-        speller = make_intrusive<SpellChecker>((global_dir + aff_path).mb_str(), (prefix + dic_path).mb_str());
+        speller = make_intrusive<SpellChecker>(to_fs_path(global_dir + aff_path).string().c_str(), to_fs_path(prefix + dic_path).string().c_str());
       }
     }
     if (!speller) {

@@ -182,16 +182,6 @@ private:
   std::string data;
 };
 
-// ----------------------------------------------------------------------------- : UTF-8
-
-// The conversions behave like wxConvUTF8 (wxMBConvStrictUTF8), which the core used before.
-
-/// Encode a string as UTF-8. Returns "" if it contains a code point above U+10FFFF (wx did the same).
-std::string encode_utf8(const String& str);
-/// Decode UTF-8 bytes. Returns false if they are not valid UTF-8.
-/** Like wx, this only checks lead and continuation bytes, so overlong forms and encoded surrogates are accepted. */
-bool decode_utf8(const char* data, size_t size, String& out);
-
 // ----------------------------------------------------------------------------- : Text input
 
 /// Eat a UTF-8 byte order mark from the beginning of a stream, if there is one

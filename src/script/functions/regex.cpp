@@ -89,7 +89,7 @@ struct RegexReplacer {
       if (replacement_function) {
         // set match results in context
         for (UInt sub = 0 ; sub < results.size() ; ++sub) {
-          String name  = sub == 0 ? _("input") : String(_("_")) << sub;
+          String name  = sub == 0 ? _("input") : String(_("_")) + int_to_string(sub);
           ctx.setVariable(name, to_script(results.str(sub)));
         }
         // call

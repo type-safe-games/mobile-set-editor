@@ -12,13 +12,13 @@
 
 // ----------------------------------------------------------------------------- : Conversion to/from normal string
 
-wxUniChar untag_char(wxUniChar c) {
+Char untag_char(Char c) {
   if (c == ESCAPED_LANGLE) return _('<');
   else if (c == CONNECTION_SPACE) return _(' ');
   else return c;
 }
 
-wxUniChar tag_char(wxUniChar c) {
+Char tag_char(Char c) {
   if (c == _('<')) return ESCAPED_LANGLE;
   else             return c;
 }
@@ -34,7 +34,7 @@ String untag(const String& str) {
   bool in_tag = false;
   String ret;
   ret.reserve(str.size());
-  for(wxUniChar c : str) {
+  for(Char c : str) {
     if (c == _('<')) {
       in_tag = true;
     } else if (!in_tag) {
@@ -50,7 +50,7 @@ String untag_no_escape(const String& str) {
   bool in_tag = false;
   String ret;
   ret.reserve(str.size());
-  for (wxUniChar c : str) {
+  for (Char c : str) {
     if (c == _('<')) {
       in_tag = true;
     } else if (!in_tag) {
@@ -80,7 +80,7 @@ String fix_old_tags(const String& str) {
   bool intag = false;
   // invariant : intag => !tags.empty()
   for (size_t i = 0 ; i < str.size() ; ++i) {
-    Char c = str.GetChar(i);
+    Char c = str[i];
     if (is_substr(str, i, _("</>"))) {
       i += 2;
       // old style close tag, replace by the correct tag type
@@ -251,7 +251,7 @@ String::const_iterator find_close_tag(String::const_iterator tag, String::const_
   size_t size = str.size();
   int taglevel = 1;
   for (size_t pos = start + tag.size() + 2 ; pos < size ; ++pos) {
-    Char c = str.GetChar(pos);
+    Char c = str[pos];
     if (c == _('<')) {
       if (is_substr(str, pos + 1, tag)) {
         ++taglevel;
@@ -286,7 +286,7 @@ bool is_tag(const String& str, size_t pos, const String& tag, bool strict) {
 
 bool is_formatting_tag(const String& str, size_t pos) {
   if (str.size() < pos + 2) return false;
-  if (str.GetChar(pos) != '<') return false;
+  if (str[pos] != '<') return false;
   pos++;
   return is_substr(str, pos, _("b"))      || is_substr(str, pos, _("/b")) ||
          is_substr(str, pos, _("i"))      || is_substr(str, pos, _("/i")) ||
@@ -361,12 +361,12 @@ bool is_formatting_tag(String::const_iterator it, String::const_iterator end) {
   int taglevel = 0;
   end = min(end,size);
   for (size_t pos = 0 ; pos < end ; ) {
-    Char c = str.GetChar(pos);
+    Char c = str[pos];
     if (c == _('<')) {
       if (is_substr(str, pos + 1, static_cast<const Char*>(tag.c_str())+1) && pos+tag.size() < str.size() && is_tag_end_char(str[pos+tag.size()], strict)) {
         if (pos < start) last_start = pos;
         ++taglevel;
-      } else if (pos + 2 < size && str.GetChar(pos+1) == _('/') && is_substr(str, pos + 2, static_cast<const Char*>(tag.c_str())+1) && pos+1+tag.size() < str.size() && is_tag_end_char(str[pos+1+tag.size()], strict)) {
+      } else if (pos + 2 < size && str[pos+1] == _('/') && is_substr(str, pos + 2, static_cast<const Char*>(tag.c_str())+1) && pos+1+tag.size() < str.size() && is_tag_end_char(str[pos+1+tag.size()], strict)) {
         --taglevel; // close tag
       }
       pos = skip_tag(str,pos);
@@ -407,7 +407,7 @@ String close_tag(const String& tag) {
 }
 
 String anti_tag(const String& tag) {
-  if (!tag.empty() && tag.GetChar(0) == _('/')) return _("<")  + tag.substr(1) + _(">");
+  if (!tag.empty() && tag[0] == _('/')) return _("<")  + tag.substr(1) + _(">");
   else                                          return _("</") + tag           + _(">");
 }
 
@@ -430,7 +430,7 @@ size_t index_to_cursor(const String& str, size_t index, Movement dir) {
   // find the range [start...end) with the same cursor value, that contains index
   // after the loop, 'cursor' corresponds to the index i/end
   for (size_t i = 0 ; i < str.size() ;) {
-    Char c = str.GetChar(i);
+    Char c = str[i];
     bool has_width = true;
     if (c == _('<')) {
       // a tag
@@ -456,7 +456,7 @@ size_t index_to_cursor(const String& str, size_t index, Movement dir) {
             // is there any non-tag after index?
             bool empty = true;
             while (i < close) {
-              c = str.GetChar(i);
+              c = str[i];
               if (c == _('<')) {
                 i = skip_tag(str, i);
               } else if (i >= index) {
@@ -473,7 +473,7 @@ size_t index_to_cursor(const String& str, size_t index, Movement dir) {
               if (i >= index) {
                 return cursor; // we didn't pass any non-tag stuff
               }
-              c = str.GetChar(i);
+              c = str[i];
               if (c != _('<')) break;
               i = skip_tag(str, i);
             }
@@ -483,7 +483,7 @@ size_t index_to_cursor(const String& str, size_t index, Movement dir) {
             int before_c = 0;
             int after_c  = 0;
             while (i < close) {
-              c = str.GetChar(i);
+              c = str[i];
               if (c == _('<')) {
                 i = skip_tag(str, i);
               } else {
@@ -525,7 +525,7 @@ void cursor_to_index_range(const String& str, size_t cursor, size_t& start, size
   size_t i = 0;
   size_t size = str.size(); // can be changed by <suffix> tags
   while (cur <= cursor && i < size) {
-    Char c = str.GetChar(i);
+    Char c = str[i];
     bool has_width = true;
     if (c == _('<')) {
       // a tag
@@ -575,10 +575,10 @@ size_t cursor_to_index(const String& str, size_t cursor, Movement dir) {
     // if the string in between contains a pair "<tag></tag>" or "</tag><tag>" returns the middle
     // otherwise returns start
     for (size_t i = start ; i < end && i < str.size() ; ) {
-      if (str.GetChar(i) == _('<')) {
+      if (str[i] == _('<')) {
         String tag1 = tag_at(str, i);
         i = skip_tag(str, i);
-        if (i < str.size() && str.GetChar(i) == _('<')) {
+        if (i < str.size() && str[i] == _('<')) {
           String tag2 = tag_at(str, i);
           if (_("<") + tag2 + _(">") == anti_tag(tag1)) {
             return i;
@@ -600,7 +600,7 @@ size_t cursor_to_index(const String& str, size_t cursor, Movement dir) {
 String untag_for_cursor(const String& str) {
   String ret; ret.reserve(str.size());
   for (size_t i = 0 ; i < str.size() ; ) {
-    Char c = str.GetChar(i);
+    Char c = str[i];
     if (c == _('<')) {
       if (is_substr(str, i, _("<atom-kwpph"))) {
         i = match_close_tag_end(str, i);
@@ -642,7 +642,7 @@ String untag_for_cursor(const String& str) {
 size_t untagged_to_index(const String& str, size_t pos, bool inside, size_t start_index) {
   size_t i = start_index, p = 0;
   while (i < str.size()) {
-    Char c = str.GetChar(i);
+    Char c = str[i];
     if (c == _('<')) {
       bool is_close = is_substr(str, i, _("</"));
       if (p == pos && is_close == inside) break;
@@ -660,7 +660,7 @@ size_t index_to_untagged(const String& str, size_t index) {
   size_t i = 0, p = 0;
   index = min(str.size(), index);
   while (i < index) {
-    Char c = str.GetChar(i);
+    Char c = str[i];
     if (c == _('<')) {
       i = skip_tag(str, i);
     } else {
@@ -725,11 +725,11 @@ String get_tags(const String& str, size_t start, size_t end, bool open_tags, boo
   bool intag = false;
   bool keeptag = false;
   for (size_t i = start ; i < end ; ++i) {
-    Char c = str.GetChar(i);
+    Char c = str[i];
     if (c == _('<') && !intag) {
       intag = true;
       // is this tag an open tag?
-      if (i + 1 < end && (str.GetChar(i + 1) == _('/') ? close_tags : open_tags)) {
+      if (i + 1 < end && (str[i + 1] == _('/') ? close_tags : open_tags)) {
         keeptag = true;
       }
     }
@@ -800,7 +800,7 @@ String simplify_tagged_merge(const String& str, bool all) {
   String ret; ret.reserve(size);
   String waiting_tags; // tags that are waiting to be written to the output
   for (size_t i = 0 ; i < size ; ++i) {
-    Char c = str.GetChar(i);
+    Char c = str[i];
     if (c == _('<')) {
       String tag = tag_at(str, i);
       add_or_cancel_tag(tag, waiting_tags, all);
@@ -819,7 +819,7 @@ String simplify_tagged_overlap(const String& str) {
   String ret; ret.reserve(size);
   String open_tags; // tags we are in
   for (size_t i = 0 ; i < size ; ++i) {
-    Char c = str.GetChar(i);
+    Char c = str[i];
     if (c == _('<')) {
       String tag = tag_at(str, i);
       if (starts_with(tag, _("b"))      || starts_with(tag, _("/b")) ||
@@ -853,21 +853,21 @@ String simplify_tagged_overlap(const String& str) {
 
 bool check_tagged(const String& str, bool check_balance) {
   for (size_t i = 0 ; i < str.size() ; ) {
-    if (str.GetChar(i) == _('<')) {
+    if (str[i] == _('<')) {
       size_t end = skip_tag(str,i);
       if (end == String::npos) {
         queue_message(MESSAGE_WARNING, _("Invalid tagged string: missing '>'"));
         return false;
       }
       for (size_t j = i + 1 ; j + 1 < end ; ++j) {
-        Char c = str.GetChar(j);
+        Char c = str[j];
         if (c == ESCAPED_LANGLE || c == _('<')) {
           queue_message(MESSAGE_WARNING, _("Invalid character in tag"));
           return false;
         }
       }
       if (check_balance) {
-        if (str.GetChar(i+1) == _('/')) {
+        if (str[i+1] == _('/')) {
           // close tag, don't check
         } else if (is_substr(str,i,_("<hint"))) {
           // no close tag for <hint> tags
@@ -878,7 +878,7 @@ bool check_tagged(const String& str, bool check_balance) {
             return false;
           }
           if (is_tag(str, i, _("<soft-line"))) {
-            if (close - end != 1 || str.GetChar(end) != _('\n')) {
+            if (close - end != 1 || str[end] != _('\n')) {
               queue_message(MESSAGE_WARNING, _("Invalid tagged string: <soft-line> doesn't contain exactly one newline character"));
               return false;
             }
@@ -930,7 +930,7 @@ bool fix_soft_lines(const String& str, String& fixed) {
         // old style soft-line that can contain anything, only keep the newlines inside soft-lines
         changed = true;
         for (size_t j = 0 ; j < content.size() ; ) {
-          Char c = content.GetChar(j);
+          Char c = content[j];
           if (c == _('\n')) {
             ret += soft_line;
             ++j;
@@ -951,7 +951,7 @@ bool fix_soft_lines(const String& str, String& fixed) {
       changed = true;
       ret += str.substr(i, open - i);
       ret += soft_line;
-      i = (open_end < size && str.GetChar(open_end) == _('\n')) ? open_end + 1 : open_end;
+      i = (open_end < size && str[open_end] == _('\n')) ? open_end + 1 : open_end;
     }
   }
   if (!changed) return false;
@@ -969,7 +969,7 @@ bool is_space_like(Char c) {
 
 String curly_quotes(String str, bool curl) {
   bool open = true, in_tag = false;
-  for (wxUniCharRef c : str) {
+  for (auto&& c : str) {
     if (c == _('\'') || c == LEFT_SINGLE_QUOTE || c == RIGHT_SINGLE_QUOTE) {
       c = curl ? (open ? LEFT_SINGLE_QUOTE : RIGHT_SINGLE_QUOTE) : _('\'');
     } else if (c == _('\"') || c == LEFT_DOUBLE_QUOTE || c == RIGHT_DOUBLE_QUOTE) {

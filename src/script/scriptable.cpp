@@ -54,7 +54,7 @@ void OptionalScript::parse(Reader& reader, bool string_mode) {
     const ScriptParseError& e = errors[i];
     if (!e.filename.empty()) {
       // error in an include file
-      include_warnings += String::Format(_("\n  On line %d:\t  "), e.line) + e.ParseError::what();
+      include_warnings += format_string(_("\n  On line %d:\t  "), e.line) + e.ParseError::what();
       if (i + 1 >= errors.size() || errors[i+1].filename != e.filename) {
         reader.warning(_("In include file '") + e.filename + _("'") + include_warnings);
         include_warnings.clear();

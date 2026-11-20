@@ -31,7 +31,7 @@ SCRIPT_FUNCTION(get_mse_version) {
 
 SCRIPT_FUNCTION(get_mse_path) {
   String app_folder = path_only(executable_path());
-  app_folder.Replace("\\", "/");
+  app_folder = replace_all(app_folder, _("\\"), _("/"));
   SCRIPT_RETURN(app_folder);
 }
 
@@ -121,9 +121,9 @@ String format_input(const String& format, const ScriptValue& input) {
     // determine type expected by format string
     String fmt = _("%") + replace_all(format, _("%"), _(""));
     if (format.find_first_of(_("DdIiOoXx")) != String::npos) {
-      return String::Format(fmt, input.toInt());
+      return format_string(fmt, input.toInt());
     } else if (format.find_first_of(_("EeFfGg")) != String::npos) {
-      return String::Format(fmt, input.toDouble());
+      return format_string(fmt, input.toDouble());
     } else if (format.find_first_of(_("Ss")) != String::npos) {
       return format_string(fmt, input.toString());
     } else {
@@ -161,7 +161,7 @@ SCRIPT_FUNCTION(to_int) {
     } else if (t == SCRIPT_STRING) {
       long l;
       String str = input->toString();
-      if (str.ToLong(&l)) {
+      if (parse_long(str, l)) {
         result = l;
       } else if (str.empty()) {
         result = 0;
@@ -191,7 +191,7 @@ SCRIPT_FUNCTION(to_real) {
       String str = input->toString();
       if (str.empty()) {
         result = 0.0;
-      } else if (!str.ToDouble(&result)) {
+      } else if (!parse_double(str, result)) {
         return delay_error(ScriptErrorConversion(str, input->typeName(), _TYPE_("double")));
       }
     } else {
@@ -219,9 +219,9 @@ SCRIPT_FUNCTION(to_number) {
     } else {
       String str = input->toString();
       long l; double d;
-      if (str.ToLong(&l)) {
+      if (parse_long(str, l)) {
         SCRIPT_RETURN((int)l);
-      } else if (str.ToDouble(&d)) {
+      } else if (parse_double(str, d)) {
         SCRIPT_RETURN((double)d);
       } else if (str.empty()) {
         SCRIPT_RETURN(0);
@@ -391,19 +391,19 @@ SCRIPT_FUNCTION(pow) {
 // convert a string to upper case
 SCRIPT_FUNCTION(to_upper) {
   SCRIPT_PARAM_C(String, input);
-  SCRIPT_RETURN(input.Upper());
+  SCRIPT_RETURN(to_upper(input));
 }
 
 // convert a string to lower case
 SCRIPT_FUNCTION(to_lower) {
   SCRIPT_PARAM_C(String, input);
-  SCRIPT_RETURN(input.Lower());
+  SCRIPT_RETURN(to_lower(input));
 }
 
 // convert a string to title case
 SCRIPT_FUNCTION(to_title) {
   SCRIPT_PARAM_C(String, input);
-  SCRIPT_RETURN(capitalize(input.Lower()));
+  SCRIPT_RETURN(capitalize(to_lower(input)));
 }
 
 // reverse a string
@@ -460,7 +460,7 @@ SCRIPT_FUNCTION(regex_escape) {
 
 // sort/filter characters
 void sort_string(String& input) {
-  vector<wxUniChar> chars;
+  vector<Char> chars;
   copy(input.begin(), input.end(), back_inserter(chars));
   sort(chars.begin(), chars.end());
   input.clear();
@@ -711,14 +711,14 @@ SCRIPT_FUNCTION(random_select_many) {
   int itemCount = input->itemCount();
   if (with_replace) {
     if (itemCount == 0) {
-      throw ScriptError(String::Format(_("Can not select %d items from an empty collection"), count));
+      throw ScriptError(format_string(_("Can not select %d items from an empty collection"), count));
     }
     for (int i = 0 ; i < count ; ++i) {
       ret->value.push_back( input->getIndex( rand() % itemCount ) );
     }
   } else {
     if (count > itemCount) {
-      throw ScriptError(String::Format(_("Can not select %d items from a collection conaining only %d items"), count, input->itemCount()));
+      throw ScriptError(format_string(_("Can not select %d items from a collection conaining only %d items"), count, input->itemCount()));
     }
     // transfer all to ret and shuffle
     ScriptValueP it = input->makeIterator();
@@ -754,12 +754,12 @@ SCRIPT_FUNCTION(make_map) {
       while (key = keys_it->next()) {
         keys_string = keys_string + _(", ") + key->toString();
       }
-      queue_message(MESSAGE_WARNING, _ERROR_1_("more keys than values", keys_string.SubString(2, keys_string.size())));
+      queue_message(MESSAGE_WARNING, _ERROR_1_("more keys than values", keys_string.substr(2)));
       break;
     }
   }
   if (value = values_it->next()) {
-    queue_message(MESSAGE_WARNING, _ERROR_1_("more values than keys", keys_string.SubString(2, keys_string.size())));
+    queue_message(MESSAGE_WARNING, _ERROR_1_("more values than keys", keys_string.size() >= 2 ? keys_string.substr(2) : String()));
   }
   return map;
 }

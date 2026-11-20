@@ -132,7 +132,7 @@ String json_pretty_print(const boost::json::value& jv, std::string* indent) {
   std::string stdstring = stream.str();
   const char* data = stdstring.data();
   size_t size = stdstring.size();
-  String wxstring = String::FromUTF8(data, size);
+  String wxstring = decode_utf8(data, size);
   if (wxstring.empty() && size > 0) {
     wxstring = String(data, wxConvWhateverWorks, size);
   }
@@ -143,7 +143,7 @@ String json_ugly_print(const boost::json::value& jv) {
   std::string stdstring = boost::json::serialize(jv);
   const char* data = stdstring.data();
   size_t size = stdstring.size();
-  String wxstring = String::FromUTF8(data, size);
+  String wxstring = decode_utf8(data, size);
   if (wxstring.empty() && size > 0) {
     wxstring = String(data, wxConvWhateverWorks, size);
   }
@@ -160,7 +160,7 @@ void read(T& out, boost::json::object& jv, const char value_name[]) {
   boost::json::string jstring = jv[value_name].as_string();
   const char* data = jstring.data();
   size_t size = jstring.size();
-  String wxstring = String::FromUTF8(data, size);
+  String wxstring = decode_utf8(data, size);
   if (wxstring.empty() && size > 0) {
     wxstring = String(data, wxConvWhateverWorks, size);
   }
@@ -176,7 +176,7 @@ void read(PackSelectType& out, boost::json::object& jv, const char value_name[])
   boost::json::string jstring = jv[value_name].as_string();
   const char* data = jstring.data();
   size_t size = jstring.size();
-  String wxstring = String::FromUTF8(data, size);
+  String wxstring = decode_utf8(data, size);
   if (wxstring.empty() && size > 0) {
     wxstring = String(data, wxConvWhateverWorks, size);
   }
@@ -238,7 +238,7 @@ CardP json_to_mse_card(boost::json::object& jv, Set* set) {
     boost::json::object datav = jv["data"].get_object();
     for (auto it = datav.begin(); it != datav.end(); ++it) {
       boost::json::string_view key_view = it->key();
-      String key_name = String::FromUTF8(key_view.data(), key_view.size());
+      String key_name = decode_utf8(key_view.data(), key_view.size());
       Value* container = get_card_field_container(*set->game, card->data, key_name, false);
       ScriptValueP value = json_to_mse(it->value(), set);
       set_container(set, container, _("card"), value, key_name);
@@ -247,7 +247,7 @@ CardP json_to_mse_card(boost::json::object& jv, Set* set) {
   // stylesheet
   if (jv.contains("stylesheet")) {
     boost::json::string stylesheet_name = jv["stylesheet"].as_string();
-    card->stylesheet = StyleSheet::byGameAndName(*set->game, String::FromUTF8(stylesheet_name.data(), stylesheet_name.size()));
+    card->stylesheet = StyleSheet::byGameAndName(*set->game, decode_utf8(stylesheet_name.data(), stylesheet_name.size()));
   }
   if (card->stylesheet) {
     // styling fields
@@ -256,7 +256,7 @@ CardP json_to_mse_card(boost::json::object& jv, Set* set) {
       boost::json::object datav = jv["styling_data"].get_object();
       for (auto it = datav.begin(); it != datav.end(); ++it) {
         boost::json::string_view key_view = it->key();
-        String key_name = String::FromUTF8(key_view.data(), key_view.size());
+        String key_name = decode_utf8(key_view.data(), key_view.size());
         Value* container = get_container(card->styling_data, String("styling"), key_name, false);
         ScriptValueP value = json_to_mse(it->value(), set);
         set_container(set, container, _("styling"), value, key_name);
@@ -268,14 +268,14 @@ CardP json_to_mse_card(boost::json::object& jv, Set* set) {
       boost::json::object datav = jv["extra_data"].get_object();
       for (auto it = datav.begin(); it != datav.end(); ++it) {
         boost::json::string_view stylesheet_view = it->key();
-        StyleSheetP stylesheet = StyleSheet::byGameAndName(*set->game, String::FromUTF8(stylesheet_view.data(), stylesheet_view.size()));
+        StyleSheetP stylesheet = StyleSheet::byGameAndName(*set->game, decode_utf8(stylesheet_view.data(), stylesheet_view.size()));
         if (!stylesheet) continue;
         IndexMap<FieldP, ValueP>& stylesheet_data = card->extraDataFor(*stylesheet);
         stylesheet_data.init(stylesheet->extra_card_fields);
         boost::json::object stylesheet_datav = it->value().as_object();
         for (auto stylesheet_it = stylesheet_datav.begin(); stylesheet_it != stylesheet_datav.end(); ++stylesheet_it) {
           boost::json::string_view key_view = stylesheet_it->key();
-          String key_name = String::FromUTF8(key_view.data(), key_view.size());
+          String key_name = decode_utf8(key_view.data(), key_view.size());
           Value* container = get_container(stylesheet_data, String("extra card"), key_name, false);
           ScriptValueP value = json_to_mse(stylesheet_it->value(), set);
           set_container(set, container, _("extra"), value, key_name);
@@ -294,16 +294,16 @@ SetP json_to_mse_set(boost::json::object& jv) {
     throw ScriptError(_ERROR_("json set without stylesheet"));
   }
   boost::json::string game_name = jv["game"].as_string();
-  GameP game = Game::byName(String::FromUTF8(game_name.data(), game_name.size()));
+  GameP game = Game::byName(decode_utf8(game_name.data(), game_name.size()));
   boost::json::string stylesheet_name = jv["stylesheet"].as_string();
-  StyleSheetP stylesheet = StyleSheet::byGameAndName(*game, String::FromUTF8(stylesheet_name.data(), stylesheet_name.size()));
+  StyleSheetP stylesheet = StyleSheet::byGameAndName(*game, decode_utf8(stylesheet_name.data(), stylesheet_name.size()));
   SetP set = make_intrusive<Set>(stylesheet);
   // set fields
   if (jv.contains("set_info") && jv["set_info"].is_object()) {
     boost::json::object datav = jv["set_info"].get_object();
     for (auto it = datav.begin(); it != datav.end(); ++it) {
       boost::json::string_view key_view = it->key();
-      String key_name = String::FromUTF8(key_view.data(), key_view.size());
+      String key_name = decode_utf8(key_view.data(), key_view.size());
       Value* container = get_container(set->data, String("set"), key_name, false);
       ScriptValueP value = json_to_mse(it->value(), set.get());
       set_container(set.get(), container, _("set"), value, key_name);
@@ -314,13 +314,13 @@ SetP json_to_mse_set(boost::json::object& jv) {
     boost::json::object datav = jv["styling"].get_object();
     for (auto it = datav.begin(); it != datav.end(); ++it) {
       boost::json::string_view stylesheet_view = it->key();
-      StyleSheetP stylesheet = StyleSheet::byGameAndName(*set->game, String::FromUTF8(stylesheet_view.data(), stylesheet_view.size()));
+      StyleSheetP stylesheet = StyleSheet::byGameAndName(*set->game, decode_utf8(stylesheet_view.data(), stylesheet_view.size()));
       if (!stylesheet) continue;
       IndexMap<FieldP, ValueP>& stylesheet_data = set->stylingDataFor(*stylesheet);
       boost::json::object stylesheet_datav = it->value().as_object();
       for (auto stylesheet_it = stylesheet_datav.begin(); stylesheet_it != stylesheet_datav.end(); ++stylesheet_it) {
         boost::json::string_view key_view = stylesheet_it->key();
-        String key_name = String::FromUTF8(key_view.data(), key_view.size());
+        String key_name = decode_utf8(key_view.data(), key_view.size());
         Value* container = get_container(stylesheet_data, String("styling"), key_name, false);
         ScriptValueP value = json_to_mse(stylesheet_it->value(), set.get());
         set_container(set.get(), container, _("styling"), value, key_name);
@@ -372,7 +372,7 @@ ScriptValueP json_to_mse(const boost::json::value& jv, Set* set) {
     if (jstring.empty()) return to_script(String());
     const char* data = jstring.data();
     size_t size = jstring.size();
-    String wxstring = String::FromUTF8(data, size);
+    String wxstring = decode_utf8(data, size);
     if (!wxstring.empty()) return to_script(wxstring);
     return to_script(String(data, wxConvWhateverWorks, size));
   }
@@ -401,7 +401,7 @@ ScriptValueP json_to_mse(const boost::json::value& jv, Set* set) {
     ScriptCustomCollectionP result = make_intrusive<ScriptCustomCollection>();
     for (auto it = object.begin(); it != object.end(); ++it) {
       boost::json::string_view jview = it->key();
-      String key_name = String::FromUTF8(jview.data(), jview.size());
+      String key_name = decode_utf8(jview.data(), jview.size());
       boost::json::value jvalue = it->value();
       ScriptValueP value = json_to_mse(jvalue, set);
       result->key_value[key_name] = value;
@@ -418,7 +418,7 @@ ScriptValueP json_to_mse(const String& string, Set* set) {
     boost::system::error_code ec;
     boost::json::parse_options options;
     options.allow_invalid_utf8 = true;
-    wxScopedCharBuffer buffer = string.ToUTF8();
+    std::string buffer = encode_utf8(string);
     boost::json::value jv = boost::json::parse(boost::json::string_view(buffer.data(), buffer.length()), ec, {}, options);
     //if(ec && buffer.length() > 0) queue_message(MESSAGE_ERROR, _ERROR_("json cant parse") + _("\n\n") + ec.message());
     if(ec) return script_nil;
@@ -443,7 +443,7 @@ ScriptValueP json_to_mse(const ScriptValueP& sv, Set* set) {
 // ----------------------------------------------------------------------------- : MSE to JSON
 
 inline boost::json::string to_json_string(const String& s) {
-  wxScopedCharBuffer buffer = s.ToUTF8();
+  std::string buffer = encode_utf8(s);
   return boost::json::string(buffer.data(), buffer.length());
 }
 
@@ -452,11 +452,11 @@ void write(boost::json::object& out, const String& name, const T& value) {
   StringOutputStream stream;
   Writer writer(stream, false);
   writer.handle(name, value);
-  String string = String::FromUTF8(stream.str().data(), stream.str().size());
+  String string = decode_utf8(stream.str().data(), stream.str().size());
   if (!string.empty()) {
-    if (string.StartsWith(name + ":")) string = string.substr(name.length() + 1).Trim(false);
-    if (string.EndsWith("\n")) string = string.substr(0, string.length() - 1);
-    out.emplace(name.ToStdString(), to_json_string(string));
+    if (starts_with(string, name + _(":"))) string = trim_ascii_left(string.substr(name.length() + 1));
+    if (ends_with(string, _("\n"))) string = string.substr(0, string.length() - 1);
+    out.emplace(encode_utf8(name), to_json_string(string));
   }
 }
 
@@ -465,7 +465,7 @@ void write(boost::json::object& out, const String& name, IndexMap<FieldP, ValueP
   for (IndexMap<FieldP, ValueP>::iterator it = map.begin(); it != map.end(); ++it) {
     write(indexmapv, (*it)->fieldP->name, *it);
   }
-  if (!indexmapv.empty()) out.emplace(name.ToStdString(), indexmapv);
+  if (!indexmapv.empty()) out.emplace(encode_utf8(name), indexmapv);
 }
 
 void write(boost::json::object& out, const String& name, DelayedIndexMaps<FieldP,ValueP>& map) {
@@ -473,7 +473,7 @@ void write(boost::json::object& out, const String& name, DelayedIndexMaps<FieldP
   for (auto it = map.data.begin() ; it != map.data.end() ; ++it) {
     write(delayedindexmapv, it->first, it->second->read_data);
   }
-  if (!delayedindexmapv.empty()) out.emplace(name.ToStdString(), delayedindexmapv);
+  if (!delayedindexmapv.empty()) out.emplace(encode_utf8(name), delayedindexmapv);
 }
 
 boost::json::object mse_to_json(const PackItemP& item) {
@@ -524,8 +524,8 @@ boost::json::object mse_to_json(const CardP& card, const Set* set) {
   for (int i = 0; i < Card::MAX_LINKS; ++i) {
     const String& uid = card->getLinkedUID(i);
     if (uid.empty()) continue;
-    write(cardv, String::Format(_("linked_card_%d"), i + 1),     uid);
-    write(cardv, String::Format(_("linked_relation_%d"), i + 1), card->getLinkedRelation(i));
+    write(cardv, format_string(_("linked_card_%d"), i + 1),     uid);
+    write(cardv, format_string(_("linked_relation_%d"), i + 1), card->getLinkedRelation(i));
   }
   // card fields
   write(cardv, "data",              card->data);
@@ -559,15 +559,15 @@ boost::json::object mse_to_json(const StyleP& style) {
 
   boost::json::object stylev;
   stylev.emplace("mse_object_type", "style");
-  stylev.emplace("z_index",   String::Format(wxT("%i"),   style->z_index));
-  stylev.emplace("tab_index", String::Format(wxT("%i"),   style->tab_index));
-  stylev.emplace("left",      String::Format(wxT("%.2f"), style->left()));
-  stylev.emplace("top",       String::Format(wxT("%.2f"), style->top()));
-  stylev.emplace("right",     String::Format(wxT("%.2f"), style->right()));
-  stylev.emplace("bottom",    String::Format(wxT("%.2f"), style->bottom()));
-  stylev.emplace("width",     String::Format(wxT("%.2f"), style->width()));
-  stylev.emplace("height",    String::Format(wxT("%.2f"), style->height()));
-  stylev.emplace("angle",     String::Format(wxT("%.2f"), style->angle()));
+  stylev.emplace("z_index",   format_string(_("%i"),   style->z_index));
+  stylev.emplace("tab_index", format_string(_("%i"),   style->tab_index));
+  stylev.emplace("left",      format_string(_("%.2f"), style->left()));
+  stylev.emplace("top",       format_string(_("%.2f"), style->top()));
+  stylev.emplace("right",     format_string(_("%.2f"), style->right()));
+  stylev.emplace("bottom",    format_string(_("%.2f"), style->bottom()));
+  stylev.emplace("width",     format_string(_("%.2f"), style->width()));
+  stylev.emplace("height",    format_string(_("%.2f"), style->height()));
+  stylev.emplace("angle",     format_string(_("%.2f"), style->angle()));
   stylev.emplace("visible",                               style->visible());
   stylev.emplace("mask",                                  to_json_string(style->mask.toScriptString()));
 
@@ -577,74 +577,74 @@ boost::json::object mse_to_json(const StyleP& style) {
     boost::json::object fontv;
     fontv.emplace("name",                                              to_json_string(s->font.name()));
     fontv.emplace("italic_name",                                       to_json_string(s->font.italic_name()));
-    fontv.emplace("size",                  String::Format(wxT("%.2f"), s->font.size()));
+    fontv.emplace("size",                  format_string(_("%.2f"), s->font.size()));
     fontv.emplace("weight",                                            s->font.weight());
     fontv.emplace("style",                                             s->font.style());
     fontv.emplace("underline",                                         s->font.underline());
     fontv.emplace("strikethrough",                                     s->font.strikethrough());
-    fontv.emplace("scale_down_to",         String::Format(wxT("%.2f"), s->font.scale_down_to));
-    fontv.emplace("max_stretch",           String::Format(wxT("%.2f"), s->font.max_stretch));
+    fontv.emplace("scale_down_to",         format_string(_("%.2f"), s->font.scale_down_to));
+    fontv.emplace("max_stretch",           format_string(_("%.2f"), s->font.max_stretch));
     fontv.emplace("color",                 format_color(               s->font.color()));
     fontv.emplace("shadow_color",          format_color(               s->font.shadow_color()));
-    fontv.emplace("shadow_displacement_x", String::Format(wxT("%.2f"), s->font.shadow_displacement_x()));
-    fontv.emplace("shadow_displacement_y", String::Format(wxT("%.2f"), s->font.shadow_displacement_y()));
-    fontv.emplace("shadow_blur",           String::Format(wxT("%.2f"), s->font.shadow_blur()));
+    fontv.emplace("shadow_displacement_x", format_string(_("%.2f"), s->font.shadow_displacement_x()));
+    fontv.emplace("shadow_displacement_y", format_string(_("%.2f"), s->font.shadow_displacement_y()));
+    fontv.emplace("shadow_blur",           format_string(_("%.2f"), s->font.shadow_blur()));
     fontv.emplace("stroke_color",          format_color(               s->font.stroke_color()));
-    fontv.emplace("stroke_radius",         String::Format(wxT("%.2f"), s->font.stroke_radius()));
-    fontv.emplace("stroke_blur",           String::Format(wxT("%.2f"), s->font.stroke_blur()));
+    fontv.emplace("stroke_radius",         format_string(_("%.2f"), s->font.stroke_radius()));
+    fontv.emplace("stroke_blur",           format_string(_("%.2f"), s->font.stroke_blur()));
     fontv.emplace("separator_color",       format_color(               s->font.separator_color));
-    fontv.emplace("flags",                 String::Format(wxT("%i"),   s->font.flags));
+    fontv.emplace("flags",                 format_string(_("%i"),   s->font.flags));
     stylev.emplace("font",                                             fontv);
 
     boost::json::object symbolfontv;
     symbolfontv.emplace("name",                                              to_json_string(s->symbol_font.name()));
-    symbolfontv.emplace("size",                  String::Format(wxT("%.2f"), s->symbol_font.size()));
+    symbolfontv.emplace("size",                  format_string(_("%.2f"), s->symbol_font.size()));
     symbolfontv.emplace("underline",                                         s->symbol_font.underline());
     symbolfontv.emplace("strikethrough",                                     s->symbol_font.strikethrough());
-    symbolfontv.emplace("scale_down_to",         String::Format(wxT("%.2f"), s->symbol_font.scale_down_to));
+    symbolfontv.emplace("scale_down_to",         format_string(_("%.2f"), s->symbol_font.scale_down_to));
     symbolfontv.emplace("shadow_color",          format_color(               s->symbol_font.shadow_color()));
-    symbolfontv.emplace("shadow_displacement_x", String::Format(wxT("%.2f"), s->symbol_font.shadow_displacement_x()));
-    symbolfontv.emplace("shadow_displacement_y", String::Format(wxT("%.2f"), s->symbol_font.shadow_displacement_y()));
-    symbolfontv.emplace("shadow_blur",           String::Format(wxT("%.2f"), s->symbol_font.shadow_blur()));
+    symbolfontv.emplace("shadow_displacement_x", format_string(_("%.2f"), s->symbol_font.shadow_displacement_x()));
+    symbolfontv.emplace("shadow_displacement_y", format_string(_("%.2f"), s->symbol_font.shadow_displacement_y()));
+    symbolfontv.emplace("shadow_blur",           format_string(_("%.2f"), s->symbol_font.shadow_blur()));
     symbolfontv.emplace("stroke_color",          format_color(               s->symbol_font.stroke_color()));
-    symbolfontv.emplace("stroke_radius",         String::Format(wxT("%.2f"), s->symbol_font.stroke_radius()));
-    symbolfontv.emplace("stroke_blur",           String::Format(wxT("%.2f"), s->symbol_font.stroke_blur()));
+    symbolfontv.emplace("stroke_radius",         format_string(_("%.2f"), s->symbol_font.stroke_radius()));
+    symbolfontv.emplace("stroke_blur",           format_string(_("%.2f"), s->symbol_font.stroke_blur()));
     stylev.emplace("symbol_font",                                      symbolfontv);
 
     stylev.emplace("always_symbol",                                    s->always_symbol);
     stylev.emplace("allow_formating",                                  s->allow_formating);
     stylev.emplace("alignment",            alignment_to_string(        s->alignment()));
     stylev.emplace("direction",            direction_to_string(        s->direction()));
-    stylev.emplace("padding_left",         String::Format(wxT("%.2f"), s->padding_left()));
-    stylev.emplace("padding_right",        String::Format(wxT("%.2f"), s->padding_right()));
-    stylev.emplace("padding_top",          String::Format(wxT("%.2f"), s->padding_top()));
-    stylev.emplace("padding_bottom",       String::Format(wxT("%.2f"), s->padding_bottom()));
-    stylev.emplace("padding_left_min",     String::Format(wxT("%.2f"), s->padding_left_min()));
-    stylev.emplace("padding_right_min",    String::Format(wxT("%.2f"), s->padding_right_min()));
-    stylev.emplace("padding_top_min",      String::Format(wxT("%.2f"), s->padding_top_min()));
-    stylev.emplace("padding_bottom_min",   String::Format(wxT("%.2f"), s->padding_bottom_min()));
-    stylev.emplace("line_height_soft",     String::Format(wxT("%.2f"), s->line_height_soft()));
-    stylev.emplace("line_height_hard",     String::Format(wxT("%.2f"), s->line_height_hard()));
-    stylev.emplace("line_height_line",     String::Format(wxT("%.2f"), s->line_height_line()));
-    stylev.emplace("line_height_soft_max", String::Format(wxT("%.2f"), s->line_height_soft_max()));
-    stylev.emplace("line_height_hard_max", String::Format(wxT("%.2f"), s->line_height_hard_max()));
-    stylev.emplace("line_height_line_max", String::Format(wxT("%.2f"), s->line_height_line_max()));
-    stylev.emplace("paragraph_height",     String::Format(wxT("%.2f"), s->paragraph_height()));
+    stylev.emplace("padding_left",         format_string(_("%.2f"), s->padding_left()));
+    stylev.emplace("padding_right",        format_string(_("%.2f"), s->padding_right()));
+    stylev.emplace("padding_top",          format_string(_("%.2f"), s->padding_top()));
+    stylev.emplace("padding_bottom",       format_string(_("%.2f"), s->padding_bottom()));
+    stylev.emplace("padding_left_min",     format_string(_("%.2f"), s->padding_left_min()));
+    stylev.emplace("padding_right_min",    format_string(_("%.2f"), s->padding_right_min()));
+    stylev.emplace("padding_top_min",      format_string(_("%.2f"), s->padding_top_min()));
+    stylev.emplace("padding_bottom_min",   format_string(_("%.2f"), s->padding_bottom_min()));
+    stylev.emplace("line_height_soft",     format_string(_("%.2f"), s->line_height_soft()));
+    stylev.emplace("line_height_hard",     format_string(_("%.2f"), s->line_height_hard()));
+    stylev.emplace("line_height_line",     format_string(_("%.2f"), s->line_height_line()));
+    stylev.emplace("line_height_soft_max", format_string(_("%.2f"), s->line_height_soft_max()));
+    stylev.emplace("line_height_hard_max", format_string(_("%.2f"), s->line_height_hard_max()));
+    stylev.emplace("line_height_line_max", format_string(_("%.2f"), s->line_height_line_max()));
+    stylev.emplace("paragraph_height",     format_string(_("%.2f"), s->paragraph_height()));
 
     boost::json::object layoutv;
-    layoutv.emplace("content_top",         String::Format(wxT("%.2f"), s->layout->top));
-    layoutv.emplace("content_middle",      String::Format(wxT("%.2f"), s->layout->middle()));
-    layoutv.emplace("content_bottom",      String::Format(wxT("%.2f"), s->layout->bottom()));
-    layoutv.emplace("content_width",       String::Format(wxT("%.2f"), s->layout->width));
-    layoutv.emplace("content_height",      String::Format(wxT("%.2f"), s->layout->height));
-    layoutv.emplace("content_lines",       String::Format(wxT("%i"),   (int)s->layout->lines.size()));
-    layoutv.emplace("content_clauses",     String::Format(wxT("%i"),   (int)s->layout->clauses.size()));
-    layoutv.emplace("content_paragraphs",  String::Format(wxT("%i"),   (int)s->layout->paragraphs.size()));
-    layoutv.emplace("content_blocks",      String::Format(wxT("%i"),   (int)s->layout->blocks.size()));
+    layoutv.emplace("content_top",         format_string(_("%.2f"), s->layout->top));
+    layoutv.emplace("content_middle",      format_string(_("%.2f"), s->layout->middle()));
+    layoutv.emplace("content_bottom",      format_string(_("%.2f"), s->layout->bottom()));
+    layoutv.emplace("content_width",       format_string(_("%.2f"), s->layout->width));
+    layoutv.emplace("content_height",      format_string(_("%.2f"), s->layout->height));
+    layoutv.emplace("content_lines",       format_string(_("%i"),   (int)s->layout->lines.size()));
+    layoutv.emplace("content_clauses",     format_string(_("%i"),   (int)s->layout->clauses.size()));
+    layoutv.emplace("content_paragraphs",  format_string(_("%i"),   (int)s->layout->paragraphs.size()));
+    layoutv.emplace("content_blocks",      format_string(_("%i"),   (int)s->layout->blocks.size()));
     boost::json::array separatorsv;
     int size = s->layout->separators.size();
     for (int i = 0; i < size; i++) {
-      separatorsv.emplace_back(String::Format(wxT("%.2f"), s->layout->separators[i]));
+      separatorsv.emplace_back(format_string(_("%.2f"), s->layout->separators[i]));
     }
     if (size > 0) layoutv.emplace("content_separators", separatorsv);
 
@@ -665,34 +665,34 @@ boost::json::object mse_to_json(const StyleP& style) {
     stylev.emplace("combine",              combine_to_string(          s->combine));
     stylev.emplace("alignment",            alignment_to_string(        s->alignment));
     stylev.emplace("direction",            direction_to_string(        s->direction()));
-    stylev.emplace("spacing",              String::Format(wxT("%.2f"), s->spacing()));
+    stylev.emplace("spacing",              format_string(_("%.2f"), s->spacing()));
 
     boost::json::object fontv;
     fontv.emplace("name",                                              to_json_string(s->font.name()));
     fontv.emplace("italic_name",                                       to_json_string(s->font.italic_name()));
-    fontv.emplace("size",                  String::Format(wxT("%.2f"), s->font.size()));
+    fontv.emplace("size",                  format_string(_("%.2f"), s->font.size()));
     fontv.emplace("weight",                                            s->font.weight());
     fontv.emplace("style",                                             s->font.style());
     fontv.emplace("underline",                                         s->font.underline());
     fontv.emplace("strikethrough",                                     s->font.strikethrough());
-    fontv.emplace("scale_down_to",         String::Format(wxT("%.2f"), s->font.scale_down_to));
-    fontv.emplace("max_stretch",           String::Format(wxT("%.2f"), s->font.max_stretch));
+    fontv.emplace("scale_down_to",         format_string(_("%.2f"), s->font.scale_down_to));
+    fontv.emplace("max_stretch",           format_string(_("%.2f"), s->font.max_stretch));
     fontv.emplace("color",                 format_color(               s->font.color()));
     fontv.emplace("shadow_color",          format_color(               s->font.shadow_color()));
-    fontv.emplace("shadow_displacement_x", String::Format(wxT("%.2f"), s->font.shadow_displacement_x()));
-    fontv.emplace("shadow_displacement_y", String::Format(wxT("%.2f"), s->font.shadow_displacement_y()));
-    fontv.emplace("shadow_blur",           String::Format(wxT("%.2f"), s->font.shadow_blur()));
+    fontv.emplace("shadow_displacement_x", format_string(_("%.2f"), s->font.shadow_displacement_x()));
+    fontv.emplace("shadow_displacement_y", format_string(_("%.2f"), s->font.shadow_displacement_y()));
+    fontv.emplace("shadow_blur",           format_string(_("%.2f"), s->font.shadow_blur()));
     fontv.emplace("stroke_color",          format_color(               s->font.stroke_color()));
-    fontv.emplace("stroke_radius",         String::Format(wxT("%.2f"), s->font.stroke_radius()));
-    fontv.emplace("stroke_blur",           String::Format(wxT("%.2f"), s->font.stroke_blur()));
+    fontv.emplace("stroke_radius",         format_string(_("%.2f"), s->font.stroke_radius()));
+    fontv.emplace("stroke_blur",           format_string(_("%.2f"), s->font.stroke_blur()));
     fontv.emplace("separator_color",       format_color(               s->font.separator_color));
-    fontv.emplace("flags",                 String::Format(wxT("%i"),   s->font.flags));
+    fontv.emplace("flags",                 format_string(_("%i"),   s->font.flags));
     stylev.emplace("font",                                             fontv);
 
     boost::json::object choiceimagesv;
     for (auto choice_image : s->choice_images) {
       String image = choice_image.second.toScriptString();
-      if (!image.empty()) choiceimagesv.emplace(choice_image.first.ToStdString(), to_json_string(image));
+      if (!image.empty()) choiceimagesv.emplace(encode_utf8(choice_image.first), to_json_string(image));
     }
     if (choiceimagesv.size() > 0) stylev.emplace("choice_images", choiceimagesv);
   }
@@ -708,29 +708,29 @@ boost::json::object mse_to_json(const StyleP& style) {
     boost::json::object fontv;
     fontv.emplace("name",                                              to_json_string(s->font.name()));
     fontv.emplace("italic_name",                                       to_json_string(s->font.italic_name()));
-    fontv.emplace("size",                  String::Format(wxT("%.2f"), s->font.size()));
+    fontv.emplace("size",                  format_string(_("%.2f"), s->font.size()));
     fontv.emplace("weight",                                            s->font.weight());
     fontv.emplace("style",                                             s->font.style());
     fontv.emplace("underline",                                         s->font.underline());
     fontv.emplace("strikethrough",                                     s->font.strikethrough());
-    fontv.emplace("scale_down_to",         String::Format(wxT("%.2f"), s->font.scale_down_to));
-    fontv.emplace("max_stretch",           String::Format(wxT("%.2f"), s->font.max_stretch));
+    fontv.emplace("scale_down_to",         format_string(_("%.2f"), s->font.scale_down_to));
+    fontv.emplace("max_stretch",           format_string(_("%.2f"), s->font.max_stretch));
     fontv.emplace("color",                 format_color(               s->font.color()));
     fontv.emplace("shadow_color",          format_color(               s->font.shadow_color()));
-    fontv.emplace("shadow_displacement_x", String::Format(wxT("%.2f"), s->font.shadow_displacement_x()));
-    fontv.emplace("shadow_displacement_y", String::Format(wxT("%.2f"), s->font.shadow_displacement_y()));
-    fontv.emplace("shadow_blur",           String::Format(wxT("%.2f"), s->font.shadow_blur()));
+    fontv.emplace("shadow_displacement_x", format_string(_("%.2f"), s->font.shadow_displacement_x()));
+    fontv.emplace("shadow_displacement_y", format_string(_("%.2f"), s->font.shadow_displacement_y()));
+    fontv.emplace("shadow_blur",           format_string(_("%.2f"), s->font.shadow_blur()));
     fontv.emplace("stroke_color",          format_color(               s->font.stroke_color()));
-    fontv.emplace("stroke_radius",         String::Format(wxT("%.2f"), s->font.stroke_radius()));
-    fontv.emplace("stroke_blur",           String::Format(wxT("%.2f"), s->font.stroke_blur()));
+    fontv.emplace("stroke_radius",         format_string(_("%.2f"), s->font.stroke_radius()));
+    fontv.emplace("stroke_blur",           format_string(_("%.2f"), s->font.stroke_blur()));
     fontv.emplace("separator_color",       format_color(               s->font.separator_color));
-    fontv.emplace("flags",                 String::Format(wxT("%i"),   s->font.flags));
+    fontv.emplace("flags",                 format_string(_("%i"),   s->font.flags));
     stylev.emplace("font",                                             fontv);
 
     boost::json::object choiceimagesv;
     for (auto choice_image : s->choice_images) {
       String image = choice_image.second.toScriptString();
-      if (!image.empty()) choiceimagesv.emplace(choice_image.first.ToStdString(), to_json_string(image));
+      if (!image.empty()) choiceimagesv.emplace(encode_utf8(choice_image.first), to_json_string(image));
     }
     if (choiceimagesv.size() > 0) stylev.emplace("choice_images", choiceimagesv);
   }
@@ -741,46 +741,46 @@ boost::json::object mse_to_json(const StyleP& style) {
     boost::json::object fontv;
     fontv.emplace("name",                                              to_json_string(s->font.name()));
     fontv.emplace("italic_name",                                       to_json_string(s->font.italic_name()));
-    fontv.emplace("size",                  String::Format(wxT("%.2f"), s->font.size()));
+    fontv.emplace("size",                  format_string(_("%.2f"), s->font.size()));
     fontv.emplace("weight",                                            s->font.weight());
     fontv.emplace("style",                                             s->font.style());
     fontv.emplace("underline",                                         s->font.underline());
     fontv.emplace("strikethrough",                                     s->font.strikethrough());
-    fontv.emplace("scale_down_to",         String::Format(wxT("%.2f"), s->font.scale_down_to));
-    fontv.emplace("max_stretch",           String::Format(wxT("%.2f"), s->font.max_stretch));
+    fontv.emplace("scale_down_to",         format_string(_("%.2f"), s->font.scale_down_to));
+    fontv.emplace("max_stretch",           format_string(_("%.2f"), s->font.max_stretch));
     fontv.emplace("color",                 format_color(               s->font.color()));
     fontv.emplace("shadow_color",          format_color(               s->font.shadow_color()));
-    fontv.emplace("shadow_displacement_x", String::Format(wxT("%.2f"), s->font.shadow_displacement_x()));
-    fontv.emplace("shadow_displacement_y", String::Format(wxT("%.2f"), s->font.shadow_displacement_y()));
-    fontv.emplace("shadow_blur",           String::Format(wxT("%.2f"), s->font.shadow_blur()));
+    fontv.emplace("shadow_displacement_x", format_string(_("%.2f"), s->font.shadow_displacement_x()));
+    fontv.emplace("shadow_displacement_y", format_string(_("%.2f"), s->font.shadow_displacement_y()));
+    fontv.emplace("shadow_blur",           format_string(_("%.2f"), s->font.shadow_blur()));
     fontv.emplace("stroke_color",          format_color(               s->font.stroke_color()));
-    fontv.emplace("stroke_radius",         String::Format(wxT("%.2f"), s->font.stroke_radius()));
-    fontv.emplace("stroke_blur",           String::Format(wxT("%.2f"), s->font.stroke_blur()));
+    fontv.emplace("stroke_radius",         format_string(_("%.2f"), s->font.stroke_radius()));
+    fontv.emplace("stroke_blur",           format_string(_("%.2f"), s->font.stroke_blur()));
     fontv.emplace("separator_color",       format_color(               s->font.separator_color));
-    fontv.emplace("flags",                 String::Format(wxT("%i"),   s->font.flags));
+    fontv.emplace("flags",                 format_string(_("%i"),   s->font.flags));
     stylev.emplace("font",                                             fontv);
   }
 
   else if (ColorStyle* s = dynamic_cast<ColorStyle*>(style.get())) {
     stylev.emplace("field_type", "color");
-    stylev.emplace("radius",               String::Format(wxT("%.2f"), s->radius()));
-    stylev.emplace("left_width",           String::Format(wxT("%.2f"), s->left_width()));
-    stylev.emplace("right_width",          String::Format(wxT("%.2f"), s->right_width()));
-    stylev.emplace("top_width",            String::Format(wxT("%.2f"), s->top_width()));
-    stylev.emplace("bottom_width",         String::Format(wxT("%.2f"), s->bottom_width()));
+    stylev.emplace("radius",               format_string(_("%.2f"), s->radius()));
+    stylev.emplace("left_width",           format_string(_("%.2f"), s->left_width()));
+    stylev.emplace("right_width",          format_string(_("%.2f"), s->right_width()));
+    stylev.emplace("top_width",            format_string(_("%.2f"), s->top_width()));
+    stylev.emplace("bottom_width",         format_string(_("%.2f"), s->bottom_width()));
     stylev.emplace("combine",              combine_to_string(          s->combine));
   }
 
   else if (SymbolStyle* s = dynamic_cast<SymbolStyle*>(style.get())) {
     stylev.emplace("field_type", "symbol");
-    stylev.emplace("min_aspect_ratio", String::Format(wxT("%.2f"), s->min_aspect_ratio));
-    stylev.emplace("max_aspect_ratio", String::Format(wxT("%.2f"), s->max_aspect_ratio));
+    stylev.emplace("min_aspect_ratio", format_string(_("%.2f"), s->min_aspect_ratio));
+    stylev.emplace("max_aspect_ratio", format_string(_("%.2f"), s->max_aspect_ratio));
     boost::json::array variationsv;
     int size = s->variations.size();
     for (int i = 0; i < size; i++) {
       boost::json::object variationv;
       variationv.emplace("name",                                         to_json_string(s->variations[i]->name));
-      variationv.emplace("border_radius",    String::Format(wxT("%.2f"), s->variations[i]->border_radius));
+      variationv.emplace("border_radius",    format_string(_("%.2f"), s->variations[i]->border_radius));
       SymbolFilterP filter = s->variations[i]->filter;
       if (SolidFillSymbolFilter* f = dynamic_cast<SolidFillSymbolFilter*>(filter.get())) {
         variationv.emplace("fill_type",                                  f->fillType());
@@ -800,10 +800,10 @@ boost::json::object mse_to_json(const StyleP& style) {
         variationv.emplace("fill_color_2",   format_color(               f->fill_color_2));
         variationv.emplace("border_color_1", format_color(               f->border_color_1));
         variationv.emplace("border_color_2", format_color(               f->border_color_2));
-        variationv.emplace("center_x",       String::Format(wxT("%.2f"), f->center_x));
-        variationv.emplace("center_y",       String::Format(wxT("%.2f"), f->center_y));
-        variationv.emplace("end_x",          String::Format(wxT("%.2f"), f->end_x));
-        variationv.emplace("end_y",          String::Format(wxT("%.2f"), f->end_y));
+        variationv.emplace("center_x",       format_string(_("%.2f"), f->center_x));
+        variationv.emplace("center_y",       format_string(_("%.2f"), f->center_y));
+        variationv.emplace("end_x",          format_string(_("%.2f"), f->end_x));
+        variationv.emplace("end_y",          format_string(_("%.2f"), f->end_y));
       }
       variationsv.emplace_back(variationv);
     }
@@ -813,32 +813,32 @@ boost::json::object mse_to_json(const StyleP& style) {
   else if (InfoStyle* s = dynamic_cast<InfoStyle*>(style.get())) {
     stylev.emplace("field_type", "info");
     stylev.emplace("alignment",            alignment_to_string(        s->alignment));
-    stylev.emplace("padding_left",         String::Format(wxT("%.2f"), s->padding_left));
-    stylev.emplace("padding_right",        String::Format(wxT("%.2f"), s->padding_right));
-    stylev.emplace("padding_top",          String::Format(wxT("%.2f"), s->padding_top));
-    stylev.emplace("padding_bottom",       String::Format(wxT("%.2f"), s->padding_bottom));
+    stylev.emplace("padding_left",         format_string(_("%.2f"), s->padding_left));
+    stylev.emplace("padding_right",        format_string(_("%.2f"), s->padding_right));
+    stylev.emplace("padding_top",          format_string(_("%.2f"), s->padding_top));
+    stylev.emplace("padding_bottom",       format_string(_("%.2f"), s->padding_bottom));
     stylev.emplace("background_color",     format_color(               s->background_color));
 
     boost::json::object fontv;
     fontv.emplace("name",                                              to_json_string(s->font.name()));
     fontv.emplace("italic_name",                                       to_json_string(s->font.italic_name()));
-    fontv.emplace("size",                  String::Format(wxT("%.2f"), s->font.size()));
+    fontv.emplace("size",                  format_string(_("%.2f"), s->font.size()));
     fontv.emplace("weight",                                            s->font.weight());
     fontv.emplace("style",                                             s->font.style());
     fontv.emplace("underline",                                         s->font.underline());
     fontv.emplace("strikethrough",                                     s->font.strikethrough());
-    fontv.emplace("scale_down_to",         String::Format(wxT("%.2f"), s->font.scale_down_to));
-    fontv.emplace("max_stretch",           String::Format(wxT("%.2f"), s->font.max_stretch));
+    fontv.emplace("scale_down_to",         format_string(_("%.2f"), s->font.scale_down_to));
+    fontv.emplace("max_stretch",           format_string(_("%.2f"), s->font.max_stretch));
     fontv.emplace("color",                 format_color(               s->font.color()));
     fontv.emplace("shadow_color",          format_color(               s->font.shadow_color()));
-    fontv.emplace("shadow_displacement_x", String::Format(wxT("%.2f"), s->font.shadow_displacement_x()));
-    fontv.emplace("shadow_displacement_y", String::Format(wxT("%.2f"), s->font.shadow_displacement_y()));
-    fontv.emplace("shadow_blur",           String::Format(wxT("%.2f"), s->font.shadow_blur()));
+    fontv.emplace("shadow_displacement_x", format_string(_("%.2f"), s->font.shadow_displacement_x()));
+    fontv.emplace("shadow_displacement_y", format_string(_("%.2f"), s->font.shadow_displacement_y()));
+    fontv.emplace("shadow_blur",           format_string(_("%.2f"), s->font.shadow_blur()));
     fontv.emplace("stroke_color",          format_color(               s->font.stroke_color()));
-    fontv.emplace("stroke_radius",         String::Format(wxT("%.2f"), s->font.stroke_radius()));
-    fontv.emplace("stroke_blur",           String::Format(wxT("%.2f"), s->font.stroke_blur()));
+    fontv.emplace("stroke_radius",         format_string(_("%.2f"), s->font.stroke_radius()));
+    fontv.emplace("stroke_blur",           format_string(_("%.2f"), s->font.stroke_blur()));
     fontv.emplace("separator_color",       format_color(               s->font.separator_color));
-    fontv.emplace("flags",                 String::Format(wxT("%i"),   s->font.flags));
+    fontv.emplace("flags",                 format_string(_("%i"),   s->font.flags));
     stylev.emplace("font",                                             fontv);
   }
 
@@ -1020,7 +1020,7 @@ boost::json::object mse_to_json(const IndexMap<FieldP, StyleP>& map) {
   boost::json::object indexmapv;
   indexmapv.emplace("mse_object_type", "style_index_map");
   for (auto it = map.begin(); it != map.end(); ++it) {
-    indexmapv.emplace((*it)->fieldP->name.ToStdString(), mse_to_json(*it));
+    indexmapv.emplace(encode_utf8((*it)->fieldP->name), mse_to_json(*it));
   }
   return indexmapv;
 }
@@ -1057,7 +1057,7 @@ boost::json::value mse_to_json(const ScriptValueP& sv, Set* set, bool suppress_w
         boost::json::object object;
         map<String, ScriptValueP>::iterator it;
         for (it = custom->key_value.begin(); it != custom->key_value.end(); it++) {
-          const std::string& key = it->first.ToStdString();
+          const std::string& key = encode_utf8(it->first);
           if (object.contains(key)) queue_message(MESSAGE_WARNING, _ERROR_1_("mse map duplicate key", it->first));
           object.emplace(key, mse_to_json(it->second, set));
         }
@@ -1087,7 +1087,7 @@ boost::json::value mse_to_json(const ScriptValueP& sv, Set* set, bool suppress_w
           boost::json::object object_b = b.get_object();
           for (auto it = object_b.begin(); it != object_b.end(); ++it) {
             boost::json::string_view key_view = it->key();
-            if (object_a.contains(key_view)) queue_message(MESSAGE_WARNING, _ERROR_1_("mse map duplicate key", String::FromUTF8(key_view.data(), key_view.size())));
+            if (object_a.contains(key_view)) queue_message(MESSAGE_WARNING, _ERROR_1_("mse map duplicate key", decode_utf8(key_view.data(), key_view.size())));
             object_a.emplace(key_view, it->value());
           }
           return object_a;

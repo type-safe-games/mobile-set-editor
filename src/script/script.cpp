@@ -43,7 +43,7 @@ String variable_to_string(Variable v) {
   FOR_EACH(vi, variables) {
     if (vi.second == v) return replace_all(vi.first, _(" "), _("_"));
   }
-  throw InternalError(String(_("Variable not found: ")) << v);
+  throw InternalError(String(_("Variable not found: ")) + int_to_string(v));
 }
 
 // ----------------------------------------------------------------------------- : CommonVariables
@@ -165,7 +165,7 @@ String Script::dumpScript() const {
 }
 
 String Script::dumpInstr(unsigned int pos, Instruction i) const {
-  String ret = String::Format(_("%d:\t"),pos);
+  String ret = format_string(_("%d:\t"),pos);
   // instruction
   switch (i.instr) {
     case I_NOP:      ret += _("nop");    break;
@@ -235,7 +235,7 @@ String Script::dumpInstr(unsigned int pos, Instruction i) const {
     case I_LOOP: case I_LOOP_WITH_KEY:
     case I_MAKE_OBJECT:
     case I_CALL: case I_CLOSURE: case I_DUP:  // int
-      ret += String::Format(_("\t%d"), i.data);
+      ret += format_string(_("\t%d"), i.data);
       break;
     case I_GET_VAR: case I_SET_VAR: case I_NOP: case I_SET_GLB:          // variable
       ret += _("\t") + variable_to_string((Variable)i.data);

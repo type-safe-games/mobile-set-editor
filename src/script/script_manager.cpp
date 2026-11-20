@@ -278,7 +278,7 @@ void SetScriptManager::updateValue(Value& value, const CardP& card) {
   // execute script for initial changed value
   value.update(getContext(card));
   #ifdef LOG_UPDATES
-    log_debug(String::Format(_("Start:     %s"), value.fieldP->name));
+    log_debug(format_string(_("Start:     %s"), value.fieldP->name));
   #endif
   // update dependent scripts
   alsoUpdate(to_update, value.fieldP->dependent_scripts, card);
@@ -357,12 +357,12 @@ void SetScriptManager::updateToUpdate(const ToUpdate& u, deque<ToUpdate>& to_upd
     // u.value has changed, also update values with a dependency on u.value
     alsoUpdate(to_update, u.value->fieldP->dependent_scripts, u.card);
   #ifdef LOG_UPDATES
-    log_debug(String::Format(_("Changed: %s"), u.value->fieldP->name));
+    log_debug(format_string(_("Changed: %s"), u.value->fieldP->name));
   #endif
   }
   #ifdef LOG_UPDATES
   else
-    log_debug(String::Format(_("Same:    %s"), u.value->fieldP->name));
+    log_debug(format_string(_("Same:    %s"), u.value->fieldP->name));
   #endif
 }
 

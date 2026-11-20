@@ -44,7 +44,7 @@ inline static Value* get_container(IndexMap<FieldP, ValueP>& map, const String& 
   // find value container to update
   IndexMap<FieldP, ValueP>::const_iterator it = map.find(key_name);
   if (it == map.end()) {
-    it = map.find(key_name.Lower());
+    it = map.find(to_lower(key_name));
     if (it == map.end()) {
       if (ignore_field_not_found) return nullptr;
       throw ScriptError(_ERROR_2_("no field with name", _TYPE_V_(type), key_name));
@@ -246,7 +246,7 @@ inline static bool cards_from_table(SetP& set, vector<String>& headers, std::vec
   int count = headers.size();
   for (int y = 0; y < table.size(); ++y) {
     if (table[y].size() != count) {
-      queue_message(MESSAGE_ERROR, _ERROR_1_("add card csv file malformed", wxString::Format(wxT("%i"), y+1)));
+      queue_message(MESSAGE_ERROR, _ERROR_1_("add card csv file malformed", format_string(_("%i"), y+1)));
       return false;
     }
   }

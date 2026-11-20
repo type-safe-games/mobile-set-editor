@@ -24,23 +24,23 @@ public:
     : spec(spec), pos(pos)
   {}
   
-  wxUniChar value; ///< Current character
+  Char value; ///< Current character
   bool escaped; ///< Was the current character escaped?
   bool preceded_by_space; ///< Was there a ' ' before this character?
   
   /// Move to the next item in the specification.
   /** returns false if we are at the end or encounter close.
    */
-  bool nextUntil(wxUniChar close, bool skip_space = true) {
+  bool nextUntil(Char close, bool skip_space = true) {
     if (pos >= spec.size()) {
       value = 0;
       if (close == 0) {
         return false;
       } else {
-        throw ParseError(String::Format(_("Expected '%c' in sort_rule specification"),close));
+        throw ParseError(format_string(_("Expected '%c' in sort_rule specification"),close));
       }
     }
-    value = spec.GetChar(pos++);
+    value = spec[pos++];
     preceded_by_space = false;
     // skip whitespace
     if (skip_space) {
@@ -49,10 +49,10 @@ public:
           if (close == 0) {
             return false;
           } else {
-            throw ParseError(String::Format(_("Expected '%c' in sort_rule specification"),close));
+            throw ParseError(format_string(_("Expected '%c' in sort_rule specification"),close));
           }
         }
-        value = spec.GetChar(pos++);
+        value = spec[pos++];
         preceded_by_space = true;
       }
     }
@@ -60,9 +60,9 @@ public:
     if (value == _('\\')) {
       escaped = true;
       if (pos >= spec.size()) {
-        throw ParseError(String::Format(_("Expected '%c' in sort_rule specification"),close));
+        throw ParseError(format_string(_("Expected '%c' in sort_rule specification"),close));
       }
-      value = spec.GetChar(pos++);
+      value = spec[pos++];
     } else {
       escaped = false;
       if (value == close) return false;
@@ -112,10 +112,10 @@ private:
 
 // ----------------------------------------------------------------------------- : Sort functions
 
-//using Bag = vector<wxUniChar>;
+//using Bag = vector<Char>;
 using Bag = String;
 
-size_t count_and_remove(wxUniChar c, Bag& input) {
+size_t count_and_remove(Char c, Bag& input) {
   size_t count = 0;
   size_t j=0;
   for (size_t i=0 ; i < input.size() ; ++i) {
@@ -170,7 +170,7 @@ void cycle_sort(const String& spec, Bag& input, Bag& ret) {
 /** Removed used characters from input! */
 void mixed_sort(const String& spec, Bag& input, Bag& ret) {
   size_t j = 0;
-  for (wxUniCharRef c : input) {
+  for (auto&& c : input) {
     if (spec.find(c) != String::npos) {
       ret += c;
       c = REMOVED;
@@ -206,8 +206,8 @@ void pattern_sort(const String& pattern, const String& spec, Bag& input, Bag& re
       // does the pattern match here?
       String placeholders;
       for (size_t j = 0; j < pattern.size(); ++j) {
-        wxUniChar c = input[pos + j];
-        wxUniChar p = pattern[j];
+        Char c = input[pos + j];
+        Char p = pattern[j];
         if (c == REMOVED) {
           goto no_match;
         } else if (p == PLACEHOLDER) {
@@ -223,7 +223,7 @@ void pattern_sort(const String& pattern, const String& spec, Bag& input, Bag& re
         // add to output, erase from input
         size_t ph = 0;
         for (size_t j = 0; j < pattern.size(); ++j) {
-          wxUniChar p = pattern[j];
+          Char p = pattern[j];
           if (p == PLACEHOLDER) {
             ret += new_placeholders[ph++];
           } else {
@@ -250,7 +250,7 @@ void in_place_sort(const String& spec, String& input, String& ret) {
   FOR_EACH_CONST(c, input) {
     if (c == REMOVED) {
       if (pos_r < result.size()) {
-        ret += result.GetChar(pos_r++);
+        ret += result[pos_r++];
       }
     } else {
       ret += c;

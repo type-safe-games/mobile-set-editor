@@ -105,7 +105,7 @@ public:
 
 // ----------------------------------------------------------------------------- : Characters
 
-bool isUnicodeAlpha(wxUniChar c) {
+bool isUnicodeAlpha(Char c) {
   #if defined(__WXMSW__)
     return false;
   #else
@@ -114,12 +114,12 @@ bool isUnicodeAlpha(wxUniChar c) {
   #endif
 }
 
-bool isAlpha_(wxUniChar c) { return isAlpha(c) || c==_('_'); }
-bool isAlnum_(wxUniChar c) { return isAlnum(c) || c==_('_') || isUnicodeAlpha(c); }
-bool isOper  (wxUniChar c) { return wxStrchr(_("+-*/!.@%^&:=<>;,"),c) != nullptr; }
-bool isLparen(wxUniChar c) { return c==_('(') || c==_('[') || c==_('{'); }
-bool isRparen(wxUniChar c) { return c==_(')') || c==_(']') || c==_('}'); }
-bool isDigitOrDot(wxUniChar c) { return isDigit(c) || c==_('.'); }
+bool isAlpha_(Char c) { return isAlpha(c) || c==_('_'); }
+bool isAlnum_(Char c) { return isAlnum(c) || c==_('_') || isUnicodeAlpha(c); }
+bool isOper  (Char c) { return wcschr(_("+-*/!.@%^&:=<>;,"),c) != nullptr; }
+bool isLparen(Char c) { return c==_('(') || c==_('[') || c==_('{'); }
+bool isRparen(Char c) { return c==_(')') || c==_(']') || c==_('}'); }
+bool isDigitOrDot(Char c) { return isDigit(c) || c==_('.'); }
 bool isLongOper(StringView s) { return s==_(":=") || s==_("==") || s==_("!=") || s==_("<=") || s==_(">=") || s==_("->"); }
 
 // moveme
@@ -313,9 +313,9 @@ void TokenIterator::readStringToken(bool string_mode) {
           i = i * 10 + static_cast<int>(c - *pos);
           ++pos;
         }
-        str += static_cast<wxUniChar>(i);
+        str += static_cast<Char>(i);
       } else {
-        add_error(String::Format(_("Invalid string escape sequence: \"\\%c\""),c));
+        add_error(format_string(_("Invalid string escape sequence: \"\\%c\""),c));
         str += _('\\');
         str += c; // ignore error
       }
@@ -669,7 +669,7 @@ ExprType parseExpr(TokenIterator& input, Script& script, Precedence minPrec) {
       script.addInstruction(I_PUSH_CONST, script_warning);
       parseOper(input, script, PREC_ALL); // condition
       auto end = input.peek().pos;
-      String message = String::Format(_("Assertion failure on line %d:\n   expected: "), line) + String(start,end);
+      String message = format_string(_("Assertion failure on line %d:\n   expected: "), line) + String(start,end);
       expectToken(input, _(")"), &token);
       if (script.getInstructions().back().instr == I_BINARY && script.getInstructions().back().instr2 == I_EQ) {
         // compile "assert(x == y)" into
@@ -717,12 +717,12 @@ ExprType parseExpr(TokenIterator& input, Script& script, Precedence minPrec) {
   } else if (token == TOK_INT) {
     long l = 0;
     //l = lexical_cast<long>(token.value);
-    token.value.ToLong(&l);
+    parse_long(token.value, l);
     script.addInstruction(I_PUSH_CONST, to_script(l));
   } else if (token == TOK_DOUBLE) {
     double d = 0;
     //d = lexical_cast<double>(token.value);
-    token.value.ToDouble(&d);
+    parse_double(token.value, d);
     script.addInstruction(I_PUSH_CONST, to_script(d));
   } else if (token == TOK_STRING) {
     script.addInstruction(I_PUSH_CONST, to_script(token.value));

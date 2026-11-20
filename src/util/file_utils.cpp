@@ -101,9 +101,9 @@ static String expand_env_vars(const String& str) {
       size_t m = n + 1;
       while (m < str.size() && (isAlnum(str[m]) || str[m] == _('_'))) ++m;
       String var_name = str.substr(n + 1, m - n - 1);
-      const char* value = var_name.empty() ? nullptr : std::getenv(var_name.mb_str());
+      const char* value = var_name.empty() ? nullptr : std::getenv(to_fs_path(var_name).string().c_str());
       if (value) {
-        result += String(value, wxConvLibc);
+        result += from_fs_path(fs::path(value));
       } else {
         // variable doesn't exist => don't change anything
         result += _('$');
@@ -133,14 +133,14 @@ static String expand_env_vars(const String& str) {
 static String user_home_dir(const String& user = String()) {
   struct passwd* who = nullptr;
   if (user.empty()) {
-    if (const char* home = std::getenv("HOME")) return String(home, wxConvLibc);
+    if (const char* home = std::getenv("HOME")) return from_fs_path(fs::path(home));
     if (const char* name = std::getenv("USER")) who = getpwnam(name);
     else if (const char* name = std::getenv("LOGNAME")) who = getpwnam(name);
     if (!who) who = getpwuid(getuid());
   } else {
-    who = getpwnam(user.mb_str());
+    who = getpwnam(to_fs_path(user).string().c_str());
   }
-  return who ? String(who->pw_dir, wxConvLibc) : String();
+  return who ? from_fs_path(fs::path(who->pw_dir)) : String();
 }
 #endif
 
@@ -167,7 +167,7 @@ String normalize_filename(const String& name, const String& base_dir) {
     dir_path = base / dir_path;
   }
   String normal_dir = from_fs_path(dir_path.lexically_normal());
-  if (normal_dir.empty() || !is_path_separator(normal_dir.Last())) normal_dir += path_separator();
+  if (normal_dir.empty() || !is_path_separator(normal_dir[normal_dir.size() - 1])) normal_dir += path_separator();
   return normal_dir + full_name;
 }
 
@@ -251,7 +251,7 @@ bool resolve_filename_conflicts(String& fn, FilenameConflicts conflicts, set<Str
   // the filename with its extension replaced by a number + the old extension
   String ext = file_ext(fn);
   String without_ext = replace_file_name(fn, file_name_no_ext(fn));
-  auto numbered = [&](int i) { return String() << without_ext << _(".") << i << _(".") << ext; };
+  auto numbered = [&](int i) { return without_ext + _(".") + int_to_string(i) + _(".") + ext; };
   switch (conflicts) {
     case CONFLICT_KEEP_OLD:
       return !file_exists(fn);
@@ -317,7 +317,7 @@ bool dir_exists(const String& path) {
 time_t file_modified_time(const String& path) {
   // Note: wxFileName also provides a function for this, but that is very slow.
   struct stat statbuf;
-  if (stat(path.mb_str(), &statbuf) != 0) {
+  if (stat(to_fs_path(path).string().c_str(), &statbuf) != 0) {
     if (errno == ENOENT) {
       return 0;
     } else {
@@ -354,7 +354,7 @@ bool is_empty_dir(const String& path) {
 /// The directory name with exactly one trailing separator, used to build paths of its entries
 static String dir_with_sep(const String& dir) {
   String d = dir;
-  while (!d.empty() && is_path_separator(d.Last())) d.RemoveLast();
+  while (!d.empty() && is_path_separator(d[d.size() - 1])) d.erase(d.size() - 1);
   return d + path_separator();
 }
 
@@ -379,7 +379,7 @@ String executable_path() {
   if (ec) return String();
   String path = from_fs_path(exe);
   // the kernel marks the link like this if the executable was deleted
-  if (path.EndsWith(_(" (deleted)"))) path.resize(path.size() - 10);
+  if (ends_with(path, _(" (deleted)"))) path.resize(path.size() - 10);
   return path;
 }
 
@@ -407,7 +407,7 @@ bool create_directory(const String& path) {
 
 bool create_directories(const String& path) {
   String p = path;
-  while (p.size() > 1 && is_path_separator(p.Last())) p.RemoveLast();
+  while (p.size() > 1 && is_path_separator(p[p.size() - 1])) p.erase(p.size() - 1);
   std::error_code ec;
   fs::create_directories(to_fs_path(p), ec);
   return dir_exists(p);

@@ -48,8 +48,8 @@ void Reader::handleAppVersion() {
 
 void Reader::warning(const String& msg, int line_number_delta, bool warn_on_previous_line) {
   warnings += String(_("\nOn line "))
-           << ((warn_on_previous_line ? previous_line_number : line_number) + line_number_delta)
-           << _(": \t") << msg;
+           + int_to_string((warn_on_previous_line ? previous_line_number : line_number) + line_number_delta)
+           + _(": \t") + msg;
 }
 
 void Reader::showWarnings() {
@@ -114,15 +114,15 @@ void Reader::readLine(bool in_string) {
   try {
     line = read_utf8_line(input);
   } catch (const ParseError& e) {
-    throw ParseError(e.what() + String(_(" on line ")) << line_number);
+    throw ParseError(e.what() + String(_(" on line ")) + int_to_string(line_number));
   }
   // read indentation
   indent = 0;
-  while ((UInt)indent < line.size() && line.GetChar(indent) == _('\t')) {
+  while ((UInt)indent < line.size() && line[indent] == _('\t')) {
     indent += 1;
   }
   // read key / value
-  if (line.find_first_not_of(_(" \t")) == String::npos || line.GetChar(indent) == _('#')) {
+  if (line.find_first_not_of(_(" \t")) == String::npos || line[indent] == _('#')) {
     // empty line or comment
     key.clear();
     return;
@@ -130,7 +130,7 @@ void Reader::readLine(bool in_string) {
   size_t pos = line.find_first_of(_(':'), indent);
   key = line.substr(indent, pos - indent);
   if (!ignore_invalid && !in_string && starts_with(key, _(" "))) {
-    warning(String(_("key: '")) << key << _("' on line number ") << line_number << _(" starts with a space; only use TABs for indentation!"), 0, false);
+    warning(String(_("key: '")) + key + _("' on line number ") + int_to_string(line_number) + _(" starts with a space; only use TABs for indentation!"), 0, false);
     // try to fix up: 4 spaces is a tab
     while (starts_with(key, _("    "))) {
       key = key.substr(4);
@@ -225,22 +225,22 @@ template <> void Reader::handle(String& s) {
 }
 template <> void Reader::handle(int& i) {
   long l = 0;
-  if (!getValue().ToLong(&l)) {
+  if (!parse_long(getValue(), l)) {
     warning(_("Expected integer instead of '") + previous_value + _("'"));
   }
   i = l;
 }
 template <> void Reader::handle(unsigned int& i) {
   long l = 0;
-  if (!getValue().ToLong(&l)) {
+  if (!parse_long(getValue(), l)) {
     warning(_("Expected non-negative integer instead of '") + previous_value + _("'"));
   } else if (l < 0) {
-    warning(wxString::Format(_("Expected non-negative integer instead of %d"),(int)l));
+    warning(format_string(_("Expected non-negative integer instead of %d"),(int)l));
   }
   i = abs(l); // abs, because it will seem strange if -1 comes out as MAX_INT
 }
 template <> void Reader::handle(double& d) {
-  if (!getValue().ToDouble(&d)) {
+  if (!parse_double(getValue(), d)) {
     warning(_("Expected floating point number instead of '") + previous_value + _("'"));
   }
 }
@@ -272,7 +272,7 @@ template <> void Reader::handle(DateTime& date) {
 }
 
 template <> void Reader::handle(Vector2D& vec) {
-  if (!wxSscanf(getValue().c_str(), _("(%lf,%lf)"), &vec.x, &vec.y)) {
+  if (!swscanf(getValue().c_str(), _("(%lf,%lf)"), &vec.x, &vec.y)) { // note: swscanf uses the global locale
     throw ParseError(_("Expected (x,y)"));
   }
 }

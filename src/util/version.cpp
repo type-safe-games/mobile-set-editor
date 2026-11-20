@@ -18,12 +18,12 @@ UInt Version::toNumber() const { return major * 10000 + minor * 100 + revision; 
 String Version::toString() const {
   if (major >= 2000) {
     // the version is a date, use ISO notation
-    return String::Format(_("%04d-%02d-%02d"),
+    return format_string(_("%04d-%02d-%02d"),
       major,
       minor,
       revision);
   } else {
-    return String::Format(_("%d.%d.%d"),
+    return format_string(_("%d.%d.%d"),
       major,
       minor,
       revision);
@@ -33,8 +33,8 @@ String Version::toString() const {
 Version Version::fromString(const String& version) {
   if (version.empty()) return Version();
   UInt major = 0, minor = 0, revision = 0;
-  if (wxSscanf(version, _("%u.%u.%u"), &major, &minor, &revision)<=1)  // a.b.c style
-      wxSscanf(version, _("%u-%u-%u"), &major, &minor, &revision);  // date style
+  if (swscanf(version.c_str(), _("%u.%u.%u"), &major, &minor, &revision)<=1)  // a.b.c style
+      swscanf(version.c_str(), _("%u-%u-%u"), &major, &minor, &revision);  // date style
   return Version(major, minor, revision);
 }
 

@@ -16,6 +16,8 @@
 #include "prec.hpp"
 #include "for_each.hpp"
 #include <ctype.h>
+#include <string>
+#include <type_traits>
 #include <boost/preprocessor/cat.hpp>
 
 // ----------------------------------------------------------------------------- : String type
@@ -303,6 +305,140 @@ size_t find_i(const String& heystack, const String& needle);
  *  b should already be in cannonical name form
  */
 bool canonical_name_compare(StringView a, const Char* b);
+
+// ----------------------------------------------------------------------------- : wxString replacements
+
+/* Free functions replacing the wxString members the core uses (issue #30, ADR 0002).
+ *
+ * They only use operations that wxString and std::wstring have in common, so they work while String
+ * is still wxString and keep working once it becomes std::wstring. Number conversions use the "C"
+ * locale whatever the global locale is; the CLI and golden runs already use "C", so output is unchanged.
+ *
+ * wxString members used by the core when #30 started (all core dirs, call counts), and their replacements:
+ *    GetChar(i)            87  s[i]
+ *    String::Format(...)  156  format_string(fmt, ...)      (also wxString::Format; FormatV was only in locale.hpp)
+ *    operator << (x)       ~40 s + int_to_string(x) / double_to_string(x) / s + other_string
+ *                              (<< int/long/unsigned is %d/%ld/%u, << double is %g, << float is %f!)
+ *    ToStdString()         16  encode_utf8(s) (was the C locale encoding: differs only for non-ASCII)
+ *    ToStdString(wxConvUTF8), ToUTF8(), utf8_str()   encode_utf8(s)
+ *    String::FromUTF8(p,n) 18  decode_utf8(p, n)
+ *    mb_str()              14  to_fs_path(s) for paths (util/file_utils.hpp); encode_utf8 otherwise
+ *    wc_str(), fn_str()        c_str() / to_fs_path(s)
+ *    ToStdWstring()         4  std::wstring(s.begin(), s.end()) -- or just s once String is std::wstring
+ *    ToLong(&l)            13  parse_long(s, l)
+ *    ToULong(&l)            1  parse_ulong(s, l)
+ *    ToInt(&i)              5  parse_int(s, i)
+ *    ToDouble(&d)           9  parse_double(s, d)
+ *    EndsWith(x)           11  ends_with(s, x)
+ *    StartsWith(x)          3  starts_with(s, x)
+ *    Contains(x)            3  contains(s, x)
+ *    Replace(a, b)          7  replace_all(s, a, b)          (wx replaced all occurrences by default)
+ *    Lower(), Upper()       9  to_lower(s), to_upper(s)
+ *    MakeUpper()            1  s = to_upper(s)
+ *    Trim(true/false)       3  trim_ascii_right(s) / trim_ascii_left(s)  NB: Trim() modifies s in place
+ *    Last(), RemoveLast()   6  s[s.size() - 1], s.erase(s.size() - 1)
+ *    SubString(a, b)        3  s.substr(a, b - a + 1)        (Mid/SubString clamp; substr throws if a > size)
+ *    Mid(a, n), Left(n)     2  s.substr(a, n), s.substr(0, n)
+ *    Clone(), Clear()       2  s, s.clear()
+ *    IsSameAs(x)            1  ==   (gfx: that one is wxImage, not a string)
+ *    wxUniChar, wxUniCharRef   Char, auto&& (iterating a wxString yields wxUniCharRef proxies)
+ *    wxT("..")                 _("..")
+ *    wxSscanf, wxStrchr        swscanf (beware: locale dependent), wcschr
+ */
+
+/// Lower case version of a string, converting each character with toLower (as wxString::Lower)
+String to_lower(const String& s);
+/// Upper case version of a string, converting each character with toUpper (as wxString::Upper)
+String to_upper(const String& s);
+
+/// Return whether str ends with suffix
+inline bool ends_with(StringView str, StringView const& suffix) {
+  return str.size() >= suffix.size() && std::equal(suffix.begin(), suffix.end(), str.end() - suffix.size());
+}
+template <typename AnyChar>
+inline bool ends_with(StringView str, const AnyChar* suffix) {
+  size_t n = 0;
+  while (suffix[n] != '\0') ++n;
+  if (str.size() < n) return false;
+  String::const_iterator it = str.end() - n;
+  for (size_t i = 0 ; i < n ; ++i, ++it) {
+    if (suffix[i] != *it) return false;
+  }
+  return true;
+}
+
+/// Does str contain needle? An empty needle is contained in every string (as wxString::Contains).
+inline bool contains(const String& str, const String& needle) {
+  return str.find(needle) != String::npos;
+}
+
+/// Remove ASCII whitespace (' ', \t, \n, \v, \f, \r) from the start, as wxString::Trim(false)
+/** Unlike trim_left, other Unicode spaces and CONNECTION_SPACE are kept. */
+String trim_ascii_left(const String& s);
+/// Remove ASCII whitespace (' ', \t, \n, \v, \f, \r) from the end, as wxString::Trim(true)
+String trim_ascii_right(const String& s);
+
+// ----------------------------------------------------------------------------- : Numbers
+
+// Parsing works like wxString::ToLong etc.: leading whitespace and a sign are allowed (wcstol/wcstod),
+// false is returned if nothing could be parsed or the value is out of range (out is unchanged then),
+// and if only a prefix of s is a number, out is set to it but false is returned.
+
+/// Parse an integer, as wxString::ToLong
+bool parse_long(const String& s, long& out, int base = 10);
+/// Parse an unsigned integer, as wxString::ToULong (a leading '-' is accepted, as by wcstoul)
+bool parse_ulong(const String& s, unsigned long& out, int base = 10);
+/// Parse an int, as wxString::ToInt (false and out unchanged if the value doesn't fit in an int)
+bool parse_int(const String& s, int& out, int base = 10);
+/// Parse a floating point number with '.' as the decimal point, as wxString::ToDouble in the "C" locale
+bool parse_double(const String& s, double& out);
+
+/// Format an integer in decimal, as String() << i
+String int_to_string(long long i);
+/// Format a double as "%g", as String() << d
+String double_to_string(double d);
+
+// ----------------------------------------------------------------------------- : Formatting
+
+namespace string_format_detail {
+  inline const wchar_t* format_arg(const String& s) { return s.c_str(); }
+  inline const wchar_t* format_arg(const wchar_t* s) { return s; }
+  template <typename T, typename = std::enable_if_t<std::is_arithmetic<T>::value || std::is_enum<T>::value>>
+  inline T format_arg(T x) { return x; }
+  #if wxUSE_UNICODE
+  inline wchar_t format_arg(wxUniChar c) { return c; }
+  inline wchar_t format_arg(wxUniCharRef c) { return c; }
+  #endif
+  String format_string_impl(const wchar_t* format, ...);
+}
+
+/// Format a string, printf style, as wxString::Format did
+/** String and wchar_t* arguments go with %s, Char arguments with %c; these are converted to %ls and %lc
+ *  (wx did the same). Numbers are formatted in the "C" locale.
+ */
+template <typename... Args>
+inline String format_string(const String& format, const Args&... args) {
+  return string_format_detail::format_string_impl(format.c_str(), string_format_detail::format_arg(args)...);
+}
+/// Overload so that a braced {} argument still means an empty String
+inline String format_string(const String& format, const String& a0) {
+  return string_format_detail::format_string_impl(format.c_str(), string_format_detail::format_arg(a0));
+}
+
+// ----------------------------------------------------------------------------- : UTF-8
+
+// The conversions behave like wxConvUTF8 (wxMBConvStrictUTF8), which the core used before.
+
+/// Encode a string as UTF-8. Returns "" if it contains a code point above U+10FFFF (wx did the same).
+std::string encode_utf8(const String& str);
+/// Decode UTF-8 bytes. Returns false if they are not valid UTF-8.
+/** Like wx, this only checks lead and continuation bytes, so overlong forms and encoded surrogates are accepted. */
+bool decode_utf8(const char* data, size_t size, String& out);
+/// Decode UTF-8 bytes. Returns "" if they are not valid UTF-8 (as String::FromUTF8).
+String decode_utf8(const char* data, size_t size);
+inline String decode_utf8(const std::string& data) {
+  return decode_utf8(data.data(), data.size());
+}
 
 // ----------------------------------------------------------------------------- : Regular expressions
 

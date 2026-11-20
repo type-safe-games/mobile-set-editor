@@ -63,14 +63,14 @@ CompareWhat  ScriptValue::compareAs(String& compare_str, void const*& compare_pt
 }
 ScriptValueP ScriptValue::getMember(const String& name) const {
   long index;
-  if (name.ToLong(&index)) {
+  if (parse_long(name, index)) {
     return getIndex(index);
   } else {
     return delay_error(ScriptErrorNoMember(typeName(), name));
   }
 }
 ScriptValueP ScriptValue::getIndex(int index) const {
-  return delay_error(ScriptErrorNoMember(typeName(), String()<<index));
+  return delay_error(ScriptErrorNoMember(typeName(), int_to_string(index)));
 }
 
 
@@ -226,7 +226,7 @@ public:
   ScriptInt(int v) : value(v) {}
   ScriptType type() const override { return SCRIPT_INT; }
   String typeName() const override { return _TYPE_("integer"); }
-  String toString() const override { return String() << value; }
+  String toString() const override { return int_to_string(value); }
   double toDouble() const override { return value; }
   int toInt()       const override { return value; }
 protected:
@@ -292,7 +292,7 @@ public:
   ScriptDouble(double v) : value(v) {}
   ScriptType type() const override { return SCRIPT_DOUBLE; }
   String typeName() const override { return _TYPE_("double"); }
-  String toString() const override { return String() << value; }
+  String toString() const override { return double_to_string(value); }
   double toDouble() const override { return value; }
   int toInt() const override { return (int)value; }
 private:
@@ -333,7 +333,7 @@ public:
   }
   double toDouble() const override {
     double d;
-    if (value.ToDouble(&d)) {
+    if (parse_double(value, d)) {
       return d;
     } else {
       throw ScriptErrorConversion(value, typeName(), _TYPE_("double"));
@@ -341,7 +341,7 @@ public:
   }
   int toInt() const override {
     long l;
-    if (value.ToLong(&l)) {
+    if (parse_long(value, l)) {
       return l;
     } else {
       throw ScriptErrorConversion(value, typeName(), _TYPE_("integer"));
@@ -381,7 +381,7 @@ public:
   ScriptValueP getMember(const String& name) const override {
     // get member returns characters
     long index;
-    if (name.ToLong(&index) && index >= 0 && (size_t)index < value.size()) {
+    if (parse_long(name, index) && index >= 0 && (size_t)index < value.size()) {
       return to_script(String(1,value[index]));
     } else {
       return delay_error(_ERROR_2_("has no member value", value, name));
@@ -557,9 +557,9 @@ ScriptValueP ScriptConcatCollection::getMember(const String& name) const {
   if (member->type() != SCRIPT_ERROR) return member;
   long index;
   int  itemsInA = a->itemCount();
-  if (name.ToLong(&index) && index - itemsInA >= 0 && index - itemsInA < b->itemCount()) { 
+  if (parse_long(name, index) && index - itemsInA >= 0 && index - itemsInA < b->itemCount()) { 
     // adjust integer index
-    return b->getMember(String() << (index - itemsInA));
+    return b->getMember(int_to_string(index - itemsInA));
   } else {
     return b->getMember(name);
   }

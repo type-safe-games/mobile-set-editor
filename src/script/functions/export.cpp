@@ -175,7 +175,7 @@ String html_escape(const String& str) {
     } else if (c == _('\"')) {  // escape "
       ret += _("&quot;");
     } else if (c >= 0x80) {    // escape non ascii
-      ret += String(_("&#")) << (int)c << _(';');
+      ret += String(_("&#")) + int_to_string((int)c) + _(';');
     } else {
       ret += c;
     }
@@ -203,8 +203,8 @@ String symbols_to_html(const String& str, SymbolFont& symbol_font, double size) 
       it = ei.exported_images.insert(make_pair(filename, wxSize(img.GetWidth(), img.GetHeight()))).first;
     }
     html += _("<img src='") + filename + _("' alt='") + html_escape(sym.text)
-         +  _("' width='")  + (String() << it->second.x)
-         +  _("' height='") + (String() << it->second.y) + _("'>");
+         +  _("' width='")  + int_to_string(it->second.x)
+         +  _("' height='") + int_to_string(it->second.y) + _("'>");
   }
   return html;
 }
@@ -220,7 +220,7 @@ String to_html(const String& str_in, const SymbolFontP& symbol_font, double symb
   TagStack tags;
   String symbols;
   for (size_t i = 0 ; i < str.size() ; ) {
-    Char c = str.GetChar(i);
+    Char c = str[i];
     if (c == _('<')) {
       ++i;
       if        (is_substr(str, i, _("b"))) {
@@ -264,7 +264,7 @@ String to_html(const String& str_in, const SymbolFontP& symbol_font, double symb
         } else if (c == _('&')) {  // escape &
           ret += _("&amp;");
         } else if (c >= 0x80) {    // escape non ascii
-          ret += String(_("&#")) << (int)c << _(';');
+          ret += String(_("&#")) + int_to_string((int)c) + _(';');
         } else if (c == _('\n')) {
           ret += _("<br>\n");
         } else {
@@ -320,7 +320,7 @@ String to_bbcode(const String& str_in) {
   TagStack tags;
   String symbols;
   for (size_t i = 0 ; i < str.size() ; ) {
-    Char c = str.GetChar(i);
+    Char c = str[i];
     if (c == _('<')) {
       ++i;
       if        (is_substr(str, i, _("b"))) {
@@ -506,7 +506,7 @@ SCRIPT_FUNCTION(write_set_to_fd) {
   SCRIPT_PARAM_C(Set*, set);
   FdOutputStream out(fd);
   set->saveCopy(out);
-  if (!out.close()) throw Error(_("Unable to write the set to file descriptor ") + String::Format(_("%d"), fd));
+  if (!out.close()) throw Error(_("Unable to write the set to file descriptor ") + format_string(_("%d"), fd));
   SCRIPT_RETURN(true);
 }
 
@@ -526,7 +526,7 @@ SCRIPT_FUNCTION(write_layout_file) {
   SCRIPT_PARAM(String, file);
   String out_path = get_export_full_path(file);
   ensure_dir_valid(out_path);
-  std::string bytes = card_layout_dump(set, input).ToStdString(wxConvUTF8);
+  std::string bytes = encode_utf8(card_layout_dump(set, input));
   unique_ptr<FileOutputStream> out;
   retry_io([&]{
     out = make_unique<FileOutputStream>(out_path);

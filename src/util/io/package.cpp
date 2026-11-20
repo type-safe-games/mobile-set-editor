@@ -193,7 +193,7 @@ bool Package::contains(const String& file) {
 }
 
 unique_ptr<InputStream> Package::openIn(const String& file) {
-  if (!file.empty() && file.GetChar(0) == _('/')) {
+  if (!file.empty() && file[0] == _('/')) {
     // absolute path, open file from another package
     Packaged* p = dynamic_cast<Packaged*>(this);
     return package_manager.openFileFromPackage(p, file).first;
@@ -205,7 +205,7 @@ unique_ptr<InputStream> Package::openIn(const String& file) {
     if (pos != String::npos) {
       // check for nested folder
       pos = filename.find_last_of(_("/\\"));
-      String nestedFilename = filename + filename.SubString(pos, filename.size()) + path_separator() + file;
+      String nestedFilename = filename + (pos <= filename.size() ? filename.substr(pos) : String()) + path_separator() + file;
       if (file_exists(nestedFilename)) {
         throw PackageError(_ERROR_1_("nested folder", filename));
       }
@@ -270,7 +270,7 @@ LocalFileName Package::newFileName(const String& prefix, const String& suffix) {
   while (true) {
     // create filename
     name = prefix;
-    name << ++infix;
+    name += int_to_string(++infix);
     name += suffix;
     name = normalize_internal_filename(name);
     // check if a file with that name exists
@@ -397,7 +397,7 @@ void Package::openSubdir(const String& name) {
   entries.clear();
   list_directory(filename + _("/") + name, entries, LIST_DIRS | LIST_HIDDEN);
   for (const String& f : entries) {
-    if (!f.empty() && f.GetChar(0) != _('.')) {
+    if (!f.empty() && f[0] != _('.')) {
       // skip directories starting with '.', like ., .. and .svn
       openSubdir(name+f+_("/"));
     }

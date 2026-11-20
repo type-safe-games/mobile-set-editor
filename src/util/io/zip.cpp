@@ -73,7 +73,7 @@ static String zip_entry_name(const mz_zip_file& info) {
     for (size_t i = 0 ; i < raw_size ; ++i) name += (Char)(unsigned char)raw[i];
   }
   // internal format (wxZipEntry::GetInternalName)
-  bool is_dir = !name.empty() && is_path_sep(name.Last());
+  bool is_dir = !name.empty() && is_path_sep(name[name.size() - 1]);
   if (is_dir) name.erase(name.size() - 1);
   while (!name.empty() && is_path_sep(name[0])) name.erase(0, 1);
   while (name.size() >= 2 && name[0] == _('.') && is_path_sep(name[1])) name.erase(0, 2);

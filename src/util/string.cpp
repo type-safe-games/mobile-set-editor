@@ -9,6 +9,12 @@
 #include <util/prec.hpp>
 #include <util/string.hpp>
 #include <util/for_each.hpp>
+#include <cerrno>
+#include <climits>
+#include <cstdarg>
+#include <cwchar>
+#include <clocale>
+#include <locale.h>
 
 // ----------------------------------------------------------------------------- : Char functions
 
@@ -56,8 +62,18 @@ String substr_replace(const String& input, size_t start, size_t end, const Strin
 }
 
 String replace_all(const String& heystack, const String& needle, const String& replacement) {
-  String ret = heystack;
-  ret.Replace(needle, replacement);
+  // as wxString::Replace: replace all non-overlapping occurrences, left to right; an empty needle replaces nothing
+  if (needle.empty()) return heystack;
+  String ret;
+  size_t pos = 0;
+  while (true) {
+    size_t found = heystack.find(needle, pos);
+    if (found == String::npos) break;
+    ret.append(heystack, pos, found - pos);
+    ret += replacement;
+    pos = found + needle.size();
+  }
+  ret.append(heystack, pos, String::npos);
   return ret;
 }
 
@@ -138,9 +154,9 @@ String name_to_caption(const String& str) {
   String ret;
   ret.reserve(str.size());
   bool leading = true, first = true;
-  for (wxUniChar c : str) {
+  for (Char c : str) {
     if ((c == _('_') || c == _(' '))) {
-      ret += leading ? c : wxUniChar(_(' '));
+      ret += leading ? c : _(' ');
     } else if (first) {
       // capitalize_sentence
       ret += toUpper(c);
@@ -156,7 +172,7 @@ String name_to_caption(const String& str) {
 
 String singular_form(const String& str) {
   assert(str.size() > 1);
-  assert(str.GetChar(str.size() - 1) == _('s')); // ends in 's'
+  assert(str[str.size() - 1] == _('s')); // ends in 's'
   if (str.size() > 3 && is_substr(str, str.size()-3, _("ies"))) {
     return str.substr(0, str.size() - 3) + _("y");
   }
@@ -248,7 +264,7 @@ int smart_compare(const String& sa, const String& sb) {
   size_t na = sa.size(), nb = sb.size();
   size_t pa = 0, pb = 0;
   for (; pa < na && pb < nb ; ++pa, ++pb) {
-    Char a = sa.GetChar(pa), b = sb.GetChar(pb);
+    Char a = sa[pa], b = sb[pb];
   next:
     bool da = isDigit(a), db = isDigit(b);
     if (da && db) {
@@ -282,12 +298,12 @@ int smart_compare(const String& sa, const String& sb) {
           if (la2) a = la2;
           else {
             if (++pa >= na) return 1;
-            a = sa.GetChar(pa);
+            a = sa[pa];
           }
           if (lb2) b = lb2;
           else {
             if (++pb >= nb) return -1;
-            b = sb.GetChar(pb);
+            b = sb[pb];
           }
           goto next; // don't move to the next character in both strings
         }
@@ -305,10 +321,10 @@ int smart_compare(const String& sa, const String& sb) {
   if (in_num) {
     if (na - pa < nb - pb) {
       // number b continues?
-      Char b = sb.GetChar(pb);
+      Char b = sb[pb];
       if (isDigit(b) || eq) return -1; // b is longer
     } else if (na - pa > nb - pb) {
-      Char a = sa.GetChar(pa);
+      Char a = sa[pa];
       if (isDigit(a) || eq) return 1;  // a is longer
     }
     return eq ? 0 : lt ? -1 : 1; // compare numbers
@@ -356,6 +372,246 @@ size_t find_i(const String& heystack, const String& needle) {
     if (is_substr_i(heystack, i, needle)) return true;
   }
   return String::npos;
+}
+
+// ----------------------------------------------------------------------------- : wxString replacements
+
+String to_lower(const String& s) {
+  String ret = s;
+  for (size_t i = 0 ; i < ret.size() ; ++i) {
+    ret[i] = toLower(ret[i]);
+  }
+  return ret;
+}
+
+String to_upper(const String& s) {
+  String ret = s;
+  for (size_t i = 0 ; i < ret.size() ; ++i) {
+    ret[i] = toUpper(ret[i]);
+  }
+  return ret;
+}
+
+// Whitespace as wxString::Trim sees it: isspace, but only for ASCII characters
+static inline bool is_ascii_space(Char c) {
+  return c == _(' ') || (c >= 0x09 && c <= 0x0D);
+}
+
+String trim_ascii_left(const String& s) {
+  size_t start = 0;
+  while (start < s.size() && is_ascii_space(s[start])) ++start;
+  return s.substr(start);
+}
+
+String trim_ascii_right(const String& s) {
+  size_t end = s.size();
+  while (end > 0 && is_ascii_space(s[end - 1])) --end;
+  return s.substr(0, end);
+}
+
+// ----------------------------------------------------------------------------- : Numbers
+
+namespace {
+  // Use the "C" locale for number conversions in the current thread while this object exists
+  #if defined(__GLIBC__) || defined(__ANDROID__) || defined(__APPLE__)
+    locale_t c_locale() {
+      static locale_t loc = newlocale(LC_ALL_MASK, "C", (locale_t)0);
+      return loc;
+    }
+    struct CLocaleScope {
+      CLocaleScope() : old(c_locale() ? uselocale(c_locale()) : (locale_t)0) {}
+      ~CLocaleScope() { if (old) uselocale(old); }
+      locale_t old;
+    };
+  #else
+    struct CLocaleScope {}; // TODO: Windows (_configthreadlocale), the desktop build there is not used
+  #endif
+}
+
+// These follow WX_STRING_TO_X_TYPE_START/END in wx/src/common/string.cpp
+
+bool parse_long(const String& s, long& out, int base) {
+  CLocaleScope c_locale;
+  const wchar_t* start = s.c_str();
+  wchar_t* end;
+  errno = 0;
+  long value = wcstol(start, &end, base);
+  if (end == start || errno == ERANGE) return false;
+  out = value;
+  return *end == 0;
+}
+
+bool parse_ulong(const String& s, unsigned long& out, int base) {
+  CLocaleScope c_locale;
+  const wchar_t* start = s.c_str();
+  wchar_t* end;
+  errno = 0;
+  unsigned long value = wcstoul(start, &end, base);
+  if (end == start || errno == ERANGE) return false;
+  out = value;
+  return *end == 0;
+}
+
+bool parse_int(const String& s, int& out, int base) {
+  CLocaleScope c_locale;
+  const wchar_t* start = s.c_str();
+  wchar_t* end;
+  errno = 0;
+  long value = wcstol(start, &end, base);
+  if (end == start || errno == ERANGE || value < INT_MIN || value > INT_MAX) return false;
+  out = (int)value;
+  return *end == 0;
+}
+
+bool parse_double(const String& s, double& out) {
+  CLocaleScope c_locale;
+  const wchar_t* start = s.c_str();
+  wchar_t* end;
+  errno = 0;
+  double value = wcstod(start, &end);
+  if (end == start || errno == ERANGE) return false;
+  out = value;
+  return *end == 0;
+}
+
+String int_to_string(long long i) {
+  return String(std::to_wstring(i));
+}
+
+String double_to_string(double d) {
+  return format_string(_("%g"), d);
+}
+
+// ----------------------------------------------------------------------------- : Formatting
+
+// Convert a format string the way wxFormatString did for wchar_t printf on Unix:
+// %s and %c without a size modifier become %ls and %lc
+static std::wstring convert_format(const wchar_t* format) {
+  std::wstring ret;
+  for (const wchar_t* p = format ; *p ; ) {
+    ret += *p;
+    if (*p++ != L'%') continue;
+    if (*p == L'%') { ret += *p++; continue; }
+    // flags, width, precision, argument position
+    while (*p && wcschr(L"0123456789-+ #'.*$", *p)) ret += *p++;
+    // size modifiers
+    bool has_size = false;
+    while (*p && wcschr(L"hlLqjztI", *p)) { ret += *p++; has_size = true; }
+    if (!has_size && (*p == L's' || *p == L'c')) ret += L'l';
+  }
+  return ret;
+}
+
+String string_format_detail::format_string_impl(const wchar_t* format, ...) {
+  std::wstring fmt = convert_format(format);
+  CLocaleScope c_locale;
+  std::vector<wchar_t> buffer(256);
+  while (true) {
+    va_list args;
+    va_start(args, format);
+    int len = vswprintf(buffer.data(), buffer.size(), fmt.c_str(), args);
+    va_end(args);
+    if (len >= 0) return String(buffer.data(), (size_t)len);
+    // vswprintf fails if the buffer is too small (or on a hard error)
+    if (buffer.size() >= 16 * 1024 * 1024) return String();
+    buffer.resize(buffer.size() * 2);
+  }
+}
+
+// ----------------------------------------------------------------------------- : UTF-8
+
+// Length of a UTF-8 sequence from its lead byte, 0 for bytes that can't start one
+// (same table as wxMBConvStrictUTF8: C0, C1 and F5..FF are invalid)
+static inline unsigned utf8_sequence_length(unsigned char c) {
+  if (c < 0x80) return 1;
+  if (c < 0xC2) return 0;
+  if (c < 0xE0) return 2;
+  if (c < 0xF0) return 3;
+  if (c < 0xF5) return 4;
+  return 0;
+}
+
+static inline void append_utf8(std::string& out, uint32_t code) {
+  if (code <= 0x7F) {
+    out += (char)code;
+  } else if (code <= 0x7FF) {
+    out += (char)(0xC0 | (code >> 6));
+    out += (char)(0x80 | (code & 0x3F));
+  } else if (code <= 0xFFFF) {
+    out += (char)(0xE0 | (code >> 12));
+    out += (char)(0x80 | ((code >> 6) & 0x3F));
+    out += (char)(0x80 | (code & 0x3F));
+  } else {
+    out += (char)(0xF0 | (code >> 18));
+    out += (char)(0x80 | ((code >> 12) & 0x3F));
+    out += (char)(0x80 | ((code >> 6) & 0x3F));
+    out += (char)(0x80 | (code & 0x3F));
+  }
+}
+
+std::string encode_utf8(const String& str) {
+  std::string out;
+  out.reserve(str.size());
+  const wchar_t* p   = str.c_str();
+  const wchar_t* end = p + str.size();
+  while (p < end) {
+    uint32_t code = (uint32_t)*p++;
+    #if WCHAR_MAX <= 0xFFFF
+      // UTF-16: combine surrogate pairs, a lone surrogate can't be encoded
+      code &= 0xFFFF;
+      if (code >= 0xD800 && code <= 0xDFFF) {
+        if (code >= 0xDC00 || p == end || (uint32_t)(*p & 0xFFFF) < 0xDC00 || (uint32_t)(*p & 0xFFFF) > 0xDFFF) return std::string();
+        code = 0x10000 + ((code - 0xD800) << 10) + ((uint32_t)(*p++ & 0xFFFF) - 0xDC00);
+      }
+    #else
+      code &= 0x7FFFFFFF;
+      if (code > 0x10FFFF) return std::string();
+    #endif
+    append_utf8(out, code);
+  }
+  return out;
+}
+
+bool decode_utf8(const char* data, size_t size, String& out) {
+  std::wstring result;
+  result.reserve(size);
+  const unsigned char* p   = (const unsigned char*)data;
+  const unsigned char* end = p + size;
+  while (p < end) {
+    unsigned char c = *p;
+    unsigned len = utf8_sequence_length(c);
+    if (len == 0 || (size_t)(end - p) < len) return false;
+    uint32_t code;
+    if (len == 1) {
+      code = c;
+    } else {
+      static const unsigned char lead_mask[] = { 0x7F, 0x1F, 0x0F, 0x07 };
+      code = c & lead_mask[len - 1];
+      for (unsigned i = 1 ; i < len ; ++i) {
+        unsigned char cc = p[i];
+        if ((cc & 0xC0) != 0x80) return false;
+        code = (code << 6) | (cc & 0x3F);
+      }
+    }
+    p += len;
+    #if WCHAR_MAX <= 0xFFFF
+      if (code >= 0x10000) {
+        code -= 0x10000;
+        result += (wchar_t)(0xD800 + (code >> 10));
+        result += (wchar_t)(0xDC00 + (code & 0x3FF));
+        continue;
+      }
+    #endif
+    result += (wchar_t)code;
+  }
+  out = String(result);
+  return true;
+}
+
+String decode_utf8(const char* data, size_t size) {
+  String ret;
+  if (!decode_utf8(data, size, ret)) return String();
+  return ret;
 }
 
 // ----------------------------------------------------------------------------- : Regular expressions

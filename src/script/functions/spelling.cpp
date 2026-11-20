@@ -49,7 +49,7 @@ void check_word(const String& tag, const String& input, size_t start, size_t end
   if (!good) { out += _("</"); out += tag; }
 }
 
-bool isWordChar(wxUniChar c) {
+bool isWordChar(Char c) {
   return isAlpha(c) || c == '\'' || c == RIGHT_SINGLE_QUOTE;
 }
 
@@ -87,7 +87,7 @@ SCRIPT_FUNCTION(check_spelling) {
   int unchecked_tag = 0;
   bool check_this_word = true;
   while (pos < input.size()) {
-    Char c = input.GetChar(pos);
+    Char c = input[pos];
     if (c == _('<')) {
       if      (is_tag(input, pos,  _("<nospellcheck"))) unchecked_tag++;
       else if (is_tag(input, pos, _("</nospellcheck"))) unchecked_tag--;
