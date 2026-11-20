@@ -1,8 +1,11 @@
 # Mobile Set Editor
 
 A fork of Magic Set Editor 2 (C++17, wxWidgets, CMake; upstream `twanvl/MagicSetEditor2`)
-being ported to mobile, Android first. Game and style templates come from the
-`templates/Full-Magic-Pack` submodule (~1 GB; run `git submodule update --init` if empty).
+being ported to mobile, Android first. Templates are never in git (ADR 0005, ADR 0008): the
+Full Magic Pack (~1 GB) sits by hand in the gitignored `templates/Full-Magic-Pack`, with the
+private goldens in `templates/goldens`. The desktop host reads templates from `MSE_TEMPLATES_DIR`;
+`tools/goldens` defaults to those paths (`--pack`/`--goldens` override). Tests use only
+`test/fixture`.
 minizip-ng is vendored as a pinned submodule in `third_party/minizip-ng` (CMake stops if it's missing).
 
 - `doc/` is MSE's own user/template documentation. `docs/` is this project's agent and

@@ -1,7 +1,9 @@
 """Shared helpers for the golden corpus scripts (ADR 0010).
 
-The template pack and everything generated from it are private (ADR 0008): they live beside the
-pack under templates/, never in this repo's history.
+The template pack and everything generated from it are private (ADR 0008): they live under the
+gitignored templates/, never in this repo's history. Copy or symlink a pack there by hand
+(templates/Full-Magic-Pack, with its data/ and "Magic - Fonts/"), or pass --pack; the goldens
+default to templates/goldens. Without a pack only `goldens.py check --fixture-only` runs.
 """
 
 from __future__ import annotations
@@ -13,8 +15,9 @@ from dataclasses import dataclass
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
-DEFAULT_PACK = REPO / "templates" / "Full-Magic-Pack"
-DEFAULT_GOLDENS = REPO / "templates" / "goldens"
+TEMPLATES = REPO / "templates"  # gitignored (ADR 0008)
+DEFAULT_PACK = TEMPLATES / "Full-Magic-Pack"
+DEFAULT_GOLDENS = TEMPLATES / "goldens"
 DEFAULT_MSE = REPO / "build" / "magicseteditor"
 
 ANSI = re.compile(r"\x1b\[[0-9;]*m")

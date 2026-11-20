@@ -1,0 +1,40 @@
+Mobile Set Editor
+=================
+
+Mobile Set Editor is an Android port of Magic Set Editor 2.
+
+Copyright (C) Twan van Laarhoven and the other Magic Set Editor developers,
+including haganbmj and GenevensiS, and the Mobile Set Editor
+contributors.
+
+License
+-------
+
+The combined work is distributed under the GNU General Public License,
+version 3 or (at your option) any later version (GPL-3.0-or-later). The full
+text is in COPYING.
+
+Files inherited from Magic Set Editor carry headers saying "GNU General Public
+License 2 or later". Those files remain available under GPL-2.0-or-later on
+their own; this repository distributes them, together with everything else,
+under the version 3 option. New files written for Mobile Set Editor (the
+Android app, the facade and their tests) are GPL-3.0-or-later only. Version 3
+is required because the Android app links Apache-2.0 libraries (Kotlin
+standard library, AndroidX, Jetpack Compose), which are compatible with GPLv3
+but not with GPLv2.
+
+Third-party components
+----------------------
+
+- third_party/minizip-ng: minizip-ng, under the zlib license (see its LICENSE).
+- test/fixture/fonts: DejaVu fonts, under the DejaVu fonts license (see
+  test/fixture/fonts/LICENSE-DejaVu.txt). Used by the tests only; never shipped.
+
+Templates
+---------
+
+No game or style templates are included or downloaded. Users import template
+packs they obtained themselves.
+
+Mobile Set Editor is not affiliated with, endorsed by or sponsored by Wizards
+of the Coast. Magic: The Gathering is a trademark of Wizards of the Coast LLC.

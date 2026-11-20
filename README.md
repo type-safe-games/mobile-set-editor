@@ -1,113 +1,80 @@
-# Magic Set Editor 2
+# Mobile Set Editor
 
-Magic Set Editor, or MSE for short, is a program with which you can design your own cards for popular trading card games. MSE can then generate images of those cards that you can print or upload to the internet. Magic Set Editor also has a statistics window that will give useful information about your set, like the average mana cost, number of rares, etc. When you have finished your set, you can export it to an HTML file to use on the Internet, or to Apprentice or CCG Lackey so you can play with your cards online.
+Mobile Set Editor is an Android port of [Magic Set Editor](https://github.com/twanvl/MagicSetEditor2)
+(MSE), the program for designing your own trading cards. It renders cards with MSE's existing
+game and style templates, which you import yourself.
 
-More information on https://magicseteditor.boards.net/
+The Android app is not released yet. Today the repository builds MSE's C++ core, a wx-free facade
+over it, and a desktop test host that runs the tests headlessly.
 
-Documentation on https://mseverse.miraheze.org/wiki/Category:MSE_Documentation
+Mobile Set Editor is not affiliated with, endorsed by or sponsored by Wizards of the Coast.
+Magic: The Gathering is a trademark of Wizards of the Coast LLC.
 
+## Credits
 
-## Dependencies
+Mobile Set Editor is a hard fork of Magic Set Editor 2 and builds on the work of:
 
-The code depends on
- * wxWidgets >= 3.3.3
- * boost
- * hunspell
+- **Twan van Laarhoven ([twanvl](https://github.com/twanvl/MagicSetEditor2))**, who wrote Magic Set
+  Editor, and the other MSE developers;
+- **[haganbmj](https://github.com/haganbmj/MagicSetEditor2)**, who maintained the 2.x fork;
+- **[GenevensiS](https://github.com/G-e-n-e-v-e-n-s-i-S/MagicSetEditor2)**, whose 2.6 line this
+  port is forked from.
 
+The full history is kept in this repository's git log.
 
-## Building on Windows with Visual Studio
+## License
 
-On windows, the program can be compiled with Visual Studio (recommended) or with mingw-gcc.
- * Visual Studio instructions up-to-date as of April 2024
- * Download and install [Visual Studio Community Edition](https://visualstudio.microsoft.com/vs/community/)
- * Download and install [vcpkg](https://github.com/microsoft/vcpkg)
- * Use vcpkg to install pkgconf, wxwidgets, boost, hunspell:
+GPL-3.0-or-later; see [COPYING](COPYING). Files inherited from Magic Set Editor are "GPL 2 or
+later", and the combined work is distributed under version 3 or later; [NOTICE](NOTICE) explains
+why and lists the third-party components.
 
-````
-.\vcpkg install pkgconf wxwidgets[fonts] boost-smart-ptr boost-regex boost-logic boost-pool boost-iterator boost-json hunspell --triplet=x64-windows-static
-````
-and/or
-````
-.\vcpkg install pkgconf wxwidgets[fonts] boost-smart-ptr boost-regex boost-logic boost-pool boost-iterator boost-json hunspell --triplet=x86-windows-static
-````
-(these two lines differ only by the triplet at the end. Use x64 for 64 bit operating systems, and x86 for 32 bit.)
+## Templates
 
-then, regardless of your choice
-````
-.\vcpkg integrate install
-````
+Nothing is bundled and nothing is downloaded. The app will import a zip of templates that you
+obtained yourself (a template pack, a single shared style, or an `.mse-installer`), and installs
+the `*.mse-*` packages and loose font files it finds inside. See
+[ADR 0005](docs/adr/0005-templates-user-imported-never-bundled.md).
 
- * Inside Visual Studio go to File menu > Open > Folder... > select the Magic Set Editor source code root folder.
- * Select the configuration that you want to build (probably release x64-windows-static). Make sure you have installed all the packages with the corresponding triplet.
+For development on the desktop, `templates/` is gitignored: put a pack there by hand, for example
+copy or symlink the Full Magic Pack to `templates/Full-Magic-Pack` (its `data/` and
+`Magic - Fonts/` directories). The desktop host reads templates from the directory in
+`MSE_TEMPLATES_DIR`:
 
-![configuration](https://github.com/G-e-n-e-v-e-n-s-i-S/MagicSetEditor2/blob/main/resource/readme/configuration.png)
-
- * Just to the right of that, select magicseteditor.exe. (These options sometimes get de-selected. If you suddenly can't build anymore, make sure to re-select these.)
- * To build the app go to Build menu > build magicseteditor.exe
-
-Notes:
- * You will most likely get a message about being unable to open hunspell-1.7.lib because pkgconf forgets to add the actual path to HUNSPELL_LIBRARIES. If so, uncomment the noted line in CMakeLists.txt (line 31) and point it to the root vcpkg installation to find the correct hunspell-1.7.lib file.
-
-![hunspell](https://github.com/G-e-n-e-v-e-n-s-i-S/MagicSetEditor2/blob/main/resource/readme/hunspell.png)
-
- * For running tests you will also need to download and install perl (For example [Strawberry perl](http://strawberryperl.com/) or using [MSYS2](https://www.msys2.org/)). The tests can be run from inside visual studio
-
-
-## Building on Windows with GCC (MSYS2)
-
- * Download and install [msys2](https://www.msys2.org/)
- * Install a recent version of the gcc compiler, cmake, and wxWidgets libraries:
-
-```
-pacman -S mingw32/mingw-w64-i686-gcc
-pacman -S mingw32/mingw-w64-i686-wxWidgets
-pacman -S mingw32/mingw-w64-i686-boost
-pacman -S mingw32/mingw-w64-i686-hunspell
-pacman -S cmake
+```sh
+MSE_TEMPLATES_DIR=$PWD/templates/Full-Magic-Pack/data ./build/magicseteditor --cli my-set.mse-set
 ```
 
-   Use `mingw64/mingw-w64-x86_64-...` instead of for the 64bit build.
- * Build
+## Building the desktop test host
 
-```
-cmake -G "MSYS Makefiles" -H. -Bbuild -DCMAKE_BUILD_TYPE=Release
-cmake --build build
-```
+Linux is the tested platform. You need a C++17 compiler, CMake 3.13 or newer, pkg-config and the
+development packages of wxWidgets 3.2 or newer (GTK 3), Boost (regex, json), hunspell, zlib, Pango
+and fontconfig. Tests also need Perl, and `xvfb-run` when there is no display.
 
- Use `CMAKE_BUILD_TYPE=Debug` for a debug build.
-
-
-## Building on Linux / FreeBSD
-
-Refer to this script:
-https://gist.github.com/ebbit1q/2b72433ef5aea4934235e8188e238346#file-update_mse-sh
-
-
-## Building on Mac OS
-
- * Install the dependencies; for example, using Homebrew: (Note: Tested with boost 1.92.0, wxmac (wxwidgets) 3.3.3, hunspell 1.7.3, cmake 4.4.2, dylibbundler 1.0.5.)
-
-```
-brew install boost wxwidgets hunspell cmake dylibbundler pkg-config
+```sh
+git clone <this repository> mobile-set-editor
+cd mobile-set-editor
+git submodule update --init third_party/minizip-ng
+cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo
+cmake --build build -j"$(nproc)"
+cd build && xvfb-run -a ctest --output-on-failure
 ```
 
- * Then use cmake to build:
+The tests render the [Test fixture](test/fixture/README.md), a tiny self-authored Game and Style
+with free fonts, so they need no template pack. The golden comparison in
+[`tools/goldens`](tools/goldens/goldens.py) runs on the fixture alone with
+`python tools/goldens/goldens.py check --fixture-only`; with a pack in `templates/` it also
+checks the private Tier 1 and Tier 2 corpora
+([ADR 0010](docs/adr/0010-two-tier-golden-corpus-layout-dump.md)).
 
-```
-mkdir build && cd build
-cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_APPLE_BUNDLE=1 ..
-cmake --build .
-```
+## Building the Android app
 
- Use `CMAKE_BUILD_TYPE=Debug` for a debug build.
- * Finally, run the application bundle:
+Planned. The app will be Jetpack Compose over the same C++ facade through JNI
+([ADR 0006](docs/adr/0006-compose-jni-over-cpp-facade.md)), with Skia built from source
+([ADR 0011](docs/adr/0011-skia-official-gn-build-from-source.md)).
 
-```
-open ./magicseteditor.app
-```
+## Documentation
 
-### Installing resources
-When you launch the app, it should tell you where to put your templates. Typically that's `$HOME/Library/Application Support/magicseteditor` (copy the `data/` folder there).
-
-### Autoupdater support
-The auto-updater isn't working on macOS just yet, so you'll have to continue sourcing app and template updates the old-fashioned way.
+- [`docs/adr/`](docs/adr/): the architecture decisions behind the port.
+- [`CONTEXT.md`](CONTEXT.md): the project's vocabulary.
+- [`doc/`](doc/): Magic Set Editor's own template and scripting documentation.
+- [`CHANGES.md`](CHANGES.md): the changelog inherited from Magic Set Editor.

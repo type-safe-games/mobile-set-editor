@@ -96,7 +96,7 @@ def collect(args) -> list[GoldenSet]:
         if templates:
             env = mse_env(args.pack, args.goldens, templates, getattr(args, "font_store", None))
         elif not (args.pack / "data").is_dir():
-            sys.exit(f"no template pack at {args.pack}; use --fixture-only")
+            sys.exit(f"no template pack at {args.pack}: copy one there or pass --pack, or use --fixture-only")
         else:
             env = mse_env(args.pack, args.goldens)
         for corpus in ("tier1", "tier2"):

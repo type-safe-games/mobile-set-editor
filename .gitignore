@@ -25,6 +25,7 @@
 /.claude/worktrees/
 /.claude/settings.local.json
 
-# Private golden corpus beside the template pack (ADR 0008, ADR 0010)
-/templates/goldens/
+# Templates and the golden corpus beside them are private (ADR 0005, ADR 0008, ADR 0010):
+# put a pack in templates/ by hand, e.g. templates/Full-Magic-Pack
+/templates/
 __pycache__/

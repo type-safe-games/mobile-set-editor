@@ -6,7 +6,7 @@ permissions:
 on:
   push:
     branches:
-      - "main"
+      - "master"
     paths:
       - "src/**"
       - "test/**"
@@ -169,7 +169,7 @@ jobs:
           xvfb-run -a ctest --output-on-failure
 
       - name: delete old ccache to save space
-        if: github.ref == 'refs/heads/main' && steps.ccache.outputs.cache-hit == 'true'
+        if: github.ref == 'refs/heads/master' && steps.ccache.outputs.cache-hit == 'true'
         env:
           GH_TOKEN: ${{github.token}}
           REPO: ${{github.repository}}
@@ -178,7 +178,7 @@ jobs:
           gh cache delete --repo "$REPO" "$KEY"
 
       - name: upload new ccache
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/master'
         uses: actions/cache/save@v5
         with:
           path: ${{env.CCACHE_DIR}}
