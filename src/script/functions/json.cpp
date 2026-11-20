@@ -134,7 +134,7 @@ String json_pretty_print(const boost::json::value& jv, std::string* indent) {
   size_t size = stdstring.size();
   String wxstring = decode_utf8(data, size);
   if (wxstring.empty() && size > 0) {
-    wxstring = String(data, wxConvWhateverWorks, size);
+    wxstring = decode_utf8_or_latin1(data, size);
   }
   return wxstring;
 }
@@ -145,7 +145,7 @@ String json_ugly_print(const boost::json::value& jv) {
   size_t size = stdstring.size();
   String wxstring = decode_utf8(data, size);
   if (wxstring.empty() && size > 0) {
-    wxstring = String(data, wxConvWhateverWorks, size);
+    wxstring = decode_utf8_or_latin1(data, size);
   }
   return wxstring;
 }
@@ -162,7 +162,7 @@ void read(T& out, boost::json::object& jv, const char value_name[]) {
   size_t size = jstring.size();
   String wxstring = decode_utf8(data, size);
   if (wxstring.empty() && size > 0) {
-    wxstring = String(data, wxConvWhateverWorks, size);
+    wxstring = decode_utf8_or_latin1(data, size);
   }
   StringInputStream stream(encode_utf8(wxstring));
   Reader reader(stream, nullptr, _(""), false, true);
@@ -178,7 +178,7 @@ void read(PackSelectType& out, boost::json::object& jv, const char value_name[])
   size_t size = jstring.size();
   String wxstring = decode_utf8(data, size);
   if (wxstring.empty() && size > 0) {
-    wxstring = String(data, wxConvWhateverWorks, size);
+    wxstring = decode_utf8_or_latin1(data, size);
   }
   StringInputStream stream(encode_utf8(wxstring));
   Reader reader(stream, nullptr, _(""), false, true);
@@ -257,7 +257,7 @@ CardP json_to_mse_card(boost::json::object& jv, Set* set) {
       for (auto it = datav.begin(); it != datav.end(); ++it) {
         boost::json::string_view key_view = it->key();
         String key_name = decode_utf8(key_view.data(), key_view.size());
-        Value* container = get_container(card->styling_data, String("styling"), key_name, false);
+        Value* container = get_container(card->styling_data, String(_("styling")), key_name, false);
         ScriptValueP value = json_to_mse(it->value(), set);
         set_container(set, container, _("styling"), value, key_name);
         card->has_styling = true;
@@ -276,7 +276,7 @@ CardP json_to_mse_card(boost::json::object& jv, Set* set) {
         for (auto stylesheet_it = stylesheet_datav.begin(); stylesheet_it != stylesheet_datav.end(); ++stylesheet_it) {
           boost::json::string_view key_view = stylesheet_it->key();
           String key_name = decode_utf8(key_view.data(), key_view.size());
-          Value* container = get_container(stylesheet_data, String("extra card"), key_name, false);
+          Value* container = get_container(stylesheet_data, String(_("extra card")), key_name, false);
           ScriptValueP value = json_to_mse(stylesheet_it->value(), set);
           set_container(set, container, _("extra"), value, key_name);
         }
@@ -304,7 +304,7 @@ SetP json_to_mse_set(boost::json::object& jv) {
     for (auto it = datav.begin(); it != datav.end(); ++it) {
       boost::json::string_view key_view = it->key();
       String key_name = decode_utf8(key_view.data(), key_view.size());
-      Value* container = get_container(set->data, String("set"), key_name, false);
+      Value* container = get_container(set->data, String(_("set")), key_name, false);
       ScriptValueP value = json_to_mse(it->value(), set.get());
       set_container(set.get(), container, _("set"), value, key_name);
     }
@@ -321,7 +321,7 @@ SetP json_to_mse_set(boost::json::object& jv) {
       for (auto stylesheet_it = stylesheet_datav.begin(); stylesheet_it != stylesheet_datav.end(); ++stylesheet_it) {
         boost::json::string_view key_view = stylesheet_it->key();
         String key_name = decode_utf8(key_view.data(), key_view.size());
-        Value* container = get_container(stylesheet_data, String("styling"), key_name, false);
+        Value* container = get_container(stylesheet_data, String(_("styling")), key_name, false);
         ScriptValueP value = json_to_mse(stylesheet_it->value(), set.get());
         set_container(set.get(), container, _("styling"), value, key_name);
       }
@@ -374,7 +374,7 @@ ScriptValueP json_to_mse(const boost::json::value& jv, Set* set) {
     size_t size = jstring.size();
     String wxstring = decode_utf8(data, size);
     if (!wxstring.empty()) return to_script(wxstring);
-    return to_script(String(data, wxConvWhateverWorks, size));
+    return to_script(decode_utf8_or_latin1(data, size));
   }
   else if (jv.is_array()) {
     boost::json::array array = jv.get_array();
@@ -395,7 +395,7 @@ ScriptValueP json_to_mse(const boost::json::value& jv, Set* set) {
       if (mse_object_type == "keyword")   return make_intrusive<ScriptObject<KeywordP>> (json_to_mse_keyword(object));
       if (mse_object_type == "pack_type") return make_intrusive<ScriptObject<PackTypeP>>(json_to_mse_pack_type(object));
       if (mse_object_type == "pack_item") return make_intrusive<ScriptObject<PackItemP>>(json_to_mse_pack_item(object));
-      queue_message(MESSAGE_ERROR, _ERROR_("json unknown type") + _("(") + String(mse_object_type.c_str()) + _(")"));
+      queue_message(MESSAGE_ERROR, _ERROR_("json unknown type") + _("(") + decode_utf8(mse_object_type.data(), mse_object_type.size()) + _(")"));
       return script_nil;
     }
     ScriptCustomCollectionP result = make_intrusive<ScriptCustomCollection>();
@@ -451,7 +451,7 @@ template <typename T>
 void write(boost::json::object& out, const String& name, const T& value) {
   StringOutputStream stream;
   Writer writer(stream, false);
-  writer.handle(name, value);
+  writer.handle(name.c_str(), value);
   String string = decode_utf8(stream.str().data(), stream.str().size());
   if (!string.empty()) {
     if (starts_with(string, name + _(":"))) string = trim_ascii_left(string.substr(name.length() + 1));
@@ -479,21 +479,21 @@ void write(boost::json::object& out, const String& name, DelayedIndexMaps<FieldP
 boost::json::object mse_to_json(const PackItemP& item) {
   boost::json::object itemv;
   itemv.emplace("mse_object_type", "pack_item");
-  write(itemv, "name",   item->name);
-  write(itemv, "amount", item->amount);
-  write(itemv, "weight", item->weight);
+  write(itemv, _("name"),   item->name);
+  write(itemv, _("amount"), item->amount);
+  write(itemv, _("weight"), item->weight);
   return itemv;
 }
 
 boost::json::object mse_to_json(const PackTypeP& pack) {
   boost::json::object packv;
   packv.emplace("mse_object_type", "pack_type");
-  write(packv, "name",       pack->name);
-  write(packv, "enabled",    pack->enabled);
-  write(packv, "selectable", pack->selectable);
-  write(packv, "summary",    pack->summary);
-  write(packv, "select",     pack->select);
-  write(packv, "filter",     pack->filter);
+  write(packv, _("name"),       pack->name);
+  write(packv, _("enabled"),    pack->enabled);
+  write(packv, _("selectable"), pack->selectable);
+  write(packv, _("summary"),    pack->summary);
+  write(packv, _("select"),     pack->select);
+  write(packv, _("filter"),     pack->filter);
   boost::json::array itemsv;
   for (auto item : pack->items) {
     itemsv.emplace_back(mse_to_json(item));
@@ -505,11 +505,11 @@ boost::json::object mse_to_json(const PackTypeP& pack) {
 boost::json::object mse_to_json(const KeywordP& keyword) {
   boost::json::object keywordv;
   keywordv.emplace("mse_object_type", "keyword");
-  write(keywordv, "keyword",  keyword->keyword);
-  write(keywordv, "match",    keyword->match);
-  write(keywordv, "reminder", keyword->reminder);
-  write(keywordv, "rules",    keyword->rules);
-  write(keywordv, "mode",     keyword->mode);
+  write(keywordv, _("keyword"),  keyword->keyword);
+  write(keywordv, _("match"),    keyword->match);
+  write(keywordv, _("reminder"), keyword->reminder);
+  write(keywordv, _("rules"),    keyword->rules);
+  write(keywordv, _("mode"),     keyword->mode);
   return keywordv;
 }
 
@@ -517,10 +517,10 @@ boost::json::object mse_to_json(const CardP& card, const Set* set) {
   boost::json::object cardv;
   cardv.emplace("mse_object_type", "card");
   // built-in values
-  write(cardv, "time_created",      card->time_created);
-  write(cardv, "time_modified",     card->time_modified);
-  write(cardv, "notes",             card->notes);
-  write(cardv, "uid",               card->uid);
+  write(cardv, _("time_created"),      card->time_created);
+  write(cardv, _("time_modified"),     card->time_modified);
+  write(cardv, _("notes"),             card->notes);
+  write(cardv, _("uid"),               card->uid);
   for (int i = 0; i < Card::MAX_LINKS; ++i) {
     const String& uid = card->getLinkedUID(i);
     if (uid.empty()) continue;
@@ -528,22 +528,22 @@ boost::json::object mse_to_json(const CardP& card, const Set* set) {
     write(cardv, format_string(_("linked_relation_%d"), i + 1), card->getLinkedRelation(i));
   }
   // card fields
-  write(cardv, "data",              card->data);
+  write(cardv, _("data"),              card->data);
   // stylesheet
   bool change_stylesheet = set && !card->stylesheet;
   if (change_stylesheet) {
     card->stylesheet = set->stylesheet;
   }
   if (card->stylesheet) {
-    write(cardv, "stylesheet",         card->stylesheet);
-    write(cardv, "stylesheet_version", card->stylesheet->version);
+    write(cardv, _("stylesheet"),         card->stylesheet);
+    write(cardv, _("stylesheet_version"), card->stylesheet->version);
     // extra card fields
-    write(cardv, "extra_data",         card->extra_data);
+    write(cardv, _("extra_data"),         card->extra_data);
   }
   // style
-  write(cardv, "has_styling",       card->has_styling);
+  write(cardv, _("has_styling"),       card->has_styling);
   if (card->has_styling) {
-    write(cardv, "styling_data",       card->styling_data);
+    write(cardv, _("styling_data"),       card->styling_data);
   }
   // restore stylesheet
   if (change_stylesheet) {
@@ -559,15 +559,15 @@ boost::json::object mse_to_json(const StyleP& style) {
 
   boost::json::object stylev;
   stylev.emplace("mse_object_type", "style");
-  stylev.emplace("z_index",   format_string(_("%i"),   style->z_index));
-  stylev.emplace("tab_index", format_string(_("%i"),   style->tab_index));
-  stylev.emplace("left",      format_string(_("%.2f"), style->left()));
-  stylev.emplace("top",       format_string(_("%.2f"), style->top()));
-  stylev.emplace("right",     format_string(_("%.2f"), style->right()));
-  stylev.emplace("bottom",    format_string(_("%.2f"), style->bottom()));
-  stylev.emplace("width",     format_string(_("%.2f"), style->width()));
-  stylev.emplace("height",    format_string(_("%.2f"), style->height()));
-  stylev.emplace("angle",     format_string(_("%.2f"), style->angle()));
+  stylev.emplace("z_index",   to_json_string(format_string(_("%i"),   style->z_index)));
+  stylev.emplace("tab_index", to_json_string(format_string(_("%i"),   style->tab_index)));
+  stylev.emplace("left",      to_json_string(format_string(_("%.2f"), style->left())));
+  stylev.emplace("top",       to_json_string(format_string(_("%.2f"), style->top())));
+  stylev.emplace("right",     to_json_string(format_string(_("%.2f"), style->right())));
+  stylev.emplace("bottom",    to_json_string(format_string(_("%.2f"), style->bottom())));
+  stylev.emplace("width",     to_json_string(format_string(_("%.2f"), style->width())));
+  stylev.emplace("height",    to_json_string(format_string(_("%.2f"), style->height())));
+  stylev.emplace("angle",     to_json_string(format_string(_("%.2f"), style->angle())));
   stylev.emplace("visible",                               style->visible());
   stylev.emplace("mask",                                  to_json_string(style->mask.toScriptString()));
 
@@ -577,74 +577,74 @@ boost::json::object mse_to_json(const StyleP& style) {
     boost::json::object fontv;
     fontv.emplace("name",                                              to_json_string(s->font.name()));
     fontv.emplace("italic_name",                                       to_json_string(s->font.italic_name()));
-    fontv.emplace("size",                  format_string(_("%.2f"), s->font.size()));
-    fontv.emplace("weight",                                            s->font.weight());
-    fontv.emplace("style",                                             s->font.style());
+    fontv.emplace("size",                  to_json_string(format_string(_("%.2f"), s->font.size())));
+    fontv.emplace("weight",                                            to_json_string(s->font.weight()));
+    fontv.emplace("style",                                             to_json_string(s->font.style()));
     fontv.emplace("underline",                                         s->font.underline());
     fontv.emplace("strikethrough",                                     s->font.strikethrough());
-    fontv.emplace("scale_down_to",         format_string(_("%.2f"), s->font.scale_down_to));
-    fontv.emplace("max_stretch",           format_string(_("%.2f"), s->font.max_stretch));
-    fontv.emplace("color",                 format_color(               s->font.color()));
-    fontv.emplace("shadow_color",          format_color(               s->font.shadow_color()));
-    fontv.emplace("shadow_displacement_x", format_string(_("%.2f"), s->font.shadow_displacement_x()));
-    fontv.emplace("shadow_displacement_y", format_string(_("%.2f"), s->font.shadow_displacement_y()));
-    fontv.emplace("shadow_blur",           format_string(_("%.2f"), s->font.shadow_blur()));
-    fontv.emplace("stroke_color",          format_color(               s->font.stroke_color()));
-    fontv.emplace("stroke_radius",         format_string(_("%.2f"), s->font.stroke_radius()));
-    fontv.emplace("stroke_blur",           format_string(_("%.2f"), s->font.stroke_blur()));
-    fontv.emplace("separator_color",       format_color(               s->font.separator_color));
-    fontv.emplace("flags",                 format_string(_("%i"),   s->font.flags));
+    fontv.emplace("scale_down_to",         to_json_string(format_string(_("%.2f"), s->font.scale_down_to)));
+    fontv.emplace("max_stretch",           to_json_string(format_string(_("%.2f"), s->font.max_stretch)));
+    fontv.emplace("color",                 to_json_string(format_color(               s->font.color())));
+    fontv.emplace("shadow_color",          to_json_string(format_color(               s->font.shadow_color())));
+    fontv.emplace("shadow_displacement_x", to_json_string(format_string(_("%.2f"), s->font.shadow_displacement_x())));
+    fontv.emplace("shadow_displacement_y", to_json_string(format_string(_("%.2f"), s->font.shadow_displacement_y())));
+    fontv.emplace("shadow_blur",           to_json_string(format_string(_("%.2f"), s->font.shadow_blur())));
+    fontv.emplace("stroke_color",          to_json_string(format_color(               s->font.stroke_color())));
+    fontv.emplace("stroke_radius",         to_json_string(format_string(_("%.2f"), s->font.stroke_radius())));
+    fontv.emplace("stroke_blur",           to_json_string(format_string(_("%.2f"), s->font.stroke_blur())));
+    fontv.emplace("separator_color",       to_json_string(format_color(               s->font.separator_color)));
+    fontv.emplace("flags",                 to_json_string(format_string(_("%i"),   s->font.flags)));
     stylev.emplace("font",                                             fontv);
 
     boost::json::object symbolfontv;
     symbolfontv.emplace("name",                                              to_json_string(s->symbol_font.name()));
-    symbolfontv.emplace("size",                  format_string(_("%.2f"), s->symbol_font.size()));
+    symbolfontv.emplace("size",                  to_json_string(format_string(_("%.2f"), s->symbol_font.size())));
     symbolfontv.emplace("underline",                                         s->symbol_font.underline());
     symbolfontv.emplace("strikethrough",                                     s->symbol_font.strikethrough());
-    symbolfontv.emplace("scale_down_to",         format_string(_("%.2f"), s->symbol_font.scale_down_to));
-    symbolfontv.emplace("shadow_color",          format_color(               s->symbol_font.shadow_color()));
-    symbolfontv.emplace("shadow_displacement_x", format_string(_("%.2f"), s->symbol_font.shadow_displacement_x()));
-    symbolfontv.emplace("shadow_displacement_y", format_string(_("%.2f"), s->symbol_font.shadow_displacement_y()));
-    symbolfontv.emplace("shadow_blur",           format_string(_("%.2f"), s->symbol_font.shadow_blur()));
-    symbolfontv.emplace("stroke_color",          format_color(               s->symbol_font.stroke_color()));
-    symbolfontv.emplace("stroke_radius",         format_string(_("%.2f"), s->symbol_font.stroke_radius()));
-    symbolfontv.emplace("stroke_blur",           format_string(_("%.2f"), s->symbol_font.stroke_blur()));
+    symbolfontv.emplace("scale_down_to",         to_json_string(format_string(_("%.2f"), s->symbol_font.scale_down_to)));
+    symbolfontv.emplace("shadow_color",          to_json_string(format_color(               s->symbol_font.shadow_color())));
+    symbolfontv.emplace("shadow_displacement_x", to_json_string(format_string(_("%.2f"), s->symbol_font.shadow_displacement_x())));
+    symbolfontv.emplace("shadow_displacement_y", to_json_string(format_string(_("%.2f"), s->symbol_font.shadow_displacement_y())));
+    symbolfontv.emplace("shadow_blur",           to_json_string(format_string(_("%.2f"), s->symbol_font.shadow_blur())));
+    symbolfontv.emplace("stroke_color",          to_json_string(format_color(               s->symbol_font.stroke_color())));
+    symbolfontv.emplace("stroke_radius",         to_json_string(format_string(_("%.2f"), s->symbol_font.stroke_radius())));
+    symbolfontv.emplace("stroke_blur",           to_json_string(format_string(_("%.2f"), s->symbol_font.stroke_blur())));
     stylev.emplace("symbol_font",                                      symbolfontv);
 
     stylev.emplace("always_symbol",                                    s->always_symbol);
     stylev.emplace("allow_formating",                                  s->allow_formating);
-    stylev.emplace("alignment",            alignment_to_string(        s->alignment()));
-    stylev.emplace("direction",            direction_to_string(        s->direction()));
-    stylev.emplace("padding_left",         format_string(_("%.2f"), s->padding_left()));
-    stylev.emplace("padding_right",        format_string(_("%.2f"), s->padding_right()));
-    stylev.emplace("padding_top",          format_string(_("%.2f"), s->padding_top()));
-    stylev.emplace("padding_bottom",       format_string(_("%.2f"), s->padding_bottom()));
-    stylev.emplace("padding_left_min",     format_string(_("%.2f"), s->padding_left_min()));
-    stylev.emplace("padding_right_min",    format_string(_("%.2f"), s->padding_right_min()));
-    stylev.emplace("padding_top_min",      format_string(_("%.2f"), s->padding_top_min()));
-    stylev.emplace("padding_bottom_min",   format_string(_("%.2f"), s->padding_bottom_min()));
-    stylev.emplace("line_height_soft",     format_string(_("%.2f"), s->line_height_soft()));
-    stylev.emplace("line_height_hard",     format_string(_("%.2f"), s->line_height_hard()));
-    stylev.emplace("line_height_line",     format_string(_("%.2f"), s->line_height_line()));
-    stylev.emplace("line_height_soft_max", format_string(_("%.2f"), s->line_height_soft_max()));
-    stylev.emplace("line_height_hard_max", format_string(_("%.2f"), s->line_height_hard_max()));
-    stylev.emplace("line_height_line_max", format_string(_("%.2f"), s->line_height_line_max()));
-    stylev.emplace("paragraph_height",     format_string(_("%.2f"), s->paragraph_height()));
+    stylev.emplace("alignment",            to_json_string(alignment_to_string(        s->alignment())));
+    stylev.emplace("direction",            to_json_string(direction_to_string(        s->direction())));
+    stylev.emplace("padding_left",         to_json_string(format_string(_("%.2f"), s->padding_left())));
+    stylev.emplace("padding_right",        to_json_string(format_string(_("%.2f"), s->padding_right())));
+    stylev.emplace("padding_top",          to_json_string(format_string(_("%.2f"), s->padding_top())));
+    stylev.emplace("padding_bottom",       to_json_string(format_string(_("%.2f"), s->padding_bottom())));
+    stylev.emplace("padding_left_min",     to_json_string(format_string(_("%.2f"), s->padding_left_min())));
+    stylev.emplace("padding_right_min",    to_json_string(format_string(_("%.2f"), s->padding_right_min())));
+    stylev.emplace("padding_top_min",      to_json_string(format_string(_("%.2f"), s->padding_top_min())));
+    stylev.emplace("padding_bottom_min",   to_json_string(format_string(_("%.2f"), s->padding_bottom_min())));
+    stylev.emplace("line_height_soft",     to_json_string(format_string(_("%.2f"), s->line_height_soft())));
+    stylev.emplace("line_height_hard",     to_json_string(format_string(_("%.2f"), s->line_height_hard())));
+    stylev.emplace("line_height_line",     to_json_string(format_string(_("%.2f"), s->line_height_line())));
+    stylev.emplace("line_height_soft_max", to_json_string(format_string(_("%.2f"), s->line_height_soft_max())));
+    stylev.emplace("line_height_hard_max", to_json_string(format_string(_("%.2f"), s->line_height_hard_max())));
+    stylev.emplace("line_height_line_max", to_json_string(format_string(_("%.2f"), s->line_height_line_max())));
+    stylev.emplace("paragraph_height",     to_json_string(format_string(_("%.2f"), s->paragraph_height())));
 
     boost::json::object layoutv;
-    layoutv.emplace("content_top",         format_string(_("%.2f"), s->layout->top));
-    layoutv.emplace("content_middle",      format_string(_("%.2f"), s->layout->middle()));
-    layoutv.emplace("content_bottom",      format_string(_("%.2f"), s->layout->bottom()));
-    layoutv.emplace("content_width",       format_string(_("%.2f"), s->layout->width));
-    layoutv.emplace("content_height",      format_string(_("%.2f"), s->layout->height));
-    layoutv.emplace("content_lines",       format_string(_("%i"),   (int)s->layout->lines.size()));
-    layoutv.emplace("content_clauses",     format_string(_("%i"),   (int)s->layout->clauses.size()));
-    layoutv.emplace("content_paragraphs",  format_string(_("%i"),   (int)s->layout->paragraphs.size()));
-    layoutv.emplace("content_blocks",      format_string(_("%i"),   (int)s->layout->blocks.size()));
+    layoutv.emplace("content_top",         to_json_string(format_string(_("%.2f"), s->layout->top)));
+    layoutv.emplace("content_middle",      to_json_string(format_string(_("%.2f"), s->layout->middle())));
+    layoutv.emplace("content_bottom",      to_json_string(format_string(_("%.2f"), s->layout->bottom())));
+    layoutv.emplace("content_width",       to_json_string(format_string(_("%.2f"), s->layout->width)));
+    layoutv.emplace("content_height",      to_json_string(format_string(_("%.2f"), s->layout->height)));
+    layoutv.emplace("content_lines",       to_json_string(format_string(_("%i"),   (int)s->layout->lines.size())));
+    layoutv.emplace("content_clauses",     to_json_string(format_string(_("%i"),   (int)s->layout->clauses.size())));
+    layoutv.emplace("content_paragraphs",  to_json_string(format_string(_("%i"),   (int)s->layout->paragraphs.size())));
+    layoutv.emplace("content_blocks",      to_json_string(format_string(_("%i"),   (int)s->layout->blocks.size())));
     boost::json::array separatorsv;
     int size = s->layout->separators.size();
     for (int i = 0; i < size; i++) {
-      separatorsv.emplace_back(format_string(_("%.2f"), s->layout->separators[i]));
+      separatorsv.emplace_back(to_json_string(format_string(_("%.2f"), s->layout->separators[i])));
     }
     if (size > 0) layoutv.emplace("content_separators", separatorsv);
 
@@ -659,34 +659,34 @@ boost::json::object mse_to_json(const StyleP& style) {
 
   else if (MultipleChoiceStyle* s = dynamic_cast<MultipleChoiceStyle*>(style.get())) {
     stylev.emplace("field_type", "multiple_choice");
-    stylev.emplace("popup_style",          popup_style_to_string(      s->popup_style));
-    stylev.emplace("render_style",         render_style_to_string(     s->render_style));
+    stylev.emplace("popup_style",          to_json_string(popup_style_to_string(      s->popup_style)));
+    stylev.emplace("render_style",         to_json_string(render_style_to_string(     s->render_style)));
     stylev.emplace("image",                                            to_json_string(s->image.toScriptString()));
-    stylev.emplace("combine",              combine_to_string(          s->combine));
-    stylev.emplace("alignment",            alignment_to_string(        s->alignment));
-    stylev.emplace("direction",            direction_to_string(        s->direction()));
-    stylev.emplace("spacing",              format_string(_("%.2f"), s->spacing()));
+    stylev.emplace("combine",              to_json_string(combine_to_string(          s->combine)));
+    stylev.emplace("alignment",            to_json_string(alignment_to_string(        s->alignment)));
+    stylev.emplace("direction",            to_json_string(direction_to_string(        s->direction())));
+    stylev.emplace("spacing",              to_json_string(format_string(_("%.2f"), s->spacing())));
 
     boost::json::object fontv;
     fontv.emplace("name",                                              to_json_string(s->font.name()));
     fontv.emplace("italic_name",                                       to_json_string(s->font.italic_name()));
-    fontv.emplace("size",                  format_string(_("%.2f"), s->font.size()));
-    fontv.emplace("weight",                                            s->font.weight());
-    fontv.emplace("style",                                             s->font.style());
+    fontv.emplace("size",                  to_json_string(format_string(_("%.2f"), s->font.size())));
+    fontv.emplace("weight",                                            to_json_string(s->font.weight()));
+    fontv.emplace("style",                                             to_json_string(s->font.style()));
     fontv.emplace("underline",                                         s->font.underline());
     fontv.emplace("strikethrough",                                     s->font.strikethrough());
-    fontv.emplace("scale_down_to",         format_string(_("%.2f"), s->font.scale_down_to));
-    fontv.emplace("max_stretch",           format_string(_("%.2f"), s->font.max_stretch));
-    fontv.emplace("color",                 format_color(               s->font.color()));
-    fontv.emplace("shadow_color",          format_color(               s->font.shadow_color()));
-    fontv.emplace("shadow_displacement_x", format_string(_("%.2f"), s->font.shadow_displacement_x()));
-    fontv.emplace("shadow_displacement_y", format_string(_("%.2f"), s->font.shadow_displacement_y()));
-    fontv.emplace("shadow_blur",           format_string(_("%.2f"), s->font.shadow_blur()));
-    fontv.emplace("stroke_color",          format_color(               s->font.stroke_color()));
-    fontv.emplace("stroke_radius",         format_string(_("%.2f"), s->font.stroke_radius()));
-    fontv.emplace("stroke_blur",           format_string(_("%.2f"), s->font.stroke_blur()));
-    fontv.emplace("separator_color",       format_color(               s->font.separator_color));
-    fontv.emplace("flags",                 format_string(_("%i"),   s->font.flags));
+    fontv.emplace("scale_down_to",         to_json_string(format_string(_("%.2f"), s->font.scale_down_to)));
+    fontv.emplace("max_stretch",           to_json_string(format_string(_("%.2f"), s->font.max_stretch)));
+    fontv.emplace("color",                 to_json_string(format_color(               s->font.color())));
+    fontv.emplace("shadow_color",          to_json_string(format_color(               s->font.shadow_color())));
+    fontv.emplace("shadow_displacement_x", to_json_string(format_string(_("%.2f"), s->font.shadow_displacement_x())));
+    fontv.emplace("shadow_displacement_y", to_json_string(format_string(_("%.2f"), s->font.shadow_displacement_y())));
+    fontv.emplace("shadow_blur",           to_json_string(format_string(_("%.2f"), s->font.shadow_blur())));
+    fontv.emplace("stroke_color",          to_json_string(format_color(               s->font.stroke_color())));
+    fontv.emplace("stroke_radius",         to_json_string(format_string(_("%.2f"), s->font.stroke_radius())));
+    fontv.emplace("stroke_blur",           to_json_string(format_string(_("%.2f"), s->font.stroke_blur())));
+    fontv.emplace("separator_color",       to_json_string(format_color(               s->font.separator_color)));
+    fontv.emplace("flags",                 to_json_string(format_string(_("%i"),   s->font.flags)));
     stylev.emplace("font",                                             fontv);
 
     boost::json::object choiceimagesv;
@@ -699,32 +699,32 @@ boost::json::object mse_to_json(const StyleP& style) {
 
   else if (ChoiceStyle* s = dynamic_cast<ChoiceStyle*>(style.get())) {
     stylev.emplace("field_type", dynamic_cast<BooleanStyle*>(style.get()) ? "boolean" : "choice");
-    stylev.emplace("popup_style",          popup_style_to_string(      s->popup_style));
-    stylev.emplace("render_style",         render_style_to_string(     s->render_style));
+    stylev.emplace("popup_style",          to_json_string(popup_style_to_string(      s->popup_style)));
+    stylev.emplace("render_style",         to_json_string(render_style_to_string(     s->render_style)));
     stylev.emplace("image",                                            to_json_string(s->image.toScriptString()));
-    stylev.emplace("combine",              combine_to_string(          s->combine));
-    stylev.emplace("alignment",            alignment_to_string(        s->alignment));
+    stylev.emplace("combine",              to_json_string(combine_to_string(          s->combine)));
+    stylev.emplace("alignment",            to_json_string(alignment_to_string(        s->alignment)));
 
     boost::json::object fontv;
     fontv.emplace("name",                                              to_json_string(s->font.name()));
     fontv.emplace("italic_name",                                       to_json_string(s->font.italic_name()));
-    fontv.emplace("size",                  format_string(_("%.2f"), s->font.size()));
-    fontv.emplace("weight",                                            s->font.weight());
-    fontv.emplace("style",                                             s->font.style());
+    fontv.emplace("size",                  to_json_string(format_string(_("%.2f"), s->font.size())));
+    fontv.emplace("weight",                                            to_json_string(s->font.weight()));
+    fontv.emplace("style",                                             to_json_string(s->font.style()));
     fontv.emplace("underline",                                         s->font.underline());
     fontv.emplace("strikethrough",                                     s->font.strikethrough());
-    fontv.emplace("scale_down_to",         format_string(_("%.2f"), s->font.scale_down_to));
-    fontv.emplace("max_stretch",           format_string(_("%.2f"), s->font.max_stretch));
-    fontv.emplace("color",                 format_color(               s->font.color()));
-    fontv.emplace("shadow_color",          format_color(               s->font.shadow_color()));
-    fontv.emplace("shadow_displacement_x", format_string(_("%.2f"), s->font.shadow_displacement_x()));
-    fontv.emplace("shadow_displacement_y", format_string(_("%.2f"), s->font.shadow_displacement_y()));
-    fontv.emplace("shadow_blur",           format_string(_("%.2f"), s->font.shadow_blur()));
-    fontv.emplace("stroke_color",          format_color(               s->font.stroke_color()));
-    fontv.emplace("stroke_radius",         format_string(_("%.2f"), s->font.stroke_radius()));
-    fontv.emplace("stroke_blur",           format_string(_("%.2f"), s->font.stroke_blur()));
-    fontv.emplace("separator_color",       format_color(               s->font.separator_color));
-    fontv.emplace("flags",                 format_string(_("%i"),   s->font.flags));
+    fontv.emplace("scale_down_to",         to_json_string(format_string(_("%.2f"), s->font.scale_down_to)));
+    fontv.emplace("max_stretch",           to_json_string(format_string(_("%.2f"), s->font.max_stretch)));
+    fontv.emplace("color",                 to_json_string(format_color(               s->font.color())));
+    fontv.emplace("shadow_color",          to_json_string(format_color(               s->font.shadow_color())));
+    fontv.emplace("shadow_displacement_x", to_json_string(format_string(_("%.2f"), s->font.shadow_displacement_x())));
+    fontv.emplace("shadow_displacement_y", to_json_string(format_string(_("%.2f"), s->font.shadow_displacement_y())));
+    fontv.emplace("shadow_blur",           to_json_string(format_string(_("%.2f"), s->font.shadow_blur())));
+    fontv.emplace("stroke_color",          to_json_string(format_color(               s->font.stroke_color())));
+    fontv.emplace("stroke_radius",         to_json_string(format_string(_("%.2f"), s->font.stroke_radius())));
+    fontv.emplace("stroke_blur",           to_json_string(format_string(_("%.2f"), s->font.stroke_blur())));
+    fontv.emplace("separator_color",       to_json_string(format_color(               s->font.separator_color)));
+    fontv.emplace("flags",                 to_json_string(format_string(_("%i"),   s->font.flags)));
     stylev.emplace("font",                                             fontv);
 
     boost::json::object choiceimagesv;
@@ -741,69 +741,69 @@ boost::json::object mse_to_json(const StyleP& style) {
     boost::json::object fontv;
     fontv.emplace("name",                                              to_json_string(s->font.name()));
     fontv.emplace("italic_name",                                       to_json_string(s->font.italic_name()));
-    fontv.emplace("size",                  format_string(_("%.2f"), s->font.size()));
-    fontv.emplace("weight",                                            s->font.weight());
-    fontv.emplace("style",                                             s->font.style());
+    fontv.emplace("size",                  to_json_string(format_string(_("%.2f"), s->font.size())));
+    fontv.emplace("weight",                                            to_json_string(s->font.weight()));
+    fontv.emplace("style",                                             to_json_string(s->font.style()));
     fontv.emplace("underline",                                         s->font.underline());
     fontv.emplace("strikethrough",                                     s->font.strikethrough());
-    fontv.emplace("scale_down_to",         format_string(_("%.2f"), s->font.scale_down_to));
-    fontv.emplace("max_stretch",           format_string(_("%.2f"), s->font.max_stretch));
-    fontv.emplace("color",                 format_color(               s->font.color()));
-    fontv.emplace("shadow_color",          format_color(               s->font.shadow_color()));
-    fontv.emplace("shadow_displacement_x", format_string(_("%.2f"), s->font.shadow_displacement_x()));
-    fontv.emplace("shadow_displacement_y", format_string(_("%.2f"), s->font.shadow_displacement_y()));
-    fontv.emplace("shadow_blur",           format_string(_("%.2f"), s->font.shadow_blur()));
-    fontv.emplace("stroke_color",          format_color(               s->font.stroke_color()));
-    fontv.emplace("stroke_radius",         format_string(_("%.2f"), s->font.stroke_radius()));
-    fontv.emplace("stroke_blur",           format_string(_("%.2f"), s->font.stroke_blur()));
-    fontv.emplace("separator_color",       format_color(               s->font.separator_color));
-    fontv.emplace("flags",                 format_string(_("%i"),   s->font.flags));
+    fontv.emplace("scale_down_to",         to_json_string(format_string(_("%.2f"), s->font.scale_down_to)));
+    fontv.emplace("max_stretch",           to_json_string(format_string(_("%.2f"), s->font.max_stretch)));
+    fontv.emplace("color",                 to_json_string(format_color(               s->font.color())));
+    fontv.emplace("shadow_color",          to_json_string(format_color(               s->font.shadow_color())));
+    fontv.emplace("shadow_displacement_x", to_json_string(format_string(_("%.2f"), s->font.shadow_displacement_x())));
+    fontv.emplace("shadow_displacement_y", to_json_string(format_string(_("%.2f"), s->font.shadow_displacement_y())));
+    fontv.emplace("shadow_blur",           to_json_string(format_string(_("%.2f"), s->font.shadow_blur())));
+    fontv.emplace("stroke_color",          to_json_string(format_color(               s->font.stroke_color())));
+    fontv.emplace("stroke_radius",         to_json_string(format_string(_("%.2f"), s->font.stroke_radius())));
+    fontv.emplace("stroke_blur",           to_json_string(format_string(_("%.2f"), s->font.stroke_blur())));
+    fontv.emplace("separator_color",       to_json_string(format_color(               s->font.separator_color)));
+    fontv.emplace("flags",                 to_json_string(format_string(_("%i"),   s->font.flags)));
     stylev.emplace("font",                                             fontv);
   }
 
   else if (ColorStyle* s = dynamic_cast<ColorStyle*>(style.get())) {
     stylev.emplace("field_type", "color");
-    stylev.emplace("radius",               format_string(_("%.2f"), s->radius()));
-    stylev.emplace("left_width",           format_string(_("%.2f"), s->left_width()));
-    stylev.emplace("right_width",          format_string(_("%.2f"), s->right_width()));
-    stylev.emplace("top_width",            format_string(_("%.2f"), s->top_width()));
-    stylev.emplace("bottom_width",         format_string(_("%.2f"), s->bottom_width()));
-    stylev.emplace("combine",              combine_to_string(          s->combine));
+    stylev.emplace("radius",               to_json_string(format_string(_("%.2f"), s->radius())));
+    stylev.emplace("left_width",           to_json_string(format_string(_("%.2f"), s->left_width())));
+    stylev.emplace("right_width",          to_json_string(format_string(_("%.2f"), s->right_width())));
+    stylev.emplace("top_width",            to_json_string(format_string(_("%.2f"), s->top_width())));
+    stylev.emplace("bottom_width",         to_json_string(format_string(_("%.2f"), s->bottom_width())));
+    stylev.emplace("combine",              to_json_string(combine_to_string(          s->combine)));
   }
 
   else if (SymbolStyle* s = dynamic_cast<SymbolStyle*>(style.get())) {
     stylev.emplace("field_type", "symbol");
-    stylev.emplace("min_aspect_ratio", format_string(_("%.2f"), s->min_aspect_ratio));
-    stylev.emplace("max_aspect_ratio", format_string(_("%.2f"), s->max_aspect_ratio));
+    stylev.emplace("min_aspect_ratio", to_json_string(format_string(_("%.2f"), s->min_aspect_ratio)));
+    stylev.emplace("max_aspect_ratio", to_json_string(format_string(_("%.2f"), s->max_aspect_ratio)));
     boost::json::array variationsv;
     int size = s->variations.size();
     for (int i = 0; i < size; i++) {
       boost::json::object variationv;
       variationv.emplace("name",                                         to_json_string(s->variations[i]->name));
-      variationv.emplace("border_radius",    format_string(_("%.2f"), s->variations[i]->border_radius));
+      variationv.emplace("border_radius",    to_json_string(format_string(_("%.2f"), s->variations[i]->border_radius)));
       SymbolFilterP filter = s->variations[i]->filter;
       if (SolidFillSymbolFilter* f = dynamic_cast<SolidFillSymbolFilter*>(filter.get())) {
-        variationv.emplace("fill_type",                                  f->fillType());
-        variationv.emplace("fill_color",     format_color(               f->fill_color));
-        variationv.emplace("border_color",   format_color(               f->border_color));
+        variationv.emplace("fill_type",                                  to_json_string(f->fillType()));
+        variationv.emplace("fill_color",     to_json_string(format_color(               f->fill_color)));
+        variationv.emplace("border_color",   to_json_string(format_color(               f->border_color)));
       }
       else if (RadialGradientSymbolFilter* f = dynamic_cast<RadialGradientSymbolFilter*>(filter.get())) {
-        variationv.emplace("fill_type",                                  f->fillType());
-        variationv.emplace("fill_color_1",   format_color(               f->fill_color_1));
-        variationv.emplace("fill_color_2",   format_color(               f->fill_color_2));
-        variationv.emplace("border_color_1", format_color(               f->border_color_1));
-        variationv.emplace("border_color_2", format_color(               f->border_color_2));
+        variationv.emplace("fill_type",                                  to_json_string(f->fillType()));
+        variationv.emplace("fill_color_1",   to_json_string(format_color(               f->fill_color_1)));
+        variationv.emplace("fill_color_2",   to_json_string(format_color(               f->fill_color_2)));
+        variationv.emplace("border_color_1", to_json_string(format_color(               f->border_color_1)));
+        variationv.emplace("border_color_2", to_json_string(format_color(               f->border_color_2)));
       }
       else if (LinearGradientSymbolFilter* f = dynamic_cast<LinearGradientSymbolFilter*>(filter.get())) {
-        variationv.emplace("fill_type",                                  f->fillType());
-        variationv.emplace("fill_color_1",   format_color(               f->fill_color_1));
-        variationv.emplace("fill_color_2",   format_color(               f->fill_color_2));
-        variationv.emplace("border_color_1", format_color(               f->border_color_1));
-        variationv.emplace("border_color_2", format_color(               f->border_color_2));
-        variationv.emplace("center_x",       format_string(_("%.2f"), f->center_x));
-        variationv.emplace("center_y",       format_string(_("%.2f"), f->center_y));
-        variationv.emplace("end_x",          format_string(_("%.2f"), f->end_x));
-        variationv.emplace("end_y",          format_string(_("%.2f"), f->end_y));
+        variationv.emplace("fill_type",                                  to_json_string(f->fillType()));
+        variationv.emplace("fill_color_1",   to_json_string(format_color(               f->fill_color_1)));
+        variationv.emplace("fill_color_2",   to_json_string(format_color(               f->fill_color_2)));
+        variationv.emplace("border_color_1", to_json_string(format_color(               f->border_color_1)));
+        variationv.emplace("border_color_2", to_json_string(format_color(               f->border_color_2)));
+        variationv.emplace("center_x",       to_json_string(format_string(_("%.2f"), f->center_x)));
+        variationv.emplace("center_y",       to_json_string(format_string(_("%.2f"), f->center_y)));
+        variationv.emplace("end_x",          to_json_string(format_string(_("%.2f"), f->end_x)));
+        variationv.emplace("end_y",          to_json_string(format_string(_("%.2f"), f->end_y)));
       }
       variationsv.emplace_back(variationv);
     }
@@ -812,33 +812,33 @@ boost::json::object mse_to_json(const StyleP& style) {
 
   else if (InfoStyle* s = dynamic_cast<InfoStyle*>(style.get())) {
     stylev.emplace("field_type", "info");
-    stylev.emplace("alignment",            alignment_to_string(        s->alignment));
-    stylev.emplace("padding_left",         format_string(_("%.2f"), s->padding_left));
-    stylev.emplace("padding_right",        format_string(_("%.2f"), s->padding_right));
-    stylev.emplace("padding_top",          format_string(_("%.2f"), s->padding_top));
-    stylev.emplace("padding_bottom",       format_string(_("%.2f"), s->padding_bottom));
-    stylev.emplace("background_color",     format_color(               s->background_color));
+    stylev.emplace("alignment",            to_json_string(alignment_to_string(        s->alignment)));
+    stylev.emplace("padding_left",         to_json_string(format_string(_("%.2f"), s->padding_left)));
+    stylev.emplace("padding_right",        to_json_string(format_string(_("%.2f"), s->padding_right)));
+    stylev.emplace("padding_top",          to_json_string(format_string(_("%.2f"), s->padding_top)));
+    stylev.emplace("padding_bottom",       to_json_string(format_string(_("%.2f"), s->padding_bottom)));
+    stylev.emplace("background_color",     to_json_string(format_color(               s->background_color)));
 
     boost::json::object fontv;
     fontv.emplace("name",                                              to_json_string(s->font.name()));
     fontv.emplace("italic_name",                                       to_json_string(s->font.italic_name()));
-    fontv.emplace("size",                  format_string(_("%.2f"), s->font.size()));
-    fontv.emplace("weight",                                            s->font.weight());
-    fontv.emplace("style",                                             s->font.style());
+    fontv.emplace("size",                  to_json_string(format_string(_("%.2f"), s->font.size())));
+    fontv.emplace("weight",                                            to_json_string(s->font.weight()));
+    fontv.emplace("style",                                             to_json_string(s->font.style()));
     fontv.emplace("underline",                                         s->font.underline());
     fontv.emplace("strikethrough",                                     s->font.strikethrough());
-    fontv.emplace("scale_down_to",         format_string(_("%.2f"), s->font.scale_down_to));
-    fontv.emplace("max_stretch",           format_string(_("%.2f"), s->font.max_stretch));
-    fontv.emplace("color",                 format_color(               s->font.color()));
-    fontv.emplace("shadow_color",          format_color(               s->font.shadow_color()));
-    fontv.emplace("shadow_displacement_x", format_string(_("%.2f"), s->font.shadow_displacement_x()));
-    fontv.emplace("shadow_displacement_y", format_string(_("%.2f"), s->font.shadow_displacement_y()));
-    fontv.emplace("shadow_blur",           format_string(_("%.2f"), s->font.shadow_blur()));
-    fontv.emplace("stroke_color",          format_color(               s->font.stroke_color()));
-    fontv.emplace("stroke_radius",         format_string(_("%.2f"), s->font.stroke_radius()));
-    fontv.emplace("stroke_blur",           format_string(_("%.2f"), s->font.stroke_blur()));
-    fontv.emplace("separator_color",       format_color(               s->font.separator_color));
-    fontv.emplace("flags",                 format_string(_("%i"),   s->font.flags));
+    fontv.emplace("scale_down_to",         to_json_string(format_string(_("%.2f"), s->font.scale_down_to)));
+    fontv.emplace("max_stretch",           to_json_string(format_string(_("%.2f"), s->font.max_stretch)));
+    fontv.emplace("color",                 to_json_string(format_color(               s->font.color())));
+    fontv.emplace("shadow_color",          to_json_string(format_color(               s->font.shadow_color())));
+    fontv.emplace("shadow_displacement_x", to_json_string(format_string(_("%.2f"), s->font.shadow_displacement_x())));
+    fontv.emplace("shadow_displacement_y", to_json_string(format_string(_("%.2f"), s->font.shadow_displacement_y())));
+    fontv.emplace("shadow_blur",           to_json_string(format_string(_("%.2f"), s->font.shadow_blur())));
+    fontv.emplace("stroke_color",          to_json_string(format_color(               s->font.stroke_color())));
+    fontv.emplace("stroke_radius",         to_json_string(format_string(_("%.2f"), s->font.stroke_radius())));
+    fontv.emplace("stroke_blur",           to_json_string(format_string(_("%.2f"), s->font.stroke_blur())));
+    fontv.emplace("separator_color",       to_json_string(format_color(               s->font.separator_color)));
+    fontv.emplace("flags",                 to_json_string(format_string(_("%i"),   s->font.flags)));
     stylev.emplace("font",                                             fontv);
   }
 
@@ -849,15 +849,15 @@ boost::json::object mse_to_json(const Set* set) {
   boost::json::object setv;
   setv.emplace("mse_object_type",    "set");
   // built-in values
-  write(setv, "mse_version",        set->fileVersion());
-  write(setv, "game",               set->game);
-  write(setv, "game_version",       set->game->version);
-  write(setv, "stylesheet",         set->stylesheet);
-  write(setv, "stylesheet_version", set->stylesheet->version);
+  write(setv, _("mse_version"),        set->fileVersion());
+  write(setv, _("game"),               set->game);
+  write(setv, _("game_version"),       set->game->version);
+  write(setv, _("stylesheet"),         set->stylesheet);
+  write(setv, _("stylesheet_version"), set->stylesheet->version);
   // set fields
-  write(setv, "set_info",           set->data);
+  write(setv, _("set_info"),           set->data);
   // styling
-  write(setv, "styling",            set->styling_data);
+  write(setv, _("styling"),            set->styling_data);
   // cards
   boost::json::array cardsv;
   for (const CardP& card : set->cards) {
@@ -884,20 +884,20 @@ boost::json::object mse_to_json(const StyleSheetP stylesheet) {
   boost::json::object stylesheetv;
   stylesheetv.emplace("mse_object_type",    "stylesheet");
   // built-in values
-  write(stylesheetv, "mse_version",        stylesheet->fileVersion());
-  write(stylesheetv, "short_name",         stylesheet->short_name);
-  write(stylesheetv, "full_name",          stylesheet->full_name);
-  write(stylesheetv, "folder_name",        stylesheet->folder_name + _(".mse-style"));
-  write(stylesheetv, "version",            stylesheet->version);
-  write(stylesheetv, "installer_group",    stylesheet->installer_group);
-  write(stylesheetv, "icon",               stylesheet->icon_filename);
-  write(stylesheetv, "dark_icon",          stylesheet->dark_icon_filename);
-  write(stylesheetv, "position_hint",      stylesheet->position_hint);
-  write(stylesheetv, "game",               stylesheet->game);
-  write(stylesheetv, "card_width",         stylesheet->card_width);
-  write(stylesheetv, "card_height",        stylesheet->card_height);
-  write(stylesheetv, "card_dpi",           stylesheet->card_dpi);
-  write(stylesheetv, "card_background",    format_color(stylesheet->card_background));
+  write(stylesheetv, _("mse_version"),        stylesheet->fileVersion());
+  write(stylesheetv, _("short_name"),         stylesheet->short_name);
+  write(stylesheetv, _("full_name"),          stylesheet->full_name);
+  write(stylesheetv, _("folder_name"),        stylesheet->folder_name + _(".mse-style"));
+  write(stylesheetv, _("version"),            stylesheet->version);
+  write(stylesheetv, _("installer_group"),    stylesheet->installer_group);
+  write(stylesheetv, _("icon"),               stylesheet->icon_filename);
+  write(stylesheetv, _("dark_icon"),          stylesheet->dark_icon_filename);
+  write(stylesheetv, _("position_hint"),      stylesheet->position_hint);
+  write(stylesheetv, _("game"),               stylesheet->game);
+  write(stylesheetv, _("card_width"),         stylesheet->card_width);
+  write(stylesheetv, _("card_height"),        stylesheet->card_height);
+  write(stylesheetv, _("card_dpi"),           stylesheet->card_dpi);
+  write(stylesheetv, _("card_background"),    format_color(stylesheet->card_background));
   // update scripts
   boost::json::array updatescriptsv;
   for (const UpdateCardsScriptP& script : stylesheet->update_cards_scripts) {
@@ -924,15 +924,15 @@ boost::json::object mse_to_json(const Game* game) {
   boost::json::object gamev;
   gamev.emplace("mse_object_type",    "game");
   // built-in values
-  write(gamev, "mse_version",        game->fileVersion());
-  write(gamev, "short_name",         game->short_name);
-  write(gamev, "full_name",          game->full_name);
-  write(gamev, "folder_name",        game->folder_name + _(".mse-game"));
-  write(gamev, "version",            game->version);
-  write(gamev, "installer_group",    game->installer_group);
-  write(gamev, "icon",               game->icon_filename);
-  write(gamev, "dark_icon",          game->dark_icon_filename);
-  write(gamev, "position_hint",      game->position_hint);
+  write(gamev, _("mse_version"),        game->fileVersion());
+  write(gamev, _("short_name"),         game->short_name);
+  write(gamev, _("full_name"),          game->full_name);
+  write(gamev, _("folder_name"),        game->folder_name + _(".mse-game"));
+  write(gamev, _("version"),            game->version);
+  write(gamev, _("installer_group"),    game->installer_group);
+  write(gamev, _("icon"),               game->icon_filename);
+  write(gamev, _("dark_icon"),          game->dark_icon_filename);
+  write(gamev, _("position_hint"),      game->position_hint);
   // update scripts
   boost::json::array updatescriptsv;
   for (const UpdateCardsScriptP& script : game->update_cards_scripts) {
@@ -942,7 +942,7 @@ boost::json::object mse_to_json(const Game* game) {
   // add scripts
   boost::json::array addscriptsv;
   for (const AddCardsScriptP& script : game->add_cards_scripts) {
-    addscriptsv.emplace_back(script->name);
+    addscriptsv.emplace_back(to_json_string(script->name));
   }
   if (!addscriptsv.empty()) gamev.emplace("add_cards_scripts", addscriptsv);
   // set fields
@@ -1048,7 +1048,7 @@ boost::json::value mse_to_json(const ScriptValueP& sv, Set* set, bool suppress_w
   if (type == SCRIPT_BOOL)     return boost::json::value(sv->toBool());
   if (type == SCRIPT_STRING)   return boost::json::value(to_json_string(sv->toString()));
   if (type == SCRIPT_REGEX)    return boost::json::value(to_json_string(sv->toString()));
-  if (type == SCRIPT_COLOR)    return boost::json::value(format_color(sv->toColor()));
+  if (type == SCRIPT_COLOR)    return boost::json::value(to_json_string(format_color(sv->toColor())));
   if (type == SCRIPT_DATETIME) return boost::json::value(to_json_string(sv->toDateTime().format(DATE_TIME_PERSIST_FORMAT)));
   if (type == SCRIPT_COLLECTION) {
     ScriptCustomCollection* custom = dynamic_cast<ScriptCustomCollection*>(sv.get());

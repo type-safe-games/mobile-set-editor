@@ -85,8 +85,8 @@ String insert_symbol_code(const SymbolFont& font, int menu_id) {
   if (!item) return String();
   if (item->type == InsertSymbolMenu::Type::CUSTOM) {
     String title = item->label.get();
-    title.Replace(_("&"), _("")); // remove underlines
-    return wxGetTextFromUser(item->prompt.get(), title);
+    title = replace_all(title, _("&"), _("")); // remove underlines
+    return wxGetTextFromUser(item->prompt.get(), title).ToStdWstring();
   }
   return item->name;
 }

@@ -329,19 +329,19 @@ void CardListBase::parseImageMetadata(CardP& card) {
 
 bool CardListBase::parseUrl(String& url, vector<CardP>& out) {
   size_t j = out.size();
-  size_t pos = url.find("URL=");
+  size_t pos = url.find(_("URL="));
   if (pos != std::string::npos) {
     url = url.substr(pos+4);
   }
-  if (!url.StartsWith(_("http"))) return false;
+  if (!starts_with(url, _("http"))) return false;
   
   WebRequestWindow wnd(url);
   if (wnd.ShowModal() == wxID_OK) {
-    if (wnd.content_type.StartsWith(_("image/"))) {
+    if (starts_with(wnd.content_type, _("image/"))) {
       parseImage(wnd.image_out, out);
     }
-    else if (wnd.content_type.StartsWith(_("text/"))) {
-      String text = String(wnd.text_out.data(), wnd.text_out.size());
+    else if (starts_with(wnd.content_type, _("text/"))) {
+      String text = decode_utf8(wnd.text_out);
       parseText(text, out);
     }
     else {
@@ -358,7 +358,7 @@ bool CardListBase::parseFiles(wxArrayString& filenames, vector<CardP>& out) {
       // if it's an image file, try to get meta_data
       Image image_file;
       image_file.SetLoadFlags(image_file.GetLoadFlags() & ~wxImage::Load_Verbose);
-      if (image_load_file(image_file, filenames[i])) {
+      if (image_load_file(image_file, filenames[i].ToStdWstring())) {
         parseImage(image_file, out);
       }
       else queue_message(MESSAGE_ERROR, _ERROR_("can't load image"));
@@ -376,7 +376,7 @@ bool CardListBase::parseFiles(wxArrayString& filenames, vector<CardP>& out) {
         return isprint(c) || isspace(c);
       });
       if (!looks_like_text) continue;
-      wxString text(content);
+      String text = decode_utf8(content);
       if (!parseUrl(text, out)) parseText(text, out);
     }
   }
@@ -386,7 +386,7 @@ bool CardListBase::parseFiles(wxArrayString& filenames, vector<CardP>& out) {
 bool CardListBase::parseImage(Image& image, vector<CardP>& out) {
   size_t j = out.size();
   if (image.HasOption(wxIMAGE_OPTION_PNG_DESCRIPTION)) {
-    auto text = image.GetOption(wxIMAGE_OPTION_PNG_DESCRIPTION);
+    String text = image.GetOption(wxIMAGE_OPTION_PNG_DESCRIPTION).ToStdWstring();
     parseText(text, out);
 
     // crop image rects to populate image fields
@@ -403,9 +403,9 @@ bool CardListBase::parseText(String& text, vector<CardP>& out) {
     return false;
   }
   size_t j = out.size();
-  size_t pos = text.find("<mse-card-data>");
+  size_t pos = text.find(_("<mse-card-data>"));
   if (pos != wxString::npos) {
-    text = text.substr(pos + 15, text.find("</mse-card-data>") - pos - 15);
+    text = text.substr(pos + 15, text.find(_("</mse-card-data>")) - pos - 15);
   }
   try {
     ScriptValueP sv = json_to_mse(text, set.get());
@@ -541,7 +541,7 @@ bool CardListBase::parseData(bool ignore_cards_from_own_card_list) {
           queue_message(MESSAGE_ERROR, _("Text too large or corrupted"));
           return false;
         }
-        String text = text_data->GetText();
+        String text = text_data->GetText().ToStdWstring();
         if (!parseUrl(text, new_cards)) parseText(text, new_cards);
       }
       break;
@@ -731,7 +731,7 @@ void CardListBase::selectColumns() {
 
 // ----------------------------------------------------------------------------- : CardListBase : Item 'events'
 
-String CardListBase::OnGetItemText(long pos, long col) const {
+wxString CardListBase::OnGetItemText(long pos, long col) const {
   if (col < 0 || (size_t)col >= column_fields.size()) {
     // wx may give us non existing columns!
     return _("");
@@ -836,15 +836,15 @@ void CardListBase::onDrag(wxMouseEvent& ev) {
 void CardListBase::onContextMenu(wxContextMenuEvent&) {
   if (allowModify()) {
     wxMenu m;
-    add_menu_item_tr(&m, wxID_CUT, settings.darkModePrefix() + "cut", "cut_card");
-    add_menu_item_tr(&m, wxID_COPY, "copy", "copy_card");
-    add_menu_item_tr(&m, ID_CARD_AND_LINK_COPY, "card_copy", "copy card and links");
-    add_menu_item_tr(&m, wxID_PASTE, "paste", "paste_card");
+    add_menu_item_tr(&m, wxID_CUT, settings.darkModePrefix() + _("cut"), _("cut_card"));
+    add_menu_item_tr(&m, wxID_COPY, _("copy"), _("copy_card"));
+    add_menu_item_tr(&m, ID_CARD_AND_LINK_COPY, _("card_copy"), _("copy card and links"));
+    add_menu_item_tr(&m, wxID_PASTE, _("paste"), _("paste_card"));
     m.AppendSeparator();
-    add_menu_item_tr(&m, ID_CARD_ADD, "card_add", "add card");
-    add_menu_item_tr(&m, ID_CARD_ADD_DOUBLE, "card_add_double", "add card double");
-    add_menu_item_tr(&m, ID_CARD_REMOVE, "card_del", "remove card");
-    add_menu_item_tr(&m, ID_CARD_LINK, settings.darkModePrefix() + "card_link", "link card");
+    add_menu_item_tr(&m, ID_CARD_ADD, _("card_add"), _("add card"));
+    add_menu_item_tr(&m, ID_CARD_ADD_DOUBLE, _("card_add_double"), _("add card double"));
+    add_menu_item_tr(&m, ID_CARD_REMOVE, _("card_del"), _("remove card"));
+    add_menu_item_tr(&m, ID_CARD_LINK, settings.darkModePrefix() + _("card_link"), _("link card"));
     PopupMenu(&m);
   }
 }

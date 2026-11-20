@@ -455,7 +455,7 @@ public:
     return make_intrusive<BlankImage>();
   }
   String toCode() const override {
-    return "nil";
+    return _("nil");
   }
   ScriptValueP eval(Context& ctx, bool) const override {
     // nil(input) == input

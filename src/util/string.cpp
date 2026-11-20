@@ -614,6 +614,16 @@ String decode_utf8(const char* data, size_t size) {
   return ret;
 }
 
+String decode_utf8_or_latin1(const char* data, size_t size) {
+  String ret;
+  if (decode_utf8(data, size, ret)) return ret;
+  ret.clear();
+  for (size_t i = 0 ; i < size ; ++i) {
+    ret += static_cast<Char>(static_cast<unsigned char>(data[i]));
+  }
+  return ret;
+}
+
 // ----------------------------------------------------------------------------- : Regular expressions
 
 /// Escape a single character for use in regular expressions

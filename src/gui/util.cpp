@@ -104,13 +104,13 @@ function<bool(int done, int total)> import_cards_progress() {
     if (!*dialog) {
       *dialog = make_unique<wxProgressDialog>(
         _TITLE_("importing cards"),
-        wxString::Format(_LABEL_2_("importing cards", String()<<1, String()<<total)),
+        wxString::Format(wxString(_LABEL_2_("importing cards", int_to_string(1), int_to_string(total)))),
         total,
         nullptr,
         wxPD_APP_MODAL | wxPD_AUTO_HIDE | wxPD_CAN_ABORT
       );
     }
-    return (*dialog)->Update(done, wxString::Format(_LABEL_2_("importing cards", String()<<(done+1), String()<<total)));
+    return (*dialog)->Update(done, wxString::Format(wxString(_LABEL_2_("importing cards", int_to_string(done+1), int_to_string(total)))));
   };
 }
 
@@ -130,29 +130,29 @@ void set_menu_item_image(wxMenuItem* item, const String& resource) {
   item->SetBitmap(bitmap);
 }
 
-wxMenuItem* make_menu_item(wxMenu* menu, int id, const char* resource, const String& text, const String& help, wxItemKind kind, wxMenu* submenu) {
+wxMenuItem* make_menu_item(wxMenu* menu, int id, const String& resource, const String& text, const String& help, wxItemKind kind, wxMenu* submenu) {
   wxMenuItem* item = new wxMenuItem(menu, id, text, help, kind, submenu);
-  if (resource) set_menu_item_image(item, resource);
+  if (!resource.empty()) set_menu_item_image(item, resource);
   return item;
 }
-wxMenuItem* make_menu_item_tr(wxMenu* menu, int id, const char* resource, const String& locale_key, wxItemKind kind, wxMenu* submenu) {
+wxMenuItem* make_menu_item_tr(wxMenu* menu, int id, const String& resource, const String& locale_key, wxItemKind kind, wxMenu* submenu) {
   wxMenuItem* item = new wxMenuItem(menu, id, tr(LOCALE_CAT_MENU, locale_key), tr(LOCALE_CAT_HELP, locale_key), kind, submenu);
-  if (resource) set_menu_item_image(item, resource);
+  if (!resource.empty()) set_menu_item_image(item, resource);
   return item;
 }
-wxMenuItem* add_menu_item(wxMenu* menu, int id, const char* resource, const String& text, const String& help, wxItemKind kind, wxMenu* submenu) {
+wxMenuItem* add_menu_item(wxMenu* menu, int id, const String& resource, const String& text, const String& help, wxItemKind kind, wxMenu* submenu) {
   wxMenuItem* item = make_menu_item(menu, id, resource, text, help, kind, submenu);
   menu->Append(item);
   return item;
 }
-wxMenuItem* add_menu_item_tr(wxMenu* menu, int id, const char* resource, const String& locale_key, wxItemKind kind, wxMenu* submenu) {
+wxMenuItem* add_menu_item_tr(wxMenu* menu, int id, const String& resource, const String& locale_key, wxItemKind kind, wxMenu* submenu) {
   wxMenuItem* item = make_menu_item_tr(menu, id, resource, locale_key, kind, submenu);
   menu->Append(item);
   return item;
 }
 
-wxToolBarToolBase* add_tool(wxToolBar* toolbar, int id, const char* resource, const String& label, const String& tooltip, const String& help, wxItemKind kind) {
-  if (resource) {
+wxToolBarToolBase* add_tool(wxToolBar* toolbar, int id, const String& resource, const String& label, const String& tooltip, const String& help, wxItemKind kind) {
+  if (!resource.empty()) {
     // Note: the bitmap must match the toolbar bitmap size, otherwise disabled and normal bitmap look different
     // if the size doesn't match, we center the image
     auto size = toolbar->GetToolBitmapSize();
@@ -172,7 +172,7 @@ wxToolBarToolBase* add_tool(wxToolBar* toolbar, int id, const char* resource, co
   }
 }
 
-wxToolBarToolBase* add_tool_tr(wxToolBar* toolbar, int id, const char* resource, const String& locale_key, bool label, wxItemKind kind) {
+wxToolBarToolBase* add_tool_tr(wxToolBar* toolbar, int id, const String& resource, const String& locale_key, bool label, wxItemKind kind) {
   return add_tool(toolbar, id, resource, label ? tr(LOCALE_CAT_TOOL,locale_key) : String(), tr(LOCALE_CAT_TOOLTIP, locale_key), tr(LOCALE_CAT_HELP, locale_key), kind);
 }
 
@@ -192,8 +192,8 @@ wxIcon load_resource_icon(const String& name) {
   #if defined(__WXMSW__) && !defined(__GNUC__)
     return wxIcon(_("icon/") + name);
   #else
-    static String path = wxStandardPaths::Get().GetDataDir() + _("/resource/icon/");
-    static String local_path = wxStandardPaths::Get().GetUserDataDir() + _("/resource/icon/");
+    static String path = wxStandardPaths::Get().GetDataDir().ToStdWstring() + _("/resource/icon/");
+    static String local_path = wxStandardPaths::Get().GetUserDataDir().ToStdWstring() + _("/resource/icon/");
     String icon_path = wxFileExists(path + name + _(".ico")) ? (path + name + _(".ico")) : (local_path + name + _(".ico"));
     wxIcon icon;
     retry_io([&]{ icon = wxIcon(icon_path, wxBITMAP_TYPE_ICO); return icon.IsOk(); });

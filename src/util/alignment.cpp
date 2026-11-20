@@ -129,15 +129,15 @@ RealPoint move_in_direction(Direction dir, const RealPoint& point, const RealSiz
 /// Convert a Direction to a String
 String to_string(Direction direction) {
   switch (direction) {
-    case LEFT_TO_RIGHT:            return "left to right";
-    case RIGHT_TO_LEFT:            return "right to left";
-    case TOP_TO_BOTTOM:            return "top to bottom";
-    case BOTTOM_TO_TOP:            return "bottom to top";
-    case TOP_RIGHT_TO_BOTTOM_LEFT: return "top-right to bottom-left";
-    case BOTTOM_LEFT_TO_TOP_RIGHT: return "bottom-left to top-right";
-    case TOP_LEFT_TO_BOTTOM_RIGHT: return "top-left to bottom-right";
-    case BOTTOM_RIGHT_TO_TOP_LEFT: return "bottom-right to top-left";
-    default:                       return "left to right";
+    case LEFT_TO_RIGHT:            return _("left to right");
+    case RIGHT_TO_LEFT:            return _("right to left");
+    case TOP_TO_BOTTOM:            return _("top to bottom");
+    case BOTTOM_TO_TOP:            return _("bottom to top");
+    case TOP_RIGHT_TO_BOTTOM_LEFT: return _("top-right to bottom-left");
+    case BOTTOM_LEFT_TO_TOP_RIGHT: return _("bottom-left to top-right");
+    case TOP_LEFT_TO_BOTTOM_RIGHT: return _("top-left to bottom-right");
+    case BOTTOM_RIGHT_TO_TOP_LEFT: return _("bottom-right to top-left");
+    default:                       return _("left to right");
   }
 }
 String direction_to_string(const Direction& direction) {

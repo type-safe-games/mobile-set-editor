@@ -32,5 +32,5 @@ static String generate_uid() {
   for (auto& c : buf) {
     c = '0' + dis(gen);
   }
-  return String(buf.data(), buf.size());
+  return String(buf.begin(), buf.end());
 }

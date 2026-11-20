@@ -115,7 +115,7 @@ String TextIOHandler::getLine() {
       return result; // error
     }
     result += buffer;
-    if (result.GetChar(result.size()-1) == _('\n')) {
+    if (result[result.size()-1] == _('\n')) {
       // drop newline, done
       result.resize(result.size() - 1);
       return result;
@@ -137,7 +137,7 @@ void TextIOHandler::enableRaw() {
 void TextIOHandler::flushRaw() {
   if (!raw_mode) return;
   // always end in a newline
-  if (!buffer.empty() && buffer.GetChar(buffer.size()-1) != _('\n')) {
+  if (!buffer.empty() && buffer[buffer.size()-1] != _('\n')) {
     buffer += _('\n');
   }
   // count newlines
@@ -147,8 +147,7 @@ void TextIOHandler::flushRaw() {
   printf("%d\n%d\n", raw_mode_status, newline_count);
   if (!buffer.empty()) {
     #ifdef UNICODE
-      wxCharBuffer buf = buffer.mb_str(wxConvUTF8);
-      fputs(buf,stream);
+      fputs(encode_utf8(buffer).c_str(), stream);
     #else
       fputs(buffer.c_str(), stream);
     #endif

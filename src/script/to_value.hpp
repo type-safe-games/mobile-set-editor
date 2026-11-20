@@ -89,6 +89,7 @@ ScriptValueP rangeIterator(int start, int end);
 // ----------------------------------------------------------------------------- : Collections
 
 ScriptValueP to_script(int);
+ScriptValueP to_script(const String&);
 
 class ScriptCollectionBase : public ScriptValue {
 public:

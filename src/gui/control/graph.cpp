@@ -66,10 +66,10 @@ struct SmartLess{
 
 String to_bin(double value, double bin_size) {
   if (bin_size <= 0 || value == 0) {
-    return String() << (int)value;
+    return int_to_string((int)value);
   } else {
     int bin = ceil(value / bin_size);
-    return String::Format(_("%.0f%c%.0f"), (bin-1) * bin_size + 1, EN_DASH, bin * bin_size);
+    return wxString::Format(_("%.0f%c%.0f"), (bin-1) * bin_size + 1, EN_DASH, bin * bin_size).ToStdWstring();
   }
 }
 int bin_to_group(double value, double bin_size) {
@@ -98,7 +98,7 @@ GraphData::GraphData(const GraphDataPre& d)
       FOR_EACH(c, counts) {
         // numeric?
         double d;
-        if (c.first.ToDouble(&d)) {
+        if (wxString(c.first).ToDouble(&d)) {
           // update mean
           a->mean_value += d * c.second;
           a->max_value  = max(a->max_value, d);
@@ -173,7 +173,7 @@ GraphData::GraphData(const GraphDataPre& d)
       String v = e->values[i];
       de->group_nrs[i] = -1;
       double d;
-      if (a->numeric && a->bin_size > 0 && v.ToDouble(&d)) {
+      if (a->numeric && a->bin_size > 0 && wxString(v).ToDouble(&d)) {
         // calculate group that contains v
         de->group_nrs[i] = bin_to_group(d, a->bin_size);
       } else {
@@ -723,8 +723,8 @@ void GraphStats::setData(const GraphDataP& d) {
   values.clear();
   if (!axis.numeric) return;
   if (axis.groups.empty()) return;
-  values.push_back(make_pair(_("max"),  String::Format(_("%.2f"), axis.max_value)));
-  values.push_back(make_pair(_("mean"), String::Format(_("%.2f"), axis.mean_value)));
+  values.push_back(make_pair(_("max"),  wxString::Format(_("%.2f"), axis.max_value).ToStdWstring()));
+  values.push_back(make_pair(_("mean"), wxString::Format(_("%.2f"), axis.mean_value).ToStdWstring()));
 }
 
 RealSize GraphStats::determineSize(RotatedDC& dc) const {
@@ -956,7 +956,7 @@ void GraphValueAxis::draw(RotatedDC& dc, int current, DrawLayer layer) const {
       if (! ((i < highlight && i + label_step > highlight) ||
              (i > highlight && i - label_step < highlight)) || highlight == -1) {
         // don't draw labels before/after current to make room
-        String label; label << i;
+        String label = int_to_string(i);
         RealSize text_size = dc.GetTextExtent(label);
         dc.DrawText(label, align_in_rect(ALIGN_MIDDLE_RIGHT, text_size, RealRect(screen_rect.x - 4, y, 0, 0)));
       }
@@ -1197,12 +1197,12 @@ void GraphControl::onMotion(wxMouseEvent& ev) {
       }
     }
     UInt count = data.count(hovered_item);
-    tip += String::Format(_("\n%d "), count) + (count == 1 ? _TYPE_("card") : _TYPE_("cards"));
+    tip += wxString::Format(_("\n%d "), count).ToStdWstring() + (count == 1 ? _TYPE_("card") : _TYPE_("cards"));
     if (!data.axes.empty() && data.axes[0]->total > 0) {
       double percent = 100.0 * count / data.axes[0]->total;
-      tip += String::Format(_("   (%.1f%%)"), percent);
+      tip += wxString::Format(_("   (%.1f%%)"), percent).ToStdWstring();
     }
-    tip.Replace(_(" "),_("\xA0"));
+    tip = replace_all(tip, _(" "), _("\xA0"));
     // set tooltip
     SetToolTip(tip);
   } else {

@@ -37,7 +37,7 @@ private:
 ChoiceThumbnailRequest::ChoiceThumbnailRequest(ValueViewer* viewer, int id, bool from_disk, bool thread_safe)
   : ThumbnailRequest(
     static_cast<void*>(viewer),
-    viewer->getStylePackage().name() + _("/") + viewer->getField()->name + _("/") << id,
+    viewer->getStylePackage().name() + _("/") + viewer->getField()->name + _("/") + int_to_string(id),
     from_disk ? wxDateTime(viewer->getStylePackage().lastModified().toTimeT())
               : wxDateTime::Now()
   )

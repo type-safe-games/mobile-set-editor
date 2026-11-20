@@ -226,9 +226,9 @@ DisplayPreferencesPage::DisplayPreferencesPage(Window* parent)
   spellcheck_enabled->SetValue( settings.default_stylesheet_settings.card_spellcheck_enabled());
   hide_back_faces->   SetValue( settings.default_stylesheet_settings.list_hide_back_faces());
   zoom_int = static_cast<int>(  settings.default_stylesheet_settings.card_zoom() * 100);
-  zoom->SetValue(String::Format(_("%d%%"),zoom_int));
+  zoom->SetValue(wxString::Format(_("%d%%"),zoom_int));
   for (int i : Settings::scale_choices) {
-    zoom->Append(String::Format(_("%d%%"), i));
+    zoom->Append(wxString::Format(_("%d%%"), i));
   }
 
   // init sizer
@@ -271,12 +271,12 @@ void DisplayPreferencesPage::onZoomChange(wxCommandEvent&) {
 }
 
 void DisplayPreferencesPage::updateZoom() {
-  String s = zoom->GetValue();
+  wxString s = zoom->GetValue();
   int i = zoom_int;
   if (wxSscanf(s.c_str(),_("%u"),&i)) {
     zoom_int = min(max(i,1),1000);
   }
-  zoom->SetValue(String::Format(_("%d%%"),(int)zoom_int));
+  zoom->SetValue(wxString::Format(_("%d%%"),(int)zoom_int));
 }
 
 BEGIN_EVENT_TABLE(DisplayPreferencesPage, wxPanel)
@@ -311,7 +311,7 @@ TransfersPreferencesPage::TransfersPreferencesPage(Window* parent) : Preferences
   export_scale->Append(_LABEL_("export force 300"));
   export_scale->Append(_LABEL_("export force 150"));
   for (int i : Settings::scale_choices) {
-    export_scale->Append(String::Format(_("%d%%"), i));
+    export_scale->Append(wxString::Format(_("%d%%"), i));
   }
   int default_export_scale = settings.default_stylesheet_settings.export_scale_selection();
   if (default_export_scale < 0 || default_export_scale > (int)export_scale->GetCount() - 1) default_export_scale = 0;
@@ -323,7 +323,7 @@ TransfersPreferencesPage::TransfersPreferencesPage(Window* parent) : Preferences
   import_scale->Append(_LABEL_("export force 300"));
   import_scale->Append(_LABEL_("export force 150"));
   for (int i : Settings::scale_choices) {
-    import_scale->Append(String::Format(_("%d%%"), i));
+    import_scale->Append(wxString::Format(_("%d%%"), i));
   }
   int default_import_scale = settings.import_scale_selection;
   if (default_import_scale < 0 || default_import_scale > import_scale->GetCount() - 1) default_import_scale = 0;
@@ -334,7 +334,7 @@ TransfersPreferencesPage::TransfersPreferencesPage(Window* parent) : Preferences
   clipboard_scale->Append(_LABEL_("export force 300"));
   clipboard_scale->Append(_LABEL_("export force 150"));
   for (int i : Settings::scale_choices) {
-    clipboard_scale->Append(String::Format(_("%d%%"), i));
+    clipboard_scale->Append(wxString::Format(_("%d%%"), i));
   }
   int default_clipboard_scale = settings.clipboard_scale_selection;
   if (default_clipboard_scale < 0 || default_clipboard_scale > clipboard_scale->GetCount() - 1) default_clipboard_scale = 0;

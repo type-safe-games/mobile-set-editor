@@ -485,11 +485,11 @@ void DataEditor::onChar(wxKeyEvent& ev) {
 void DataEditor::onContextMenu(wxContextMenuEvent& ev) {
   if (current_editor) {
     wxMenu m;
-    add_menu_item_tr(&m, ID_EDIT_CUT, settings.darkModePrefix() + "cut", "cut");
-    add_menu_item_tr(&m, ID_EDIT_COPY, "copy", "copy");
-    add_menu_item_tr(&m, ID_EDIT_PASTE, "paste", "paste");
+    add_menu_item_tr(&m, ID_EDIT_CUT, settings.darkModePrefix() + _("cut"), _("cut"));
+    add_menu_item_tr(&m, ID_EDIT_COPY, _("copy"), _("copy"));
+    add_menu_item_tr(&m, ID_EDIT_PASTE, _("paste"), _("paste"));
     m.AppendSeparator();
-    add_menu_item_tr(&m, ID_EDIT_DEFAULT_RESET, settings.darkModePrefix() + "default_reset", "default_reset");
+    add_menu_item_tr(&m, ID_EDIT_DEFAULT_RESET, settings.darkModePrefix() + _("default_reset"), _("default_reset"));
     m.Enable(ID_EDIT_CUT,   canCut());
     m.Enable(ID_EDIT_COPY,  canCopy());
     m.Enable(ID_EDIT_PASTE, canPaste());

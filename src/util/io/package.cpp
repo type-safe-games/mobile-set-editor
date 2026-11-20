@@ -769,9 +769,9 @@ void Packaged::validate(Version) {
 
 void Packaged::requireDependency(Packaged* package) {
   if (package == this) return; // dependency on self
-  if (this->relativeFilename().find("mse-set") != String::npos) return; // skip checks on sets
+  if (this->relativeFilename().find(_("mse-set")) != String::npos) return; // skip checks on sets
   String n = package->relativeFilename();
-  if (n.find("mse-symbol-font") != String::npos) return; // skip checks for symbol-fonts
+  if (n.find(_("mse-symbol-font")) != String::npos) return; // skip checks for symbol-fonts
   FOR_EACH(dep, dependencies) {
     if (dep->package == n) {
       if (package->version < dep->version) {

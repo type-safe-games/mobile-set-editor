@@ -305,7 +305,7 @@ String process_english_hints(const String& str) {
           String last = ret.substr(ret.size() - 2);
           if ( (ret.size() == 2 || !isAlpha(ret[ret.size() - 3])) &&
             (last == _("a ") || last == _("A ")) ) {
-            ret.insert(ret.size() - 1, _('n'));
+            ret.insert(ret.size() - 1, 1, _('n'));
           }
         } else if (is_substr(str, after, _("</param-")) && ret.size() >= 1 &&
               ret[ret.size() - 1] == _(' ')) {

@@ -28,7 +28,7 @@ String serialize_for_clipboard(Package& package, T& object) {
   Writer writer(stream, file_version_clipboard);
   WITH_DYNAMIC_ARG(clipboard_package, &package);
     writer.handle(object);
-  return String::FromUTF8(stream.str().data(), stream.str().size());
+  return decode_utf8(stream.str().data(), stream.str().size());
 }
 
 template <typename T>
@@ -78,7 +78,7 @@ CardsDataObject::CardsDataObject(const SetP& set, const String& id, const vector
   // store as raw bytes
   WrappedCards data = { set->game.get(), set->game->name(), id, cards };
   String serialized = serialize_for_clipboard(*set, data);
-  wxScopedCharBuffer utf8 = serialized.utf8_str();
+  std::string utf8 = encode_utf8(serialized);
   buffer.assign(utf8.data(), utf8.length());
   SetData(buffer.size(), buffer.data());
 
@@ -153,7 +153,7 @@ KeywordDataObject::KeywordDataObject() {
 KeywordP KeywordDataObject::getKeyword(const SetP& set) {
   KeywordP keyword(new Keyword());
   WrappedKeyword data = { set->game.get(), set->game->name(), keyword};
-  deserialize_from_clipboard(data, *set, GetText());
+  deserialize_from_clipboard(data, *set, GetText().ToStdWstring());
   if (data.game_name != set->game->name()) return KeywordP(); // Keyword is from a different game
   else                                     return keyword;
 }

@@ -504,7 +504,7 @@ Image make_stroke_image(Image& img, Color stroke_color, int stroke_radius, int b
   }
   // transfer metadata
   if (img.HasOption(wxIMAGE_OPTION_PNG_DESCRIPTION)) {
-    String metadata = transformAllEncodedRects(img.GetOption(wxIMAGE_OPTION_PNG_DESCRIPTION), RealRect::translate, margin, margin);
+    String metadata = transformAllEncodedRects(img.GetOption(wxIMAGE_OPTION_PNG_DESCRIPTION).ToStdWstring(), RealRect::translate, margin, margin);
     s_img.SetOption(wxIMAGE_OPTION_PNG_DESCRIPTION, metadata);
   }
   return s_img;

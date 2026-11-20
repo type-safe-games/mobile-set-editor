@@ -339,11 +339,11 @@ void StatsPanel::initControls() {
   
   // init menu
   menuGraph = new wxMenu();
-    add_menu_item_tr(menuGraph, ID_GRAPH_PIE,         "graph_pie",         "pie",         wxITEM_CHECK);
-    add_menu_item_tr(menuGraph, ID_GRAPH_BAR,         "graph_bar",         "bar",         wxITEM_CHECK);
-    add_menu_item_tr(menuGraph, ID_GRAPH_STACK,       "graph_stack",       "stack",       wxITEM_CHECK);
-    add_menu_item_tr(menuGraph, ID_GRAPH_SCATTER,     "graph_scatter",     "scatter",     wxITEM_CHECK);
-    add_menu_item_tr(menuGraph, ID_GRAPH_SCATTER_PIE, "graph_scatter_pie", "scatter pie", wxITEM_CHECK);
+    add_menu_item_tr(menuGraph, ID_GRAPH_PIE,         _("graph_pie"),         _("pie"),         wxITEM_CHECK);
+    add_menu_item_tr(menuGraph, ID_GRAPH_BAR,         _("graph_bar"),         _("bar"),         wxITEM_CHECK);
+    add_menu_item_tr(menuGraph, ID_GRAPH_STACK,       _("graph_stack"),       _("stack"),       wxITEM_CHECK);
+    add_menu_item_tr(menuGraph, ID_GRAPH_SCATTER,     _("graph_scatter"),     _("scatter"),     wxITEM_CHECK);
+    add_menu_item_tr(menuGraph, ID_GRAPH_SCATTER_PIE, _("graph_scatter_pie"), _("scatter pie"), wxITEM_CHECK);
 }
 
 StatsPanel::~StatsPanel() {
@@ -387,11 +387,11 @@ void StatsPanel::initUI   (wxToolBar* tb, wxMenuBar* mb) {
   if (!up_to_date) showCategory();
   // Toolbar
   #if USE_DIMENSION_LISTS || USE_SEPARATE_DIMENSION_LISTS
-    add_tool_tr(tb, ID_GRAPH_PIE, "graph_pie", "pie");
-    add_tool_tr(tb, ID_GRAPH_BAR, "graph_bar", "bar");
-    add_tool_tr(tb, ID_GRAPH_STACK, "graph_stack", "stack");
-    add_tool_tr(tb, ID_GRAPH_SCATTER, "graph_scatter", "scatter");
-    add_tool_tr(tb, ID_GRAPH_SCATTER_PIE, "graph_scatter_pie", "scatter_pie");
+    add_tool_tr(tb, ID_GRAPH_PIE, _("graph_pie"), _("pie"));
+    add_tool_tr(tb, ID_GRAPH_BAR, _("graph_bar"), _("bar"));
+    add_tool_tr(tb, ID_GRAPH_STACK, _("graph_stack"), _("stack"));
+    add_tool_tr(tb, ID_GRAPH_SCATTER, _("graph_scatter"), _("scatter"));
+    add_tool_tr(tb, ID_GRAPH_SCATTER_PIE, _("graph_scatter_pie"), _("scatter_pie"));
     tb->Realize();
     // Menu
     mb->Insert(2, menuGraph, _MENU_("graph"));
@@ -501,7 +501,7 @@ void StatsPanel::showCategory(const GraphType* prefer_layout) {
   // find global_script values
   vector<ScriptValueP> global_values;
   Context& global_ctx = set->getContext();
-  ScriptValueP global_ctx_value = global_ctx.getVariableOpt("global_value");
+  ScriptValueP global_ctx_value = global_ctx.getVariableOpt(_("global_value"));
   for (size_t d = 0 ; d < dims.size() ; ++d) {
     auto& dim = dims[d];
     try {
@@ -519,7 +519,7 @@ void StatsPanel::showCategory(const GraphType* prefer_layout) {
     bool show = true;
     for (size_t d = 0 ; d < dims.size() ; ++d) {
       auto& dim = dims[d];
-      ctx.setVariable("global_value", global_values[d]);
+      ctx.setVariable(_("global_value"), global_values[d]);
       try {
         String value = untag(dim->script.invoke(ctx)->toString());
         e->values.push_back(value);
@@ -540,7 +540,7 @@ void StatsPanel::showCategory(const GraphType* prefer_layout) {
     }
   }
   // restore old global value if any
-  if (global_ctx_value) global_ctx.setVariable("global_value", global_ctx_value);
+  if (global_ctx_value) global_ctx.setVariable(_("global_value"), global_ctx_value);
   // split lists
   size_t dim_id = 0;
   FOR_EACH(dim, dims) {

@@ -54,59 +54,59 @@ SetWindow::SetWindow(Window* parent, const SetP& set)
   // initialize menu bar
   auto menuBar = new wxMenuBar();
   auto menuFile = new wxMenu();
-    add_menu_item_tr(menuFile, ID_FILE_NEW, "new", "new_set");
-    add_menu_item_tr(menuFile, ID_FILE_OPEN, "open", "open_set");
-    add_menu_item_tr(menuFile, ID_FILE_SAVE, "save", "save_set");
-    add_menu_item_tr(menuFile, ID_FILE_SAVE_AS, "save", "save_set_as");
-    add_menu_item_tr(menuFile, ID_FILE_SAVE_AS_DIRECTORY, "save", "save_set_as_directory");
-    add_menu_item_tr(menuFile, wxID_ANY, "export", "export", wxITEM_NORMAL, makeExportMenu());
+    add_menu_item_tr(menuFile, ID_FILE_NEW, _("new"), _("new_set"));
+    add_menu_item_tr(menuFile, ID_FILE_OPEN, _("open"), _("open_set"));
+    add_menu_item_tr(menuFile, ID_FILE_SAVE, _("save"), _("save_set"));
+    add_menu_item_tr(menuFile, ID_FILE_SAVE_AS, _("save"), _("save_set_as"));
+    add_menu_item_tr(menuFile, ID_FILE_SAVE_AS_DIRECTORY, _("save"), _("save_set_as_directory"));
+    add_menu_item_tr(menuFile, wxID_ANY, _("export"), _("export"), wxITEM_NORMAL, makeExportMenu());
     menuFile->AppendSeparator();
-    add_menu_item_tr(menuFile, ID_FILE_CHECK_UPDATES, "check_updates", "check_updates");
+    add_menu_item_tr(menuFile, ID_FILE_CHECK_UPDATES, _("check_updates"), _("check_updates"));
     #if USE_SCRIPT_PROFILING
-    add_menu_item_tr(menuFile, ID_FILE_PROFILER, nullptr, "show_profiler");
+    add_menu_item_tr(menuFile, ID_FILE_PROFILER, String(), _("show_profiler"));
     #endif
 //    menuFile->Append(ID_FILE_INSPECT,          _("Inspect Internal Data..."),  _("Shows a the data in the set using a tree structure"));
 //    menuFile->AppendSeparator();
-    add_menu_item_tr(menuFile, ID_FILE_RELOAD, "reload_data", "reload_data");
+    add_menu_item_tr(menuFile, ID_FILE_RELOAD, _("reload_data"), _("reload_data"));
     menuFile->AppendSeparator();
-    add_menu_item_tr(menuFile, ID_FILE_PRINT_PREVIEW, "print_preview", "print_preview");
-    add_menu_item_tr(menuFile, ID_FILE_PRINT, "print", "print");
+    add_menu_item_tr(menuFile, ID_FILE_PRINT_PREVIEW, _("print_preview"), _("print_preview"));
+    add_menu_item_tr(menuFile, ID_FILE_PRINT, _("print"), _("print"));
     menuFile->AppendSeparator();
     // recent files go here
     menuFile->AppendSeparator();
-    add_menu_item_tr(menuFile, ID_FILE_EXIT, nullptr, "exit");
+    add_menu_item_tr(menuFile, ID_FILE_EXIT, String(), _("exit"));
   menuBar->Append(menuFile, _MENU_("file"));
   
   auto menuEdit = new wxMenu();
-    add_menu_item(menuEdit, ID_EDIT_UNDO, settings.darkModePrefix() + "undo", _MENU_1_("undo",_("")),  _HELP_("undo"));
-    add_menu_item(menuEdit, ID_EDIT_REDO, settings.darkModePrefix() + "redo", _MENU_1_("redo",_("")),  _HELP_("redo"));
+    add_menu_item(menuEdit, ID_EDIT_UNDO, settings.darkModePrefix() + _("undo"), _MENU_1_("undo",_("")),  _HELP_("undo"));
+    add_menu_item(menuEdit, ID_EDIT_REDO, settings.darkModePrefix() + _("redo"), _MENU_1_("redo",_("")),  _HELP_("redo"));
     menuEdit->AppendSeparator();
-    add_menu_item_tr(menuEdit, ID_EDIT_CUT, settings.darkModePrefix() + "cut", "cut");
-    add_menu_item_tr(menuEdit, ID_EDIT_COPY, "copy", "copy");
-    add_menu_item_tr(menuEdit, ID_EDIT_PASTE, "paste", "paste");
+    add_menu_item_tr(menuEdit, ID_EDIT_CUT, settings.darkModePrefix() + _("cut"), _("cut"));
+    add_menu_item_tr(menuEdit, ID_EDIT_COPY, _("copy"), _("copy"));
+    add_menu_item_tr(menuEdit, ID_EDIT_PASTE, _("paste"), _("paste"));
     menuEdit->AppendSeparator();
-    add_menu_item_tr(menuEdit, ID_EDIT_SELECT_ALL, nullptr, "select_all");
+    add_menu_item_tr(menuEdit, ID_EDIT_SELECT_ALL, String(), _("select_all"));
     menuEdit->AppendSeparator();
-    add_menu_item_tr(menuEdit, ID_EDIT_DEFAULT_RESET, settings.darkModePrefix() + "default_reset", "default_reset");
+    add_menu_item_tr(menuEdit, ID_EDIT_DEFAULT_RESET, settings.darkModePrefix() + _("default_reset"), _("default_reset"));
     menuEdit->AppendSeparator();
-    add_menu_item_tr(menuEdit, ID_EDIT_FIND,         settings.darkModePrefix() + "find", "find");
-    add_menu_item_tr(menuEdit, ID_EDIT_FIND_NEXT,    settings.darkModePrefix() + "find", "find_next");
-    add_menu_item_tr(menuEdit, ID_EDIT_REPLACE,      settings.darkModePrefix() + "find", "replace");
-    add_menu_item_tr(menuEdit, ID_EDIT_AUTO_REPLACE, settings.darkModePrefix() + "find", "auto_replace");
+    add_menu_item_tr(menuEdit, ID_EDIT_FIND,         settings.darkModePrefix() + _("find"), _("find"));
+    add_menu_item_tr(menuEdit, ID_EDIT_FIND_NEXT,    settings.darkModePrefix() + _("find"), _("find_next"));
+    add_menu_item_tr(menuEdit, ID_EDIT_REPLACE,      settings.darkModePrefix() + _("find"), _("replace"));
+    add_menu_item_tr(menuEdit, ID_EDIT_AUTO_REPLACE, settings.darkModePrefix() + _("find"), _("auto_replace"));
     menuEdit->AppendSeparator();
-    add_menu_item_tr(menuEdit, ID_EDIT_PREFERENCES, settings.darkModePrefix() + "preferences", "preferences");
+    add_menu_item_tr(menuEdit, ID_EDIT_PREFERENCES, settings.darkModePrefix() + _("preferences"), _("preferences"));
   menuBar->Append(menuEdit, _MENU_("edit"));
   
   auto menuWindow = new wxMenu();
-    add_menu_item_tr(menuWindow, ID_WINDOW_NEW, nullptr, "new_window");
+    add_menu_item_tr(menuWindow, ID_WINDOW_NEW, String(), _("new_window"));
     menuWindow->AppendSeparator();
   menuBar->Append(menuWindow, _MENU_("window"));
   
   auto menuHelp = new wxMenu();
-    //add_menu_item_tr(menuHelp, ID_HELP_INDEX, "help", "index"); // not implemented
-    add_menu_item_tr(menuHelp, ID_HELP_WEBSITE, nullptr, "website");
-    add_menu_item_tr(menuHelp, ID_HELP_DOCUMENTATION, nullptr, "documentation");
-    add_menu_item_tr(menuHelp, ID_HELP_ABOUT, nullptr, "about");
+    //add_menu_item_tr(menuHelp, ID_HELP_INDEX, _("help"), _("index")); // not implemented
+    add_menu_item_tr(menuHelp, ID_HELP_WEBSITE, String(), _("website"));
+    add_menu_item_tr(menuHelp, ID_HELP_DOCUMENTATION, String(), _("documentation"));
+    add_menu_item_tr(menuHelp, ID_HELP_ABOUT, String(), _("about"));
   menuBar->Append(menuHelp, _MENU_("help"));
   
   SetMenuBar(menuBar);
@@ -119,18 +119,18 @@ SetWindow::SetWindow(Window* parent, const SetP& set)
   // tool bar
   wxToolBar* tb = CreateToolBar(wxTB_FLAT | wxNO_BORDER | wxTB_HORIZONTAL);
   tb->SetToolBitmapSize(wxSize(20,20));
-  add_tool_tr(tb, ID_FILE_NEW, "new", "new_set");
-  add_tool_tr(tb, ID_FILE_OPEN, "open", "open_set");
-  add_tool_tr(tb, ID_FILE_SAVE, "save", "save_set");
+  add_tool_tr(tb, ID_FILE_NEW, _("new"), _("new_set"));
+  add_tool_tr(tb, ID_FILE_OPEN, _("open"), _("open_set"));
+  add_tool_tr(tb, ID_FILE_SAVE, _("save"), _("save_set"));
   tb->AddSeparator();
-  add_tool_tr(tb, ID_FILE_EXPORT, "export", "export");
+  add_tool_tr(tb, ID_FILE_EXPORT, _("export"), _("export"));
   tb->AddSeparator();
-  add_tool_tr(tb, ID_EDIT_CUT, settings.darkModePrefix() + "cut", "cut");
-  add_tool_tr(tb, ID_EDIT_COPY, "copy", "copy");
-  add_tool_tr(tb, ID_EDIT_PASTE, "paste", "paste");
+  add_tool_tr(tb, ID_EDIT_CUT, settings.darkModePrefix() + _("cut"), _("cut"));
+  add_tool_tr(tb, ID_EDIT_COPY, _("copy"), _("copy"));
+  add_tool_tr(tb, ID_EDIT_PASTE, _("paste"), _("paste"));
   tb->AddSeparator();
-  add_tool(tb, ID_EDIT_UNDO, settings.darkModePrefix() + "undo", {}, _TOOLTIP_1_("undo", {}), _HELP_("undo"));
-  add_tool(tb, ID_EDIT_REDO, settings.darkModePrefix() + "redo", {}, _TOOLTIP_1_("redo", {}), _HELP_("redo"));
+  add_tool(tb, ID_EDIT_UNDO, settings.darkModePrefix() + _("undo"), {}, _TOOLTIP_1_("undo", {}), _HELP_("undo"));
+  add_tool(tb, ID_EDIT_REDO, settings.darkModePrefix() + _("redo"), {}, _TOOLTIP_1_("redo", {}), _HELP_("redo"));
   tb->AddSeparator();
   tb->Realize();
   
@@ -186,10 +186,10 @@ SetWindow::SetWindow(Window* parent, const SetP& set)
 
 wxMenu* SetWindow::makeExportMenu() {
   auto menuExport = new wxMenu();
-  add_menu_item_tr(menuExport, ID_FILE_EXPORT_HTML, "export_html", "export_html");
-  add_menu_item_tr(menuExport, ID_FILE_EXPORT_IMAGE, "export_image", "export_image");
-  add_menu_item_tr(menuExport, ID_FILE_EXPORT_IMAGES, "export_images", "export_images");
-  add_menu_item_tr(menuExport, ID_FILE_EXPORT_MWS, "export_mws", "export_mws");
+  add_menu_item_tr(menuExport, ID_FILE_EXPORT_HTML, _("export_html"), _("export_html"));
+  add_menu_item_tr(menuExport, ID_FILE_EXPORT_IMAGE, _("export_image"), _("export_image"));
+  add_menu_item_tr(menuExport, ID_FILE_EXPORT_IMAGES, _("export_images"), _("export_images"));
+  add_menu_item_tr(menuExport, ID_FILE_EXPORT_MWS, _("export_mws"), _("export_mws"));
   return menuExport;
 }
 
@@ -466,7 +466,7 @@ bool SetWindow::askSaveAndContinue() {
         wxFileDialog dlg(this, _TITLE_("save_set"), settings.default_set_dir, clean_filename(set->short_name), export_formats(*set->game), wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
         if (dlg.ShowModal() == wxID_OK) {
           settings.default_set_dir = dlg.GetDirectory();
-          export_set(*set, dlg.GetPath(), dlg.GetFilterIndex());
+          export_set(*set, dlg.GetPath().ToStdWstring(), dlg.GetFilterIndex());
           return true;
         } else {
           return false;
@@ -559,7 +559,7 @@ void SetWindow::rebuildRecentSetsMenu() {
   UInt i = 0;
   FOR_EACH(file, settings.recent_sets) {
     if (i >= settings.max_recent_sets) break;
-    file_menu->Insert(insert_pos + i, ID_FILE_RECENT + i, String(_("&")) << (i+1) << _(" ") << file, _(""));
+    file_menu->Insert(insert_pos + i, ID_FILE_RECENT + i, _("&") + int_to_string(i+1) + _(" ") + file, _(""));
     i++;
   }
 }
@@ -586,7 +586,7 @@ void SetWindow::onFileOpen(wxCommandEvent&) {
   if (dlg.ShowModal() == wxID_OK) {
     settings.default_set_dir = dlg.GetDirectory();
     wxBusyCursor busy;
-    SetP new_set = import_set(dlg.GetPath());
+    SetP new_set = import_set(dlg.GetPath().ToStdWstring());
     switchSet(new_set);
   }
 }
@@ -606,7 +606,7 @@ void SetWindow::onFileSaveAs(wxCommandEvent&) {
   wxFileDialog dlg(this, _TITLE_("save_set"), settings.default_set_dir, clean_filename(set->short_name), export_formats(*set->game), wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
   if (dlg.ShowModal() == wxID_OK) {
     settings.default_set_dir = dlg.GetDirectory();
-    export_set(*set, dlg.GetPath(), dlg.GetFilterIndex());
+    export_set(*set, dlg.GetPath().ToStdWstring(), dlg.GetFilterIndex());
     updateTitle(); // title may depend on filename
   }
 }
@@ -614,7 +614,7 @@ void SetWindow::onFileSaveAs(wxCommandEvent&) {
 void SetWindow::onFileSaveAsDirectory(wxCommandEvent&) {
   wxFileDialog dlg(this, _TITLE_("save_set_as_directory"), settings.default_set_dir, clean_filename(set->short_name), "Magic Set Editor sets (*.mse-set)|*.mse-set", wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
   if (dlg.ShowModal() == wxID_OK) {
-    String filename = dlg.GetPath();
+    String filename = dlg.GetPath().ToStdWstring();
     settings.default_set_dir = dlg.GetDirectory();
     set->saveAs(filename, true, true);
     settings.addRecentFile(filename);
@@ -667,7 +667,7 @@ void SetWindow::onFileExportImage(wxCommandEvent&) {
   if (!card)  return; // no card selected
   String name = wxFileSelector(_TITLE_("save image"), settings.default_export_dir, clean_filename(card->identification()), _(""),
                              _("PNG images (*.png)|*.png|JPEG images (*.jpg)|*.jpg|Windows bitmaps (*.bmp)|*.bmp|TIFF images (*.tif)|*.tif"),
-                             wxFD_SAVE | wxFD_OVERWRITE_PROMPT, this);
+                             wxFD_SAVE | wxFD_OVERWRITE_PROMPT, this).ToStdWstring();
   if (!name.empty()) {
     settings.default_export_dir = wxPathOnly(name);
     export_image(set, card, name);
@@ -695,7 +695,7 @@ void SetWindow::onFileExportMWS(wxCommandEvent&) {
   // Select filename
   String name = wxFileSelector(_("Export to file"),settings.default_export_dir,_(""),_(""),
                              _("Text files (*.txt)|*.txt|All Files|*"),
-                             wxFD_SAVE | wxFD_OVERWRITE_PROMPT, this);
+                             wxFD_SAVE | wxFD_OVERWRITE_PROMPT, this).ToStdWstring();
   if (name.empty()) return;
   settings.default_export_dir = wxPathOnly(name);
   wxBusyCursor busy;

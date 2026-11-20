@@ -899,13 +899,13 @@ SCRIPT_FUNCTION(get_front_face) {
     ctx.setVariable(SCRIPT_VAR_input, input);
     ScriptValueP result = set->game->get_front_face_script.invoke(ctx);
     if (result != script_nil && !dynamic_cast<ScriptObject<CardP>*>(result.get())) {
-      queue_message(MESSAGE_ERROR, _ERROR_1_("result not card or nil", "get_front_face_script"));
+      queue_message(MESSAGE_ERROR, _ERROR_1_("result not card or nil", _("get_front_face_script")));
       return script_nil;
     }
     return result;
   }
   // fallback on regular Front Face/Back Face logic
-  vector<CardP> other_cards = input_card->getLinkedRelationCards(*set, "Front Face");
+  vector<CardP> other_cards = input_card->getLinkedRelationCards(*set, _("Front Face"));
   if (other_cards.size() == 0) return script_nil;
   //if (other_cards.size() > 1) queue_message(MESSAGE_WARNING, _ERROR_1_("multiple front faces", input_card->identification()));
   SCRIPT_RETURN(other_cards[0]);
@@ -931,13 +931,13 @@ SCRIPT_FUNCTION(get_back_face) {
     ctx.setVariable(SCRIPT_VAR_input, input);
     ScriptValueP result = set->game->get_back_face_script.invoke(ctx);
     if (result != script_nil && !dynamic_cast<ScriptObject<CardP>*>(result.get())) {
-      queue_message(MESSAGE_ERROR, _ERROR_1_("result not card or nil", "get_back_face_script"));
+      queue_message(MESSAGE_ERROR, _ERROR_1_("result not card or nil", _("get_back_face_script")));
       return script_nil;
     }
     return result;
   }
   // fallback on regular Front Face/Back Face logic
-  vector<CardP> other_cards = input_card->getLinkedRelationCards(*set, "Back Face");
+  vector<CardP> other_cards = input_card->getLinkedRelationCards(*set, _("Back Face"));
   if (other_cards.size() == 0) return script_nil;
   //if (other_cards.size() > 1) queue_message(MESSAGE_WARNING, _ERROR_1_("multiple back faces", input_card->identification()));
   SCRIPT_RETURN(other_cards[0]);

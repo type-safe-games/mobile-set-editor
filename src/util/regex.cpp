@@ -16,7 +16,7 @@
 void Regex::assign(const String& code) {
   // compile string
   try {
-    regex.assign(toStdString(code));
+    regex.assign(code);
   } catch (const boost::regex_error& e) {
     /// TODO: be more precise
     throw ScriptError(format_string(_("Error while compiling regular expression: '%s'\nAt position: %d\n%s"),
@@ -25,7 +25,7 @@ void Regex::assign(const String& code) {
 }
 
 String Regex::replace_all(const String& input, const String& format) const {
-  return regex_replace(toStdString(input), regex, toStdString(format), boost::format_sed);
+  return regex_replace(input, regex, format, boost::format_sed);
 }
 
 #endif // USE_BOOST_REGEX

@@ -154,12 +154,12 @@ wxPen SymbolPointEditor::handlePen(WhichPen p, LockMode lock) {
 void SymbolPointEditor::initUI(wxToolBar* tb, wxMenuBar* mb) {
   // Initialize toolbar
   tb->AddSeparator();
-  add_tool_tr(tb, ID_SEGMENT_LINE, "line", "line_segment", true, wxITEM_CHECK);
-  add_tool_tr(tb, ID_SEGMENT_CURVE, "curve", "curve_segment", true, wxITEM_CHECK);
+  add_tool_tr(tb, ID_SEGMENT_LINE, _("line"), _("line_segment"), true, wxITEM_CHECK);
+  add_tool_tr(tb, ID_SEGMENT_CURVE, _("curve"), _("curve_segment"), true, wxITEM_CHECK);
   tb->AddSeparator();                                                          
-  add_tool_tr(tb, ID_LOCK_FREE, "lock_free", "free_point", true, wxITEM_CHECK);
-  add_tool_tr(tb, ID_LOCK_DIR, "lock_dir", "smooth_point", true, wxITEM_CHECK);
-  add_tool_tr(tb, ID_LOCK_SIZE, "lock_size", "symmetric point", true, wxITEM_CHECK);
+  add_tool_tr(tb, ID_LOCK_FREE, _("lock_free"), _("free_point"), true, wxITEM_CHECK);
+  add_tool_tr(tb, ID_LOCK_DIR, _("lock_dir"), _("smooth_point"), true, wxITEM_CHECK);
+  add_tool_tr(tb, ID_LOCK_SIZE, _("lock_size"), _("symmetric point"), true, wxITEM_CHECK);
   tb->Realize();
   // TODO : menu bar
   //mb->Insert(2, curveMenu, _("&Curve"))

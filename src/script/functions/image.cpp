@@ -85,7 +85,7 @@ SCRIPT_FUNCTION(get_metadata) {
   SCRIPT_PARAM(Set*, set);
   SCRIPT_PARAM(GeneratedImageP, input);
   Image image = input->generate(GeneratedImage::Options(0, 0, set, set));
-  SCRIPT_RETURN(image.GetOption(wxIMAGE_OPTION_PNG_DESCRIPTION));
+  SCRIPT_RETURN(image.GetOption(wxIMAGE_OPTION_PNG_DESCRIPTION).ToStdWstring());
 }
 
 SCRIPT_FUNCTION(set_metadata) {

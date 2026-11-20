@@ -129,7 +129,7 @@ ImageSliceWindow::ImageSliceWindow(Window* parent, const Image& source, const St
   selector  = new ImageSliceSelector(this, ID_SELECTOR, slice);
   preview   = new ImageSlicePreview (this, ID_PREVIEW,  slice, mask, 0);
   
-  String sizes[] = { _LABEL_("original size")
+  wxString sizes[] = { _LABEL_("original size")
                    , _LABEL_("size to fit")
                    , _LABEL_("force to fit")
                    , _LABEL_("custom size") };
@@ -157,7 +157,7 @@ ImageSliceWindow::ImageSliceWindow(Window* parent, const Image& source, const St
 //  allowOutside= new CheckBox(&this, idSliceAllowOutside, _("Allow selection outside source"))
 //  bgColor       = new ColorSelector(&this, wxID_ANY)
 
-  String grids[] = { _LABEL_("none")
+  wxString grids[] = { _LABEL_("none")
                    , _LABEL_("grid halves")
                    , _LABEL_("grid thirds")
                    , _LABEL_("grid fourths")
@@ -178,11 +178,11 @@ ImageSliceWindow::ImageSliceWindow(Window* parent, const Image& source, const St
     // top row: image editors
     wxSizer* s2 = new wxBoxSizer(wxHORIZONTAL);
       wxSizer* s3 = new wxBoxSizer(wxVERTICAL);
-        s3->Add(new wxStaticText(this, wxID_ANY, _LABEL_2_("original with dimensions", to_string(slice.source.GetWidth()), to_string(slice.source.GetHeight()))));
+        s3->Add(new wxStaticText(this, wxID_ANY, _LABEL_2_("original with dimensions", int_to_string(slice.source.GetWidth()), int_to_string(slice.source.GetHeight()))));
         s3->Add(selector, 1, wxEXPAND | wxTOP, 4);
       s2->Add(s3, 1, wxEXPAND | wxALL, 4);
       wxSizer* s4 = new wxBoxSizer(wxVERTICAL);
-        result_label = new wxStaticText(this, wxID_ANY, _LABEL_2_("result with dimensions", to_string(slice.target_size.GetWidth()), to_string(slice.target_size.GetHeight())));
+        result_label = new wxStaticText(this, wxID_ANY, _LABEL_2_("result with dimensions", int_to_string(slice.target_size.GetWidth()), int_to_string(slice.target_size.GetHeight())));
         s4->Add(result_label);
         s4->Add(preview, 0, wxTOP, 4);
       s2->Add(s4, 0, wxALL, 4);
@@ -396,7 +396,7 @@ void ImageSliceWindow::updateControls() {
                         slice.selection.width  == slice.source.GetWidth() &&
                         slice.selection.height == slice.source.GetHeight();
     size->SetSelection(whole_source ? 2 : 3);
-    result_label->SetLabel(_LABEL_2_("result with dimensions", to_string(slice.target_size.GetWidth()), to_string(slice.target_size.GetHeight())));
+    result_label->SetLabel(_LABEL_2_("result with dimensions", int_to_string(slice.target_size.GetWidth()), int_to_string(slice.target_size.GetHeight())));
   } else if (slice.selection.width == slice.target_size.GetWidth() && slice.selection.height == slice.target_size.GetHeight()) {
     size->SetSelection(0); // original size
   } else if (slice.selection.x == 0 && slice.selection.width  == slice.source.GetWidth() &&

@@ -123,7 +123,7 @@ void WelcomeWindow::onOpenSet(wxCommandEvent&) {
     settings.default_set_dir = dlg->GetDirectory();
     wxBusyCursor wait;
     try {
-      close(import_set(dlg->GetPath()));
+      close(import_set(dlg->GetPath().ToStdWstring()));
     } catch (Error& e) {
       wxMessageDialog dial = wxMessageDialog(this, _ERROR_("error loading set") + _("\n\n") + e.what(), _(""), wxOK|wxCENTRE|wxICON_ERROR);
       dial.ShowModal();

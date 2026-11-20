@@ -14,12 +14,6 @@
 
 DECLARE_POINTER_TYPE(SpellChecker);
 
-#ifdef UNICODE
-  typedef wxCharBuffer CharBuffer;
-#else
-  typedef const char* CharBuffer;
-#endif
-
 // ----------------------------------------------------------------------------- : Spell checker
 
 /// A spelling checker for a particular language
@@ -44,9 +38,14 @@ public:
   void suggest(const String& word, vector<String>& suggestions_out);
 
 private:
-  /// Convert between String and dictionary encoding
-  wxCSConv encoding;
-  bool convert_encoding(const String& word, CharBuffer& out);
+  /// The dictionary encoding (hunspell's SET, ISO8859-1 by default)
+  enum class Encoding { UTF8, LATIN1, OTHER };
+  Encoding encoding;
+  String encoding_name; ///< Only used for Encoding::OTHER
+  /// Convert from String to the dictionary encoding; false if the word can't be encoded
+  bool convert_encoding(const String& word, std::string& out);
+  /// Convert from the dictionary encoding to String; "" if that fails
+  String convert_from_encoding(const std::string& word);
 
   static map<String,SpellCheckerP> spellers; //< Cached checkers for each language
 };

@@ -245,7 +245,7 @@ void PackageDirectory::init(bool local) {
     // MSE_TEMPLATES_DIR (ADR 0008) points the test host at a template pack outside the user's data dir
     const char* templates_dir = std::getenv("MSE_TEMPLATES_DIR");
     if (templates_dir && *templates_dir) {
-      init(String(templates_dir, *wxConvFileName));
+      init(decode_utf8_or_latin1(templates_dir, strlen(templates_dir)));
     } else {
       init(user_data_dir() + _("/data"));
     }

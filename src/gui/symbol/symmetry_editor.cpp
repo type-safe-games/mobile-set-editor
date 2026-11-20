@@ -58,11 +58,11 @@ void SymbolSymmetryEditor::initUI(wxToolBar* tb, wxMenuBar* mb) {
   copies->SetHelpText(_HELP_("copies"));
   copies->SetSize(50, -1);
   tb->AddSeparator();
-  add_tool_tr(tb, ID_ADD_SYMMETRY, "symmetry_add", "add_symmetry", true, wxITEM_CHECK);
-  add_tool_tr(tb, ID_REMOVE_SYMMETRY, "symmetry_remove", "remove_symmetry", true, wxITEM_CHECK);
+  add_tool_tr(tb, ID_ADD_SYMMETRY, _("symmetry_add"), _("add_symmetry"), true, wxITEM_CHECK);
+  add_tool_tr(tb, ID_REMOVE_SYMMETRY, _("symmetry_remove"), _("remove_symmetry"), true, wxITEM_CHECK);
   tb->AddSeparator();
-  add_tool_tr(tb, ID_SYMMETRY_ROTATION, "symmetry_rotation", "rotation", true, wxITEM_CHECK);
-  add_tool_tr(tb, ID_SYMMETRY_REFLECTION, "symmetry_reflection", "reflection", true, wxITEM_CHECK);
+  add_tool_tr(tb, ID_SYMMETRY_ROTATION, _("symmetry_rotation"), _("rotation"), true, wxITEM_CHECK);
+  add_tool_tr(tb, ID_SYMMETRY_REFLECTION, _("symmetry_reflection"), _("reflection"), true, wxITEM_CHECK);
   tb->AddSeparator();
   tb->AddControl(copies);
   tb->Realize();

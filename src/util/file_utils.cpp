@@ -24,20 +24,21 @@ namespace fs = std::filesystem;
 
 // ----------------------------------------------------------------------------- : Path conversion
 
-// Paths are converted the same way wx converted file names (wxConvFileName), so non-ASCII names keep working.
+// On POSIX, paths are UTF-8 bytes. wx converted file names with wxConvFileName, which in the "C" and UTF-8
+// locales the program runs in also wrote UTF-8, and read UTF-8 falling back to ISO-8859-1 for invalid bytes.
+// (In other locales, e.g. ISO-8859-x, wx used the locale's encoding; we no longer do.)
 fs::path to_fs_path(const String& s) {
   #ifdef _WIN32
-    return fs::path(s.ToStdWstring());
+    return fs::path(s);
   #else
-    wxCharBuffer buf = s.fn_str();
-    return fs::path(buf.data() ? std::string(buf.data()) : std::string());
+    return fs::path(encode_utf8(s));
   #endif
 }
 static String from_fs_path(const fs::path& p) {
   #ifdef _WIN32
     return String(p.wstring());
   #else
-    return String(p.c_str(), *wxConvFileName);
+    return decode_utf8_or_latin1(p.c_str(), strlen(p.c_str()));
   #endif
 }
 

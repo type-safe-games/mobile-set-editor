@@ -161,7 +161,7 @@ void resample_and_clip(const Image& img_in, Image& img_out, wxRect rect) {
   if (img_in.HasOption(wxIMAGE_OPTION_PNG_DESCRIPTION)) {
     double scale_x = (double)img_out.GetWidth() / img_in.GetWidth();
     double scale_y = (double)img_out.GetHeight() / img_in.GetHeight();
-    String metadata = transformAllEncodedRects(img_in.GetOption(wxIMAGE_OPTION_PNG_DESCRIPTION), RealRect::scale, scale_x, scale_y);
+    String metadata = transformAllEncodedRects(img_in.GetOption(wxIMAGE_OPTION_PNG_DESCRIPTION).ToStdWstring(), RealRect::scale, scale_x, scale_y);
     img_out.SetOption(wxIMAGE_OPTION_PNG_DESCRIPTION, metadata);
   }
 }
@@ -288,7 +288,7 @@ void resample_nine_slice(const Image& img_in, Image& img_out, int left, int righ
         double y1 = map_axis(rect.y + rect.height, t, src_h, b, height);
         rect = RealRect(x0, y0, x1 - x0, y1 - y0);
       };
-    String metadata = transformAllEncodedRects(img_in.GetOption(wxIMAGE_OPTION_PNG_DESCRIPTION), nine_slice_transform, 0, 0);
+    String metadata = transformAllEncodedRects(img_in.GetOption(wxIMAGE_OPTION_PNG_DESCRIPTION).ToStdWstring(), nine_slice_transform, 0, 0);
     img_out.SetOption(wxIMAGE_OPTION_PNG_DESCRIPTION, metadata);
   }
 }
@@ -355,7 +355,7 @@ Image crop(const Image& base_img, int width, int height, int offset_x, int offse
 
   // recrop metadata
   if (base_img.HasOption(wxIMAGE_OPTION_PNG_DESCRIPTION)) {
-    String metadata = transformAllEncodedRects(base_img.GetOption(wxIMAGE_OPTION_PNG_DESCRIPTION), RealRect::translate, -offset_x, -offset_y);
+    String metadata = transformAllEncodedRects(base_img.GetOption(wxIMAGE_OPTION_PNG_DESCRIPTION).ToStdWstring(), RealRect::translate, -offset_x, -offset_y);
     // prune out of bounds cards
     boost::json::array cardsv = metadata_to_json(metadata);
     boost::json::array inbounds_cardsv;

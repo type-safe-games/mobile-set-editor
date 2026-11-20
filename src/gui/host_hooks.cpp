@@ -95,7 +95,7 @@ static DownloadResult download_file(const String& url, OutputStream& out, const 
 static int run_program(const vector<String>& arguments, bool wait) {
   if (arguments.empty()) return -1;
   vector<const wxChar*> argv;
-  for (const String& a : arguments) argv.push_back(a.wc_str());
+  for (const String& a : arguments) argv.push_back(a.c_str());
   argv.push_back(nullptr);
   long result = wxExecute(const_cast<wxChar**>(argv.data()), wait ? wxEXEC_SYNC : wxEXEC_ASYNC);
   if (wait) return (int)result;

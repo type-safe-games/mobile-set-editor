@@ -436,7 +436,7 @@ public:
   {}
   
   String get_command_and_clear() {
-    String command = GetValue();
+    String command = GetValue().ToStdWstring();
     history.push_back(command);
     history_pos = (int)history.size();
     SetValue(_(""));
@@ -464,7 +464,7 @@ private:
   // browse history for strings that share the part before the cursor with the current value in the control
   bool browse_history(int dir) {
     int caret = GetInsertionPoint();
-    String to_match = GetValue().substr(0, caret);
+    String to_match = GetValue().substr(0, caret).ToStdWstring();
     while (history_pos+dir >= 0 && history_pos+dir < (int)history.size()) {
       history_pos += dir;
       if (starts_with(history[history_pos],to_match)) {
@@ -520,7 +520,7 @@ ConsolePanel::ConsolePanel(Window* parent, int id)
 
   // init menus
   menuConsole = new wxMenu();
-  add_menu_item_tr(menuConsole, ID_CLEAR_CONSOLE, "clear_console", "clear console");
+  add_menu_item_tr(menuConsole, ID_CLEAR_CONSOLE, _("clear_console"), _("clear console"));
 }
 
 ConsolePanel::~ConsolePanel() {
@@ -546,7 +546,7 @@ void ConsolePanel::initUI(wxToolBar* tb, wxMenuBar* mb) {
   is_active_window = true;
   stop_blinker();
 
-  add_tool_tr(tb, ID_CLEAR_CONSOLE, "clear_console", "clear console");
+  add_tool_tr(tb, ID_CLEAR_CONSOLE, _("clear_console"), _("clear console"));
   tb->Realize();
 
   mb->Insert(2, menuConsole, _MENU_("console"));

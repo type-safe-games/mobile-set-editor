@@ -448,10 +448,10 @@ PrintJobP make_print_job(Window* parent, const SetP& set, const ExportCardSelect
     return PrintJobP(); // cancel
   } else {
     // save settings, make print job
-    String spacing = space->GetValue();
+    wxString spacing = space->GetValue();
     if (spacing.empty()) spacing = _("0");
     spacing.ToDouble(&settings.print_spacing);
-    String bleeding = bleed->GetValue();
+    wxString bleeding = bleed->GetValue();
     if (bleeding.empty()) bleeding = _("0");
     bleeding.ToDouble(&settings.print_bleed);
     settings.print_cutter_lines = (CutterLinesType)cutter->GetSelection();

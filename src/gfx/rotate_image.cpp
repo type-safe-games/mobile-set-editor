@@ -42,7 +42,7 @@ Image rotate_image_impl(const Image& img) {
   }
   // transfer metadata
   if (img.HasOption(wxIMAGE_OPTION_PNG_DESCRIPTION)) {
-    String metadata = transformAllEncodedRects(img.GetOption(wxIMAGE_OPTION_PNG_DESCRIPTION), RealRect::rotate, width, height, lround(rad_to_deg(Rotater::angle())));
+    String metadata = transformAllEncodedRects(img.GetOption(wxIMAGE_OPTION_PNG_DESCRIPTION).ToStdWstring(), RealRect::rotate, width, height, lround(rad_to_deg(Rotater::angle())));
     ret.SetOption(wxIMAGE_OPTION_PNG_DESCRIPTION, metadata);
   }
   // ret is rotated image
@@ -101,7 +101,7 @@ Image rotate_image(const Image& image, Radians angle) {
   else {
     if (!image.HasAlpha()) const_cast<Image&>(image).InitAlpha();
     Image ret = image.Rotate(angle, wxPoint(0,0));
-    ret.SetOption(wxIMAGE_OPTION_PNG_DESCRIPTION, image.GetOption(wxIMAGE_OPTION_PNG_DESCRIPTION));
+    ret.SetOption(wxIMAGE_OPTION_PNG_DESCRIPTION, image.GetOption(wxIMAGE_OPTION_PNG_DESCRIPTION).ToStdWstring());
     return ret;
   }
 }
@@ -133,7 +133,7 @@ Image flip_image_horizontal(Image const& img) {
     do_flip(img.GetAlpha(), out.GetAlpha(), 1, w, h);
   }
   if (img.HasOption(wxIMAGE_OPTION_PNG_DESCRIPTION)) {
-    String metadata = transformAllEncodedRects(img.GetOption(wxIMAGE_OPTION_PNG_DESCRIPTION), RealRect::flip, w, h, 1);
+    String metadata = transformAllEncodedRects(img.GetOption(wxIMAGE_OPTION_PNG_DESCRIPTION).ToStdWstring(), RealRect::flip, w, h, 1);
     out.SetOption(wxIMAGE_OPTION_PNG_DESCRIPTION, metadata);
   }
   return out;
@@ -148,7 +148,7 @@ Image flip_image_vertical(Image const& img) {
     do_flip(img.GetAlpha(), out.GetAlpha(), 1 * w, h);
   }
   if (img.HasOption(wxIMAGE_OPTION_PNG_DESCRIPTION)) {
-    String metadata = transformAllEncodedRects(img.GetOption(wxIMAGE_OPTION_PNG_DESCRIPTION), RealRect::flip, w, h, 0);
+    String metadata = transformAllEncodedRects(img.GetOption(wxIMAGE_OPTION_PNG_DESCRIPTION).ToStdWstring(), RealRect::flip, w, h, 0);
     out.SetOption(wxIMAGE_OPTION_PNG_DESCRIPTION, metadata);
   }
   return out;

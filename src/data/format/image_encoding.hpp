@@ -225,21 +225,21 @@ inline static bool decodeImageFromString(const String& string, Image& img_out) {
 inline static String metadata_merge(const Image& img1, const Image& img2, int offset_x1 = 0, int offset_y1 = 0, int offset_x2 = 0, int offset_y2 = 0)
 {
   if (img1.HasOption(wxIMAGE_OPTION_PNG_DESCRIPTION)) {
-    String metadata1 = img1.GetOption(wxIMAGE_OPTION_PNG_DESCRIPTION);
+    String metadata1 = img1.GetOption(wxIMAGE_OPTION_PNG_DESCRIPTION).ToStdWstring();
     if (offset_x1 != 0 || offset_y1 != 0) metadata1 = transformAllEncodedRects(metadata1, RealRect::translate, offset_x1, offset_y1);
     if (img2.HasOption(wxIMAGE_OPTION_PNG_DESCRIPTION)) {
-      String metadata2 = img2.GetOption(wxIMAGE_OPTION_PNG_DESCRIPTION);
+      String metadata2 = img2.GetOption(wxIMAGE_OPTION_PNG_DESCRIPTION).ToStdWstring();
       if (offset_x2 != 0 || offset_y2 != 0) metadata2 = transformAllEncodedRects(metadata2, RealRect::translate, offset_x2, offset_y2);
       size_t end1 = metadata1.find(_("</mse-card-data>"));
       size_t start2 = metadata2.find(_("<mse-card-data>"));
       if (end1 != String::npos && start2 != String::npos && end1 > 0 && start2 + 16 < metadata2.size()) {
-        metadata1 = metadata1.substr(0, end1 - 1) + "," + metadata2.substr(start2 + 16);
+        metadata1 = metadata1.substr(0, end1 - 1) + _(",") + metadata2.substr(start2 + 16);
       }
     }
     return metadata1;
   }
   else if (img2.HasOption(wxIMAGE_OPTION_PNG_DESCRIPTION)) {
-    String metadata2 = img2.GetOption(wxIMAGE_OPTION_PNG_DESCRIPTION);
+    String metadata2 = img2.GetOption(wxIMAGE_OPTION_PNG_DESCRIPTION).ToStdWstring();
     if (offset_x2 != 0 || offset_y2 != 0) metadata2 = transformAllEncodedRects(metadata2, RealRect::translate, offset_x2, offset_y2);
     return metadata2;
   }

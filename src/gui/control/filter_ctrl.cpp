@@ -95,7 +95,7 @@ void FilterCtrl::update() {
 
 void FilterCtrl::onChangeEvent(wxCommandEvent&) {
   if (!changing) {
-    setFilter(GetValue(),true);
+    setFilter(GetValue().ToStdWstring(),true);
   }
 }
 void FilterCtrl::onChar(wxKeyEvent& ev) {

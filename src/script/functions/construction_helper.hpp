@@ -82,7 +82,7 @@ inline static void set_image_from_external_string(Set* set, ImageValue* ivalue, 
       loaded = make_intrusive<ImportedImage>(set, string);
     }
     ExternalImage* ext = dynamic_cast<ExternalImage*>(loaded.get());
-    ivalue->filename = LocalFileName::fromReadString(ext->toString(), "");
+    ivalue->filename = LocalFileName::fromReadString(ext->toString(), _(""));
   } catch (const ScriptError& e) {
     queue_message(MESSAGE_ERROR, e.what());
     ivalue->filename.makeEmpty();
@@ -107,7 +107,7 @@ inline static void set_container(Set* set, Value* container, String type, Script
   }
   else if (ImageValue* ivalue = dynamic_cast<ImageValue*>(container)) {
     if (ExternalImage* img = dynamic_cast<ExternalImage*>(value.get())) {
-      ivalue->filename = LocalFileName::fromReadString(img->toString(), "");
+      ivalue->filename = LocalFileName::fromReadString(img->toString(), _(""));
     } else if (value->type() == SCRIPT_STRING) {
       String str = value->toString();
       if (trim(str).empty()) {
@@ -117,7 +117,7 @@ inline static void set_container(Set* set, Value* container, String type, Script
       } else if (looks_like_local_path(str)) {
         set_image_from_external_string(set, ivalue, str, false);
       } else {
-        ivalue->filename = LocalFileName::fromReadString(str, "");
+        ivalue->filename = LocalFileName::fromReadString(str, _(""));
       }
     } else {
       throw ScriptError(_ERROR_1_("cant set image value", key_name));
@@ -125,7 +125,7 @@ inline static void set_container(Set* set, Value* container, String type, Script
   }
   else if (SymbolValue* svalue = dynamic_cast<SymbolValue*>(container)) {
     if (value->type() == SCRIPT_STRING) {
-      svalue->filename = LocalFileName::fromReadString(value->toString(), "");
+      svalue->filename = LocalFileName::fromReadString(value->toString(), _(""));
     } else {
       throw ScriptError(_ERROR_1_("cant set symbol value", key_name));
     }
@@ -252,10 +252,10 @@ inline static bool cards_from_table(SetP& set, vector<String>& headers, std::vec
   }
   // set up context
   Context& ctx = set->getContext();
-  ScriptValueP new_card_function = ctx.getVariable("new_card");
+  ScriptValueP new_card_function = ctx.getVariable(_("new_card"));
   ScriptValueP ctx_input = ctx.getVariableOpt(SCRIPT_VAR_input);
-  ScriptValueP ctx_ignore = ctx.getVariableOpt("ignore_field_not_found");
-  ctx.setVariable("ignore_field_not_found", to_script(ignore_field_not_found));
+  ScriptValueP ctx_ignore = ctx.getVariableOpt(_("ignore_field_not_found"));
+  ctx.setVariable(_("ignore_field_not_found"), to_script(ignore_field_not_found));
   int total = (int)table.size();
   bool cancelled = false;
   // produce cards from table
@@ -281,6 +281,6 @@ inline static bool cards_from_table(SetP& set, vector<String>& headers, std::vec
     cards_out.push_back(card);
   }
   if (ctx_input) ctx.setVariable(SCRIPT_VAR_input, ctx_input);
-  if (ctx_ignore) ctx.setVariable("ignore_field_not_found", ctx_ignore);
+  if (ctx_ignore) ctx.setVariable(_("ignore_field_not_found"), ctx_ignore);
   return !cancelled;
 }

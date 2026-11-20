@@ -116,7 +116,7 @@ void PackTotalsPanel::draw(DC& dc) {
 void PackTotalsPanel::drawItem(DC& dc, int& y,  const String& name, double value) {
   wxSize size = dc.GetSize();
   int w,h;
-  String amount = String::Format(_("%.f"),value);
+  String amount = wxString::Format(_("%.f"),value).ToStdWstring();
   dc.GetTextExtent(amount,&w,&h);
   dc.DrawText(name,   0,        y);
   dc.DrawText(amount, size.x-w, y);//align right
@@ -376,7 +376,7 @@ bool CustomPackDialog::isDuplicateName(const String& name) {
 
 void CustomPackDialog::onOk(wxCommandEvent&) {
   // check for duplicates
-  if (isDuplicateName(name->GetValue())) {
+  if (isDuplicateName(name->GetValue().ToStdWstring())) {
     wxMessageBox(_ERROR_1_("pack type duplicate name",name->GetValue()),_TITLE_("custom pack"),wxOK|wxICON_EXCLAMATION);
     return;
   }
@@ -628,7 +628,7 @@ int RandomPackPanel::getSeed() {
          + clock() % 1000;
   } else {
     // convert *any* string to a number
-    String s = this->seed->GetValue();
+    String s = this->seed->GetValue().ToStdWstring();
     FOR_EACH_CONST(c,s) {
       seed *= 10;
       seed += abs(c - '0') + 123456789*(abs(c - '0')/10);

@@ -116,15 +116,15 @@ void SymbolSelectEditor::drawRotationCenter(DC& dc, const Vector2D& pos) {
 
 void SymbolSelectEditor::initUI(wxToolBar* tb, wxMenuBar* mb) {
   tb->AddSeparator();
-  add_tool_tr(tb, ID_SYMBOL_COMBINE_MERGE, "combine_or", "merge", true, wxITEM_CHECK);
-  add_tool_tr(tb, ID_SYMBOL_COMBINE_SUBTRACT, "combine_sub_dark", "subtract", true, wxITEM_CHECK);
-  add_tool_tr(tb, ID_SYMBOL_COMBINE_INTERSECTION, "combine_and_dark", "intersect", true, wxITEM_CHECK);
-  add_tool_tr(tb, ID_SYMBOL_COMBINE_DIFFERENCE, "combine_xor", "difference", true, wxITEM_CHECK);
-  add_tool_tr(tb, ID_SYMBOL_COMBINE_OVERLAP, "combine_over", "overlap", true, wxITEM_CHECK);
+  add_tool_tr(tb, ID_SYMBOL_COMBINE_MERGE, _("combine_or"), _("merge"), true, wxITEM_CHECK);
+  add_tool_tr(tb, ID_SYMBOL_COMBINE_SUBTRACT, _("combine_sub_dark"), _("subtract"), true, wxITEM_CHECK);
+  add_tool_tr(tb, ID_SYMBOL_COMBINE_INTERSECTION, _("combine_and_dark"), _("intersect"), true, wxITEM_CHECK);
+  add_tool_tr(tb, ID_SYMBOL_COMBINE_DIFFERENCE, _("combine_xor"), _("difference"), true, wxITEM_CHECK);
+  add_tool_tr(tb, ID_SYMBOL_COMBINE_OVERLAP, _("combine_over"), _("overlap"), true, wxITEM_CHECK);
   tb->AddSeparator();
-  add_tool_tr(tb, ID_SYMBOL_REGION_FILL,   "region_fill",   "fill",   true, wxITEM_CHECK);
-  add_tool_tr(tb, ID_SYMBOL_REGION_ACCENT, "region_accent", "accent", true, wxITEM_CHECK);
-  add_tool_tr(tb, ID_SYMBOL_REGION_BORDER, "combine_border", "border", true, wxITEM_CHECK);
+  add_tool_tr(tb, ID_SYMBOL_REGION_FILL,   _("region_fill"),   _("fill"),   true, wxITEM_CHECK);
+  add_tool_tr(tb, ID_SYMBOL_REGION_ACCENT, _("region_accent"), _("accent"), true, wxITEM_CHECK);
+  add_tool_tr(tb, ID_SYMBOL_REGION_BORDER, _("combine_border"), _("border"), true, wxITEM_CHECK);
   tb->Realize();
 }
 void SymbolSelectEditor::destroyUI(wxToolBar* tb, wxMenuBar* mb) {

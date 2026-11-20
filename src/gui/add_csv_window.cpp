@@ -69,7 +69,7 @@ void AddCSVWindow::onSeparatorTypeChange(wxCommandEvent&) {
 void AddCSVWindow::onBrowseFiles(wxCommandEvent&) {
   wxFileDialog* dlg = new wxFileDialog(this, _TITLE_("add card csv file"), settings.default_import_dir, _(""), _("CSV files|*.csv;*.tsv|All files (*.*)|*"), wxFD_OPEN);
   if (dlg->ShowModal() == wxID_OK) {
-    const String& path = dlg->GetPath();
+    const wxString& path = dlg->GetPath();
     file_path->SetValue(path);
     settings.default_import_dir = wxPathOnly(path);
   }
@@ -150,7 +150,7 @@ bool AddCSVWindow::readCSV(std::ifstream& in, std::vector<String>& headers_out, 
   // Parse headers
   std::vector<std::string> headers = readCSVRow(rows[0]);
   for (int x = 0; x < headers.size(); ++x) {
-    String wxstring(headers[x].c_str(), wxConvUTF8);
+    String wxstring = decode_utf8(headers[x]);
     headers_out.push_back(wxstring);
   }
   // Parse rows, add to table
@@ -158,9 +158,9 @@ bool AddCSVWindow::readCSV(std::ifstream& in, std::vector<String>& headers_out, 
     auto fields = readCSVRow(rows[y]);
     std::vector<ScriptValueP> values;
     for (int x = 0; x < fields.size(); ++x) {
-      String wxstring = String(fields[x].c_str(), wxConvUTF8);
-      if (wxstring.empty()) wxstring = String(fields[x].c_str(), wxConvWhateverWorks);
-      wxstring.Replace(_("\\n"), _("\n"));
+      String wxstring = decode_utf8(fields[x]);
+      if (wxstring.empty()) wxstring = decode_utf8_or_latin1(fields[x].data(), fields[x].size());
+      wxstring = replace_all(wxstring, _("\\n"), _("\n"));
       if (wxstring == _("nil")) values.push_back(script_nil); 
       else values.push_back(to_script(wxstring));
     }

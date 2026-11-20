@@ -114,43 +114,43 @@ CardsPanel::CardsPanel(Window* parent, int id)
   
   // init menus
   menuCard = new wxMenu();
-    add_menu_item_tr(menuCard, ID_CARD_PREV, nullptr, "previous card");
-    add_menu_item_tr(menuCard, ID_CARD_NEXT, nullptr, "next card");
-    add_menu_item_tr(menuCard, ID_CARD_SEARCH, nullptr, "search cards");
+    add_menu_item_tr(menuCard, ID_CARD_PREV, String(), _("previous card"));
+    add_menu_item_tr(menuCard, ID_CARD_NEXT, String(), _("next card"));
+    add_menu_item_tr(menuCard, ID_CARD_SEARCH, String(), _("search cards"));
     menuCard->AppendSeparator();
-    add_menu_item_tr(menuCard, ID_CARD_ADD, "card_add", "add_card");
-    add_menu_item_tr(menuCard, ID_CARD_ADD_DOUBLE, "card_add_double", "add_card_double");
-    insertManyCardsMenu = add_menu_item_tr(menuCard, ID_CARD_ADD_MULT, "card_add_multiple", "add cards", wxITEM_NORMAL, new wxMenu());
+    add_menu_item_tr(menuCard, ID_CARD_ADD, _("card_add"), _("add_card"));
+    add_menu_item_tr(menuCard, ID_CARD_ADD_DOUBLE, _("card_add_double"), _("add_card_double"));
+    insertManyCardsMenu = add_menu_item_tr(menuCard, ID_CARD_ADD_MULT, _("card_add_multiple"), _("add cards"), wxITEM_NORMAL, new wxMenu());
     // NOTE: space after "Del" prevents wx from making del an accellerator
     // otherwise we delete a card when delete is pressed inside the editor
     // Adding a space never hurts, please keep it just to be safe.
-    add_menu_item(menuCard, ID_CARD_ADD_CSV, "card_add_multiple", _MENU_("add card csv") + _(" "), _HELP_("add card csv"));
-    add_menu_item(menuCard, ID_CARD_ADD_JSON, "card_add_multiple", _MENU_("add card json") + _(" "), _HELP_("add card json"));
-    add_menu_item(menuCard, ID_CARD_REMOVE, "card_del", _MENU_("remove card")+_(" "), _HELP_("remove card"));
-    add_menu_item(menuCard, ID_CARD_LINK, settings.darkModePrefix() + "card_link", _MENU_("link card") + _(" "), _HELP_("link card"));
-    add_menu_item(menuCard, ID_CARD_AND_LINK_COPY, "card_copy", _MENU_("copy card and links") + _(" "), _HELP_("copy card and links"));
-    add_menu_item(menuCard, ID_CARD_BULK, "card_modify_multiple", _MENU_("bulk modify") + _(" "), _HELP_("bulk modify"));
+    add_menu_item(menuCard, ID_CARD_ADD_CSV, _("card_add_multiple"), _MENU_("add card csv") + _(" "), _HELP_("add card csv"));
+    add_menu_item(menuCard, ID_CARD_ADD_JSON, _("card_add_multiple"), _MENU_("add card json") + _(" "), _HELP_("add card json"));
+    add_menu_item(menuCard, ID_CARD_REMOVE, _("card_del"), _MENU_("remove card")+_(" "), _HELP_("remove card"));
+    add_menu_item(menuCard, ID_CARD_LINK, settings.darkModePrefix() + _("card_link"), _MENU_("link card") + _(" "), _HELP_("link card"));
+    add_menu_item(menuCard, ID_CARD_AND_LINK_COPY, _("card_copy"), _MENU_("copy card and links") + _(" "), _HELP_("copy card and links"));
+    add_menu_item(menuCard, ID_CARD_BULK, _("card_modify_multiple"), _MENU_("bulk modify") + _(" "), _HELP_("bulk modify"));
     menuCard->AppendSeparator();
     auto menuRotate = new wxMenu();
-      add_menu_item_tr(menuRotate, ID_CARD_ROTATE_0, "card_rotate_0", "rotate_0", wxITEM_CHECK);
-      add_menu_item_tr(menuRotate, ID_CARD_ROTATE_270, "card_rotate_270", "rotate_270", wxITEM_CHECK);
-      add_menu_item_tr(menuRotate, ID_CARD_ROTATE_180, "card_rotate_180", "rotate_180", wxITEM_CHECK);
-      add_menu_item_tr(menuRotate, ID_CARD_ROTATE_90, "card_rotate_90", "rotate_90", wxITEM_CHECK);
-    add_menu_item_tr(menuCard, wxID_ANY, "card_rotate", "orientation", wxITEM_NORMAL, menuRotate);
+      add_menu_item_tr(menuRotate, ID_CARD_ROTATE_0, _("card_rotate_0"), _("rotate_0"), wxITEM_CHECK);
+      add_menu_item_tr(menuRotate, ID_CARD_ROTATE_270, _("card_rotate_270"), _("rotate_270"), wxITEM_CHECK);
+      add_menu_item_tr(menuRotate, ID_CARD_ROTATE_180, _("card_rotate_180"), _("rotate_180"), wxITEM_CHECK);
+      add_menu_item_tr(menuRotate, ID_CARD_ROTATE_90, _("card_rotate_90"), _("rotate_90"), wxITEM_CHECK);
+    add_menu_item_tr(menuCard, wxID_ANY, _("card_rotate"), _("orientation"), wxITEM_NORMAL, menuRotate);
     menuCard->AppendSeparator();
     // This probably belongs in the window menu, but there we can't remove the separator once it is added
-    add_menu_item_tr(menuCard, ID_SELECT_COLUMNS, nullptr, "card_list_columns");
+    add_menu_item_tr(menuCard, ID_SELECT_COLUMNS, String(), _("card_list_columns"));
   
   menuFormat = new wxMenu();
-    add_menu_item_tr(menuFormat, ID_FORMAT_FONT,          settings.darkModePrefix() + "font",          "font",          wxITEM_CHECK);
-    add_menu_item_tr(menuFormat, ID_FORMAT_BOLD,          settings.darkModePrefix() + "bold",          "bold",          wxITEM_CHECK);
-    add_menu_item_tr(menuFormat, ID_FORMAT_ITALIC,        settings.darkModePrefix() + "italic",        "italic",        wxITEM_CHECK);
-    add_menu_item_tr(menuFormat, ID_FORMAT_UNDERLINE,     settings.darkModePrefix() + "underline",     "underline",     wxITEM_CHECK);
-    add_menu_item_tr(menuFormat, ID_FORMAT_STRIKETHROUGH, settings.darkModePrefix() + "strikethrough", "strikethrough", wxITEM_CHECK);
-    add_menu_item_tr(menuFormat, ID_FORMAT_COLOR,                                     "color_text",    "color_text",    wxITEM_CHECK);
-    add_menu_item_tr(menuFormat, ID_FORMAT_BULLETPOINT,   settings.darkModePrefix() + "bullet_point",  "bullet_point",  wxITEM_CHECK);
-    add_menu_item_tr(menuFormat, ID_FORMAT_SYMBOL,        settings.darkModePrefix() + "symbol",        "symbols",       wxITEM_CHECK);
-    add_menu_item_tr(menuFormat, ID_FORMAT_REMINDER,      settings.darkModePrefix() + "reminder",      "reminder_text", wxITEM_CHECK);
+    add_menu_item_tr(menuFormat, ID_FORMAT_FONT,          settings.darkModePrefix() + _("font"),          _("font"),          wxITEM_CHECK);
+    add_menu_item_tr(menuFormat, ID_FORMAT_BOLD,          settings.darkModePrefix() + _("bold"),          _("bold"),          wxITEM_CHECK);
+    add_menu_item_tr(menuFormat, ID_FORMAT_ITALIC,        settings.darkModePrefix() + _("italic"),        _("italic"),        wxITEM_CHECK);
+    add_menu_item_tr(menuFormat, ID_FORMAT_UNDERLINE,     settings.darkModePrefix() + _("underline"),     _("underline"),     wxITEM_CHECK);
+    add_menu_item_tr(menuFormat, ID_FORMAT_STRIKETHROUGH, settings.darkModePrefix() + _("strikethrough"), _("strikethrough"), wxITEM_CHECK);
+    add_menu_item_tr(menuFormat, ID_FORMAT_COLOR,                                     _("color_text"),    _("color_text"),    wxITEM_CHECK);
+    add_menu_item_tr(menuFormat, ID_FORMAT_BULLETPOINT,   settings.darkModePrefix() + _("bullet_point"),  _("bullet_point"),  wxITEM_CHECK);
+    add_menu_item_tr(menuFormat, ID_FORMAT_SYMBOL,        settings.darkModePrefix() + _("symbol"),        _("symbols"),       wxITEM_CHECK);
+    add_menu_item_tr(menuFormat, ID_FORMAT_REMINDER,      settings.darkModePrefix() + _("reminder"),      _("reminder_text"), wxITEM_CHECK);
     menuFormat->AppendSeparator();
     insertSymbolMenu = new wxMenuItem(menuFormat, ID_INSERT_SYMBOL, _MENU_("insert symbol"));
     menuFormat->Append(insertSymbolMenu);
@@ -301,8 +301,8 @@ wxMenu* CardsPanel::makeAddCardsSubmenu(bool add_single_card_option) {
   // default item?
   if (add_single_card_option) {
     cards_scripts_menu = new wxMenu();
-    add_menu_item_tr(cards_scripts_menu, ID_CARD_ADD, "card_add", "add_card");
-    add_menu_item_tr(cards_scripts_menu, ID_CARD_ADD_DOUBLE, "card_add_double", "add_card_double");
+    add_menu_item_tr(cards_scripts_menu, ID_CARD_ADD, _("card_add"), _("add_card"));
+    add_menu_item_tr(cards_scripts_menu, ID_CARD_ADD_DOUBLE, _("card_add_double"), _("add_card_double"));
     cards_scripts_menu->AppendSeparator();
   }
   // create menu for add_cards_scripts
@@ -320,27 +320,27 @@ wxMenu* CardsPanel::makeAddCardsSubmenu(bool add_single_card_option) {
 
 void CardsPanel::initUI(wxToolBar* tb, wxMenuBar* mb) {
   // Toolbar
-  add_tool_tr(tb, ID_FORMAT_FONT,          settings.darkModePrefix() + "font",          "font",          false, wxITEM_CHECK);
-  add_tool_tr(tb, ID_FORMAT_BOLD,          settings.darkModePrefix() + "bold",          "bold",          false, wxITEM_CHECK);
-  add_tool_tr(tb, ID_FORMAT_ITALIC,        settings.darkModePrefix() + "italic",        "italic",        false, wxITEM_CHECK);
-  add_tool_tr(tb, ID_FORMAT_UNDERLINE,     settings.darkModePrefix() + "underline",     "underline",     false, wxITEM_CHECK);
-  add_tool_tr(tb, ID_FORMAT_STRIKETHROUGH, settings.darkModePrefix() + "strikethrough", "strikethrough", false, wxITEM_CHECK);
-  add_tool_tr(tb, ID_FORMAT_COLOR,                                     "color_text",    "color_text",    false, wxITEM_CHECK);
-  add_tool_tr(tb, ID_FORMAT_BULLETPOINT,   settings.darkModePrefix() + "bullet_point",  "bullet_point",  false, wxITEM_CHECK);
-  add_tool_tr(tb, ID_FORMAT_SYMBOL,        settings.darkModePrefix() + "symbol",        "symbols",       false, wxITEM_CHECK);
-  add_tool_tr(tb, ID_FORMAT_REMINDER,      settings.darkModePrefix() + "reminder",      "reminder_text", false, wxITEM_CHECK);
+  add_tool_tr(tb, ID_FORMAT_FONT,          settings.darkModePrefix() + _("font"),          _("font"),          false, wxITEM_CHECK);
+  add_tool_tr(tb, ID_FORMAT_BOLD,          settings.darkModePrefix() + _("bold"),          _("bold"),          false, wxITEM_CHECK);
+  add_tool_tr(tb, ID_FORMAT_ITALIC,        settings.darkModePrefix() + _("italic"),        _("italic"),        false, wxITEM_CHECK);
+  add_tool_tr(tb, ID_FORMAT_UNDERLINE,     settings.darkModePrefix() + _("underline"),     _("underline"),     false, wxITEM_CHECK);
+  add_tool_tr(tb, ID_FORMAT_STRIKETHROUGH, settings.darkModePrefix() + _("strikethrough"), _("strikethrough"), false, wxITEM_CHECK);
+  add_tool_tr(tb, ID_FORMAT_COLOR,                                     _("color_text"),    _("color_text"),    false, wxITEM_CHECK);
+  add_tool_tr(tb, ID_FORMAT_BULLETPOINT,   settings.darkModePrefix() + _("bullet_point"),  _("bullet_point"),  false, wxITEM_CHECK);
+  add_tool_tr(tb, ID_FORMAT_SYMBOL,        settings.darkModePrefix() + _("symbol"),        _("symbols"),       false, wxITEM_CHECK);
+  add_tool_tr(tb, ID_FORMAT_REMINDER,      settings.darkModePrefix() + _("reminder"),      _("reminder_text"), false, wxITEM_CHECK);
   tb->AddSeparator();
-  toolAddCard = add_tool_tr(tb, ID_CARD_ADD, "card_add", "add_card", false, wxITEM_DROPDOWN);
+  toolAddCard = add_tool_tr(tb, ID_CARD_ADD, _("card_add"), _("add_card"), false, wxITEM_DROPDOWN);
   tb->SetDropdownMenu(ID_CARD_ADD, makeAddCardsSubmenu(true));
-  add_tool_tr(tb, ID_CARD_REMOVE, "card_del", "remove_card");
-  add_tool_tr(tb, ID_CARD_LINK, settings.darkModePrefix() + "card_link", "link_card");
+  add_tool_tr(tb, ID_CARD_REMOVE, _("card_del"), _("remove_card"));
+  add_tool_tr(tb, ID_CARD_LINK, settings.darkModePrefix() + _("card_link"), _("link_card"));
   tb->AddSeparator();
-  add_tool_tr(tb, ID_CARD_ROTATE, "card_rotate", "rotate_card", false, wxITEM_DROPDOWN);
+  add_tool_tr(tb, ID_CARD_ROTATE, _("card_rotate"), _("rotate_card"), false, wxITEM_DROPDOWN);
   auto menuRotate = new wxMenu();
-    add_menu_item_tr(menuRotate, ID_CARD_ROTATE_0, "card_rotate_0", "rotate_0", wxITEM_CHECK);
-    add_menu_item_tr(menuRotate, ID_CARD_ROTATE_270, "card_rotate_270", "rotate_270", wxITEM_CHECK);
-    add_menu_item_tr(menuRotate, ID_CARD_ROTATE_180, "card_rotate_180", "rotate_180", wxITEM_CHECK);
-    add_menu_item_tr(menuRotate, ID_CARD_ROTATE_90, "card_rotate_90", "rotate_90", wxITEM_CHECK);
+    add_menu_item_tr(menuRotate, ID_CARD_ROTATE_0, _("card_rotate_0"), _("rotate_0"), wxITEM_CHECK);
+    add_menu_item_tr(menuRotate, ID_CARD_ROTATE_270, _("card_rotate_270"), _("rotate_270"), wxITEM_CHECK);
+    add_menu_item_tr(menuRotate, ID_CARD_ROTATE_180, _("card_rotate_180"), _("rotate_180"), wxITEM_CHECK);
+    add_menu_item_tr(menuRotate, ID_CARD_ROTATE_90, _("card_rotate_90"), _("rotate_90"), wxITEM_CHECK);
   tb->SetDropdownMenu(ID_CARD_ROTATE, menuRotate);
   // Filter/search textbox
   tb->AddSeparator();
@@ -476,8 +476,8 @@ void CardsPanel::onCommand(int id) {
       cards.push_back(make_intrusive<Card>(*set->game));
       cards[0]->linked_card_1 = cards[1]->uid;
       cards[1]->linked_card_1 = cards[0]->uid;
-      cards[0]->linked_relation_1 = "Back Face";
-      cards[1]->linked_relation_1 = "Front Face";
+      cards[0]->linked_relation_1 = _("Back Face");
+      cards[1]->linked_relation_1 = _("Front Face");
       set->actions.addAction(make_unique<AddCardAction>(ADD, *set, cards));
       break;
     }
@@ -670,7 +670,7 @@ public:
     panel.setCard(card, true);
     // Replace
     if (was_selection) {
-      panel.editor->insert(escape(what.GetReplaceString()), _("Replace"));
+      panel.editor->insert(escape(what.GetReplaceString().ToStdWstring()), _("Replace"));
       return false;
     } else {
       return true;

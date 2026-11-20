@@ -172,14 +172,14 @@ private:
           if (package_manager.installedVersion(p->description->name, v) && v < p->description->version) {
             if (
                  (settings.check_updates_what == CHECK_EVERYTHING)
-              || (settings.check_updates_what == CHECK_GAMES && (  p->description->name.EndsWith("mse-updater")
-                                                                || p->description->name.EndsWith("mse-locale")
-                                                                || p->description->name.EndsWith("mse-game")
-                                                                || p->description->name.EndsWith("mse-include")
-                                                                || p->description->name.EndsWith("mse-style")
-                                                                || p->description->name.EndsWith("mse-symbol-font")))
-              || (settings.check_updates_what == CHECK_APP   && (  p->description->name.EndsWith("mse-updater")
-                                                                || p->description->name.EndsWith("mse-locale")))
+              || (settings.check_updates_what == CHECK_GAMES && (  ends_with(p->description->name, _("mse-updater"))
+                                                                || ends_with(p->description->name, _("mse-locale"))
+                                                                || ends_with(p->description->name, _("mse-game"))
+                                                                || ends_with(p->description->name, _("mse-include"))
+                                                                || ends_with(p->description->name, _("mse-style"))
+                                                                || ends_with(p->description->name, _("mse-symbol-font"))))
+              || (settings.check_updates_what == CHECK_APP   && (  ends_with(p->description->name, _("mse-updater"))
+                                                                || ends_with(p->description->name, _("mse-locale"))))
             ) {
               downloadable_installers.check_status = FOUND;
               return;

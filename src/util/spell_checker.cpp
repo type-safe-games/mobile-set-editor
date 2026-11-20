@@ -59,8 +59,22 @@ SpellChecker* SpellChecker::get(const String& filename, const String& language) 
 
 SpellChecker::SpellChecker(const char* aff_path, const char* dic_path)
   : Hunspell(aff_path,dic_path)
-  , encoding(String(get_dic_encoding(), IF_UNICODE(wxConvLibc, wxSTRING_MAXLEN)))
-{}
+{
+  // Dictionaries are UTF-8 or (hunspell's default without a SET line) ISO8859-1; those are converted without wx.
+  String name = decode_utf8_or_latin1(get_dic_encoding(), strlen(get_dic_encoding()));
+  String key;
+  for (Char c : name) {
+    if (c != _('-') && c != _('_')) key += toUpper(c);
+  }
+  if (key == _("UTF8")) {
+    encoding = Encoding::UTF8;
+  } else if (key == _("ISO88591") || key == _("LATIN1")) {
+    encoding = Encoding::LATIN1;
+  } else {
+    encoding = Encoding::OTHER;
+    encoding_name = name;
+  }
+}
 
 void SpellChecker::destroyAll() {
   spellers.clear();
@@ -68,7 +82,7 @@ void SpellChecker::destroyAll() {
 
 // ----------------------------------------------------------------------------- : Spell checker : use
 
-bool SpellChecker::convert_encoding(const String& word, CharBuffer& out) {
+bool SpellChecker::convert_encoding(const String& word, std::string& out) {
   // fix curly quotes, especially apstrophes
   String fixed;
   FOR_EACH_CONST(c,word) {
@@ -92,8 +106,20 @@ bool SpellChecker::convert_encoding(const String& word, CharBuffer& out) {
     }
   }
   // convert encoding
-  out = fixed.mb_str(encoding);
-  if (!out || *out == '\0') {
+  out.clear();
+  if (encoding == Encoding::UTF8) {
+    out = encode_utf8(fixed);
+  } else if (encoding == Encoding::LATIN1) {
+    for (Char c : fixed) {
+      if ((unsigned)c > 0xFF) { out.clear(); break; }
+      out += (char)(unsigned char)c;
+    }
+  } else {
+    // wx boundary (#30): other 8-bit dictionary encodings (none in the template pack) have no wx-free converter yet
+    wxCharBuffer buf = wxString(fixed).mb_str(wxCSConv(wxString(encoding_name)));
+    if (buf.data()) out = buf.data();
+  }
+  if (out.empty() || out[0] == '\0') {
     // If encoding fails we get an empty string, since the word was not empty this can never happen
     // words that can't be encoded are not in the dictionary, so they are wrong.
     return false;
@@ -102,23 +128,31 @@ bool SpellChecker::convert_encoding(const String& word, CharBuffer& out) {
   }
 }
 
+String SpellChecker::convert_from_encoding(const std::string& word) {
+  if (encoding == Encoding::UTF8) {
+    return decode_utf8(word);
+  } else if (encoding == Encoding::LATIN1) {
+    String ret;
+    for (char c : word) ret += (Char)(unsigned char)c;
+    return ret;
+  } else {
+    // wx boundary (#30): no wx-free converter for arbitrary 8-bit encodings yet
+    return wxString(word.c_str(), wxCSConv(wxString(encoding_name))).ToStdWstring();
+  }
+}
+
 bool SpellChecker::spell(const String& word) {
   if (word.empty()) return true; // empty word is okay
-  CharBuffer str;
+  std::string str;
   if (!convert_encoding(word,str)) return false;
   return Hunspell::spell(str);
 }
 
 void SpellChecker::suggest(const String& word, vector<String>& suggestions_out) {
-  CharBuffer str;
+  std::string str;
   if (!convert_encoding(word,str)) return;
-  // call Hunspell
-  char** suggestions;
-  int num_suggestions = Hunspell::suggest(&suggestions, str);
-  // copy sugestions
-  for (int i = 0 ; i < num_suggestions ; ++i) {
-    suggestions_out.push_back(String(suggestions[i],encoding));
-    free(suggestions[i]);
+  // call Hunspell, copy sugestions
+  for (const std::string& suggestion : Hunspell::suggest(str)) {
+    suggestions_out.push_back(convert_from_encoding(suggestion));
   }
-  free(suggestions);
 }

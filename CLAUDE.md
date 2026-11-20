@@ -7,9 +7,10 @@ minizip-ng is vendored as a pinned submodule in `third_party/minizip-ng` (CMake 
 
 - `doc/` is MSE's own user/template documentation. `docs/` is this project's agent and
   design docs (`docs/agents/`, `docs/adr/`). Don't mix them.
-- The core leaks wx everywhere: `String` is `wxString`, `Image`/`Bitmap`/`DC` are wx
-  types (`src/util/prec.hpp`, `src/util/string.hpp`). Check this before assuming any
-  module is GUI-free.
+- wx is being removed from the core in ADR 0003's order. `String` is now `std::wstring`
+  (free functions in `src/util/string.hpp`), but `Image`/`Bitmap`/`DC` are still wx types
+  (`src/util/prec.hpp`). The core reaches the GUI only through host hooks, which the
+  desktop app installs in `src/gui/host_hooks.cpp`.
 - Headless testing goes through the CLI: `magicseteditor --cli <script.mse-script>`
   (see `test/tests.cmake`).
 

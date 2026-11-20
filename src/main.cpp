@@ -107,13 +107,13 @@ int MSE::OnRun() {
       // ingnore the --color argument, it is handled by cli.init()
       vector<String> args;
       for (int i = 1; i < argc; ++i) {
-        args.push_back(argv[i]);
+        args.push_back(argv[i].ToStdWstring());
         if (args.back() == _("--color")) args.pop_back();
       }
       if (!args.empty()) {
         const String& arg = args[0];
         // Find the extension
-        wxFileName f(arg.Mid(0,arg.find_last_not_of(_("\\/")) + 1));
+        wxFileName f(arg.substr(0,arg.find_last_not_of(_("\\/")) + 1));
         if (f.GetExt() == _("mse-symbol")) {
           // Show the symbol editor
           Window* wnd = new SymbolWindow(nullptr, arg);
@@ -132,7 +132,7 @@ int MSE::OnRun() {
               parse_enum(String(args[1]).substr(2), type);
             }
           }
-          InstallerP installer = open_package<Installer>(argv[1]);
+          InstallerP installer = open_package<Installer>(argv[1].ToStdWstring());
           PackagesWindow wnd(nullptr, installer);
           wnd.ShowModal();
           return EXIT_SUCCESS;

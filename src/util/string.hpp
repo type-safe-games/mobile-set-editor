@@ -23,26 +23,7 @@
 // ----------------------------------------------------------------------------- : String type
 
 /// The string type used throughout MSE
-typedef wxString String;
-
-inline wxStdString const& toStdString(String const& s) {
-  #if wxUSE_UNICODE_WCHAR
-    return s.ToStdWstring();
-  #else
-    return s.ToStdString();
-  #endif
-}
-
-#if wxVERSION_NUMBER < 3100
-// wxWidgets 3.1.0 added this specialization
-namespace std {
-  template<> struct hash<String> {
-    size_t operator()(String const& s) const {
-      return std::hash<std::wstring>()(s.ToStdWstring());
-    }
-  };
-}
-#endif
+typedef std::wstring String;
 
 // ----------------------------------------------------------------------------- : Unicode
 
@@ -58,7 +39,7 @@ namespace std {
 #define _(S) IF_UNICODE(BOOST_PP_CAT(L,S), S)
 
 /// The character type used
-typedef wxChar Char;
+typedef wchar_t Char;
 
 /// UTF-8 Byte order mark for writing at the start of files
 /** In non-unicode builds it is UTF8 encoded \xFEFF.
@@ -310,8 +291,8 @@ bool canonical_name_compare(StringView a, const Char* b);
 
 /* Free functions replacing the wxString members the core uses (issue #30, ADR 0002).
  *
- * They only use operations that wxString and std::wstring have in common, so they work while String
- * is still wxString and keep working once it becomes std::wstring. Number conversions use the "C"
+ * They were written with only the operations wxString and std::wstring have in common, so the String
+ * typedef could flip; since #30 stage 2 String is std::wstring. Number conversions use the "C"
  * locale whatever the global locale is; the CLI and golden runs already use "C", so output is unchanged.
  *
  * wxString members used by the core when #30 started (all core dirs, call counts), and their replacements:
@@ -344,6 +325,10 @@ bool canonical_name_compare(StringView a, const Char* b);
  *    wxUniChar, wxUniCharRef   Char, auto&& (iterating a wxString yields wxUniCharRef proxies)
  *    wxT("..")                 _("..")
  *    wxSscanf, wxStrchr        swscanf (beware: locale dependent), wcschr
+ *    String(p, wxConvUTF8)     decode_utf8; wxConvWhateverWorks / wxConvFileName: decode_utf8_or_latin1
+ *
+ * At the boundary with wx (GUI, and wxImage options / the colour database in the core), std::wstring
+ * converts implicitly to wxString; the other way is wxString::ToStdWstring().
  */
 
 /// Lower case version of a string, converting each character with toLower (as wxString::Lower)
@@ -408,10 +393,6 @@ namespace string_format_detail {
   /// Other pointers are formatted with %p
   template <typename T, typename = std::enable_if_t<!std::is_same<std::remove_cv_t<T>, char>::value && !std::is_same<std::remove_cv_t<T>, wchar_t>::value>>
   inline const void* format_arg(T* p) { return p; }
-  #if wxUSE_UNICODE
-  inline wchar_t format_arg(wxUniChar c) { return c; }
-  inline wchar_t format_arg(wxUniCharRef c) { return c; }
-  #endif
   String format_string_impl(const wchar_t* format, ...);
 }
 
@@ -442,6 +423,11 @@ String decode_utf8(const char* data, size_t size);
 inline String decode_utf8(const std::string& data) {
   return decode_utf8(data.data(), data.size());
 }
+/// Decode bytes as UTF-8, or as ISO-8859-1 (one byte per character) if they are not valid UTF-8.
+/** This is what wxConvWhateverWorks and wxConvFileName (on Linux) did in the "C" and UTF-8 locales:
+ *  their middle step, the locale's multibyte encoding, fails exactly where UTF-8 does in those locales.
+ */
+String decode_utf8_or_latin1(const char* data, size_t size);
 
 // ----------------------------------------------------------------------------- : Regular expressions
 

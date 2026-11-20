@@ -141,7 +141,7 @@ void CLISetInterface::handleCommand(const String& command) {
   try {
     if (command.empty()) {
       // empty, ignore
-    } else if (command.GetChar(0) == _(':')) {
+    } else if (command[0] == _(':')) {
       // :something
       size_t space = min(command.find_first_of(_(' ')), command.size());
       String before = command.substr(0,space);
@@ -169,7 +169,7 @@ void CLISetInterface::handleCommand(const String& command) {
           cli << _("set:      ") << set->identification() << ENDL;
           cli << _("filename: ") << set->absoluteFilename() << ENDL;
           cli << _("relative: ") << set->relativeFilename() << ENDL;
-          cli << String::Format(_("#cards:   %d"), set->cards.size()) << ENDL;
+          cli << format_string(_("#cards:   %d"), (int)set->cards.size()) << ENDL;
         } else {
           cli << _("No set loaded") << ENDL;
         }
@@ -193,8 +193,7 @@ void CLISetInterface::handleCommand(const String& command) {
             #ifdef __WXMSW__
               _wsystem(arg.c_str()); // TODO: is this function available on other platforms?
             #else
-              wxCharBuffer buf = arg.fn_str();
-              system(buf);
+              system(encode_utf8(arg).c_str());
             #endif
           #else
             system(arg.c_str());
@@ -206,7 +205,7 @@ void CLISetInterface::handleCommand(const String& command) {
             showProfilingStats(profile_root);
           } else {
             long level = 1;
-            arg.ToLong(&level);
+            parse_long(arg, level);
             showProfilingStats(profile_aggregated(level));
           }
       #endif

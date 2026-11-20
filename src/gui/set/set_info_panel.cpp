@@ -34,27 +34,27 @@ void SetInfoPanel::onChangeSet() {
 
 void SetInfoPanel::initUI(wxToolBar* tb, wxMenuBar* mb) {
   // Toolbar
-  add_tool_tr(tb, ID_FORMAT_FONT,          settings.darkModePrefix() + "font",          "font",          false, wxITEM_CHECK);
-  add_tool_tr(tb, ID_FORMAT_BOLD,          settings.darkModePrefix() + "bold",          "bold",          false, wxITEM_CHECK);
-  add_tool_tr(tb, ID_FORMAT_ITALIC,        settings.darkModePrefix() + "italic",        "italic",        false, wxITEM_CHECK);
-  add_tool_tr(tb, ID_FORMAT_UNDERLINE,     settings.darkModePrefix() + "underline",     "underline",     false, wxITEM_CHECK);
-  add_tool_tr(tb, ID_FORMAT_STRIKETHROUGH, settings.darkModePrefix() + "strikethrough", "strikethrough", false, wxITEM_CHECK);
-  add_tool_tr(tb, ID_FORMAT_COLOR,                                     "color_text",    "color_text",    false, wxITEM_CHECK);
-  add_tool_tr(tb, ID_FORMAT_BULLETPOINT,   settings.darkModePrefix() + "bullet_point",  "bullet_point",  false, wxITEM_CHECK);
-  add_tool_tr(tb, ID_FORMAT_SYMBOL,        settings.darkModePrefix() + "symbol",        "symbols",       false, wxITEM_CHECK);
-  add_tool_tr(tb, ID_FORMAT_REMINDER,      settings.darkModePrefix() + "reminder",      "reminder_text", false, wxITEM_CHECK);
+  add_tool_tr(tb, ID_FORMAT_FONT,          settings.darkModePrefix() + _("font"),          _("font"),          false, wxITEM_CHECK);
+  add_tool_tr(tb, ID_FORMAT_BOLD,          settings.darkModePrefix() + _("bold"),          _("bold"),          false, wxITEM_CHECK);
+  add_tool_tr(tb, ID_FORMAT_ITALIC,        settings.darkModePrefix() + _("italic"),        _("italic"),        false, wxITEM_CHECK);
+  add_tool_tr(tb, ID_FORMAT_UNDERLINE,     settings.darkModePrefix() + _("underline"),     _("underline"),     false, wxITEM_CHECK);
+  add_tool_tr(tb, ID_FORMAT_STRIKETHROUGH, settings.darkModePrefix() + _("strikethrough"), _("strikethrough"), false, wxITEM_CHECK);
+  add_tool_tr(tb, ID_FORMAT_COLOR,                                     _("color_text"),    _("color_text"),    false, wxITEM_CHECK);
+  add_tool_tr(tb, ID_FORMAT_BULLETPOINT,   settings.darkModePrefix() + _("bullet_point"),  _("bullet_point"),  false, wxITEM_CHECK);
+  add_tool_tr(tb, ID_FORMAT_SYMBOL,        settings.darkModePrefix() + _("symbol"),        _("symbols"),       false, wxITEM_CHECK);
+  add_tool_tr(tb, ID_FORMAT_REMINDER,      settings.darkModePrefix() + _("reminder"),      _("reminder_text"), false, wxITEM_CHECK);
   tb->Realize();
   // Menus
   auto menuFormat = new wxMenu();
-    add_menu_item_tr(menuFormat, ID_FORMAT_FONT,          settings.darkModePrefix() + "font",          "font",          wxITEM_CHECK);
-    add_menu_item_tr(menuFormat, ID_FORMAT_BOLD,          settings.darkModePrefix() + "bold",          "bold",          wxITEM_CHECK);
-    add_menu_item_tr(menuFormat, ID_FORMAT_ITALIC,        settings.darkModePrefix() + "italic",        "italic",        wxITEM_CHECK);
-    add_menu_item_tr(menuFormat, ID_FORMAT_UNDERLINE,     settings.darkModePrefix() + "underline",     "underline",     wxITEM_CHECK);
-    add_menu_item_tr(menuFormat, ID_FORMAT_STRIKETHROUGH, settings.darkModePrefix() + "strikethrough", "strikethrough", wxITEM_CHECK);
-    add_menu_item_tr(menuFormat, ID_FORMAT_COLOR,                                     "color_text",    "color_text",    wxITEM_CHECK);
-    add_menu_item_tr(menuFormat, ID_FORMAT_BULLETPOINT,   settings.darkModePrefix() + "bullet_point",  "bullet_point",  wxITEM_CHECK);
-    add_menu_item_tr(menuFormat, ID_FORMAT_SYMBOL,        settings.darkModePrefix() + "symbol",        "symbols",       wxITEM_CHECK);
-    add_menu_item_tr(menuFormat, ID_FORMAT_REMINDER,      settings.darkModePrefix() + "reminder",      "reminder_text", wxITEM_CHECK);
+    add_menu_item_tr(menuFormat, ID_FORMAT_FONT,          settings.darkModePrefix() + _("font"),          _("font"),          wxITEM_CHECK);
+    add_menu_item_tr(menuFormat, ID_FORMAT_BOLD,          settings.darkModePrefix() + _("bold"),          _("bold"),          wxITEM_CHECK);
+    add_menu_item_tr(menuFormat, ID_FORMAT_ITALIC,        settings.darkModePrefix() + _("italic"),        _("italic"),        wxITEM_CHECK);
+    add_menu_item_tr(menuFormat, ID_FORMAT_UNDERLINE,     settings.darkModePrefix() + _("underline"),     _("underline"),     wxITEM_CHECK);
+    add_menu_item_tr(menuFormat, ID_FORMAT_STRIKETHROUGH, settings.darkModePrefix() + _("strikethrough"), _("strikethrough"), wxITEM_CHECK);
+    add_menu_item_tr(menuFormat, ID_FORMAT_COLOR,                                     _("color_text"),    _("color_text"),    wxITEM_CHECK);
+    add_menu_item_tr(menuFormat, ID_FORMAT_BULLETPOINT,   settings.darkModePrefix() + _("bullet_point"),  _("bullet_point"),  wxITEM_CHECK);
+    add_menu_item_tr(menuFormat, ID_FORMAT_SYMBOL,        settings.darkModePrefix() + _("symbol"),        _("symbols"),       wxITEM_CHECK);
+    add_menu_item_tr(menuFormat, ID_FORMAT_REMINDER,      settings.darkModePrefix() + _("reminder"),      _("reminder_text"), wxITEM_CHECK);
   mb->Insert(2, menuFormat, _MENU_("format"));
   // focus on editor
   editor->SetFocus();

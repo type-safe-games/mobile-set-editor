@@ -169,7 +169,7 @@ void TokenIterator::addToken(TokenType type, const String& value, String::const_
 
 void TokenIterator::readToken() {
   if (pos == end) {
-    addToken(TOK_EOF, "end of input", pos);
+    addToken(TOK_EOF, _("end of input"), pos);
     return;
   }
   // read a character from the input
@@ -186,10 +186,10 @@ void TokenIterator::readToken() {
     auto eol = find_first_of(pos, end, newlines, newlines + 2);
     String include_file = String(trim(StringView(pos, eol))) + _("_") + settings.locale;
     // include_file("filename_en")
-    addToken(TOK_NAME, "include_file", pos - 23);
-    addToken(TOK_LPAREN, "(", pos);
+    addToken(TOK_NAME, _("include_file"), pos - 23);
+    addToken(TOK_LPAREN, _("("), pos);
     addToken(TOK_STRING, include_file, pos);
-    addToken(TOK_RPAREN, ")", eol);
+    addToken(TOK_RPAREN, _(")"), eol);
     pos = eol;
   } else if (is_substr(pos, end, "include dark file:")) {
     pos += 18; // "include dark file:"
@@ -197,10 +197,10 @@ void TokenIterator::readToken() {
     auto eol = find_first_of(pos, end, newlines, newlines + 2);
     String include_file = String(trim(StringView(pos, eol))) + (settings.darkMode() ? _("_dark") : _(""));
     // include_file("filename_dark")
-    addToken(TOK_NAME, "include_file", pos - 18);
-    addToken(TOK_LPAREN, "(", pos);
+    addToken(TOK_NAME, _("include_file"), pos - 18);
+    addToken(TOK_LPAREN, _("("), pos);
     addToken(TOK_STRING, include_file, pos);
-    addToken(TOK_RPAREN, ")", eol);
+    addToken(TOK_RPAREN, _(")"), eol);
     pos = eol;
   } else if (is_substr(pos, end, "include file:")) {
     pos += 13; // "include file:"
@@ -208,10 +208,10 @@ void TokenIterator::readToken() {
     auto eol = find_first_of(pos,end, newlines,newlines+2);
     String include_file = trim(StringView(pos, eol));
     // include_file("filename")
-    addToken(TOK_NAME, "include_file", pos - 13);
-    addToken(TOK_LPAREN, "(", pos);
+    addToken(TOK_NAME, _("include_file"), pos - 13);
+    addToken(TOK_LPAREN, _("("), pos);
     addToken(TOK_STRING, include_file, pos);
-    addToken(TOK_RPAREN, ")", eol);
+    addToken(TOK_RPAREN, _(")"), eol);
     pos = eol;
   } else if (isAlpha(c) || isUnicodeAlpha(c) || c == _('_') || (isDigit(c) && !buffer.empty() && buffer.back() == _("."))) {
     // name, or a number after a . token, as in array.0
@@ -244,7 +244,7 @@ void TokenIterator::readToken() {
   } else if (c == _('}') && !open_braces.empty() && open_braces.top() != BRACE_PAREN) {
     // closing smart string, resume to string parsing
     //   "a{e}b"  -->  "a"  "{  e  }"  "b"
-    addToken(TOK_RPAREN, "}\"", pos);
+    addToken(TOK_RPAREN, _("}\""), pos);
     readStringToken();
   } else if (isLparen(c)) {
     // paranthesis/brace

@@ -50,7 +50,7 @@ WebRequestWindow::WebRequestWindow(const String& url, bool sizer)
     }
     // request failed
     case wxWebRequest::State_Failed:
-      onFail(evt.GetErrorDescription());
+      onFail(evt.GetErrorDescription().ToStdWstring());
       break;
     }
   });
@@ -89,14 +89,14 @@ void WebRequestWindow::onComplete(wxWebRequestEvent& evt) {
   }
 
   content_type = response.GetHeader(_("Content-Type")); // GetContentType() is wx >= 3.3
-  if (content_type.StartsWith("image/")) {
+  if (starts_with(content_type, _("image/"))) {
     image_out = Image(*stream);
     if (!image_out.IsOk()) {
       onFail(_ERROR_("web request corrupted"));
       return;
     }
   }
-  else if (content_type.StartsWith("text/") || content_type.Contains("json")) {
+  else if (starts_with(content_type, _("text/")) || contains(content_type, _("json"))) {
     wxMemoryOutputStream mem;
     char buffer[8192];
     while (true) {
@@ -120,7 +120,7 @@ void WebRequestWindow::onComplete(wxWebRequestEvent& evt) {
 }
 
 void WebRequestWindow::onFail(const String& message) {
-  content_type.Clear();
+  content_type.clear();
   queue_message(MESSAGE_ERROR, message);
   // onFail can be called from the constructor. EndModal() at that
   // point would have no effect, so defer the close to the next idle event.

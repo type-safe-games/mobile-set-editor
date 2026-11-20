@@ -107,14 +107,14 @@ void KeywordsPanel::initControls() {
   
   // init menus
   menuKeyword = new wxMenu();
-    add_menu_item_tr(menuKeyword, ID_KEYWORD_PREV, nullptr, "previous_keyword");
-    add_menu_item_tr(menuKeyword, ID_KEYWORD_NEXT, nullptr, "next_keyword");
-    add_menu_item_tr(menuKeyword, ID_KEYWORD_SEARCH, nullptr, "search keywords");
+    add_menu_item_tr(menuKeyword, ID_KEYWORD_PREV, String(), _("previous_keyword"));
+    add_menu_item_tr(menuKeyword, ID_KEYWORD_NEXT, String(), _("next_keyword"));
+    add_menu_item_tr(menuKeyword, ID_KEYWORD_SEARCH, String(), _("search keywords"));
     menuKeyword->AppendSeparator();
-    add_menu_item_tr(menuKeyword, ID_KEYWORD_ADD, "keyword_add", "add_keyword");
+    add_menu_item_tr(menuKeyword, ID_KEYWORD_ADD, _("keyword_add"), _("add_keyword"));
     // NOTE: space after "Del" prevents wx from making del an accellerator
     // otherwise we delete a card when delete is pressed inside the editor
-    add_menu_item(menuKeyword, ID_KEYWORD_REMOVE, "keyword_del",  _MENU_("remove_keyword")+_(" "), _HELP_("remove_keyword"));
+    add_menu_item(menuKeyword, ID_KEYWORD_REMOVE, _("keyword_del"),  _MENU_("remove_keyword")+_(" "), _HELP_("remove_keyword"));
 }
 
 KeywordsPanel::~KeywordsPanel() {
@@ -132,8 +132,8 @@ void KeywordsPanel::initUI(wxToolBar* tb, wxMenuBar* mb) {
     onChangeSet();
   }
   // Toolbar
-  add_tool_tr(tb, ID_KEYWORD_ADD, "keyword_add", "add_keyword");
-  add_tool_tr(tb, ID_KEYWORD_REMOVE, "keyword_del", "remove_keyword");
+  add_tool_tr(tb, ID_KEYWORD_ADD, _("keyword_add"), _("add_keyword"));
+  add_tool_tr(tb, ID_KEYWORD_REMOVE, _("keyword_del"), _("remove_keyword"));
   // Filter/search textbox
   tb->AddSeparator();
   assert(!filter);
@@ -206,7 +206,7 @@ void KeywordsPanel::onCommand(int id) {
       int id = ID_PARAM_REF_MIN;
       int param = 0;
       FOR_EACH(p, list->getKeyword()->parameters) {
-        String item = String() << ++param << _(". ") << LEFT_ANGLE_BRACKET << p->name << RIGHT_ANGLE_BRACKET;
+        String item = int_to_string(++param) + _(". ") + LEFT_ANGLE_BRACKET + p->name + RIGHT_ANGLE_BRACKET;
         if (p->refer_scripts.empty()) {
           ref_menu.Append(id++, item);
         } else {
@@ -247,7 +247,7 @@ String KeywordsPanel::runRefScript(int find_i) {
   int param = 0;
   int i = 0;
   FOR_EACH(p, list->getKeyword()->parameters) {
-    String param_s = String(_("param")) << ++param;
+    String param_s = _("param") + int_to_string(++param);
     if (p->refer_scripts.empty()) {
       if (i++ == find_i) {
         // found it

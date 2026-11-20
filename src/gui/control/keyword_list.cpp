@@ -193,7 +193,7 @@ int KeywordList::usage(const Keyword& kw) const {
 
 // ----------------------------------------------------------------------------- : KeywordList : Item text
 
-String KeywordList::OnGetItemText (long pos, long col) const {
+wxString KeywordList::OnGetItemText (long pos, long col) const {
   if (sorted_list.size() == 0) return _("");
   
   const Keyword& kw = *getKeyword(pos);
@@ -201,13 +201,13 @@ String KeywordList::OnGetItemText (long pos, long col) const {
     case 0:    return kw.keyword;
     case 1:    return match_string(kw);
     case 2:    return kw.mode;
-    case 3:    return String::Format(_("%d"), usage(kw));
+    case 3:    return wxString::Format(_("%d"), usage(kw));
     case 4: {
       // convert all whitespace to ' '
       String formatted;
       bool seen_space = false;
       for (size_t i = 0; i < kw.reminder.getUnparsed().size(); ++i) {
-        Char c = kw.reminder.getUnparsed().GetChar(i);
+        Char c = kw.reminder.getUnparsed()[i];
         if (isSpace(c)) {
           seen_space = true;
         } else {
@@ -244,12 +244,12 @@ wxListItemAttr* KeywordList::OnGetItemAttr(long pos) const {
 
 void KeywordList::onContextMenu(wxContextMenuEvent&) {
   wxMenu m;
-  add_menu_item_tr(&m, ID_EDIT_CUT, settings.darkModePrefix() + "cut", "cut_keyword");
-  add_menu_item_tr(&m, ID_EDIT_COPY, "copy", "copy_keyword");
-  add_menu_item_tr(&m, ID_EDIT_PASTE, "paste", "paste_keyword");
+  add_menu_item_tr(&m, ID_EDIT_CUT, settings.darkModePrefix() + _("cut"), _("cut_keyword"));
+  add_menu_item_tr(&m, ID_EDIT_COPY, _("copy"), _("copy_keyword"));
+  add_menu_item_tr(&m, ID_EDIT_PASTE, _("paste"), _("paste_keyword"));
   m.AppendSeparator();
-  add_menu_item_tr(&m, ID_KEYWORD_ADD, "keyword_add", "add_keyword");
-  add_menu_item_tr(&m, ID_KEYWORD_REMOVE, "keyword_del", "remove_keyword");
+  add_menu_item_tr(&m, ID_KEYWORD_ADD, _("keyword_add"), _("add_keyword"));
+  add_menu_item_tr(&m, ID_KEYWORD_REMOVE, _("keyword_del"), _("remove_keyword"));
   PopupMenu(&m);
 }
 

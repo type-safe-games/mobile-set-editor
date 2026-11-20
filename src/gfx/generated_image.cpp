@@ -340,7 +340,7 @@ Image EnlargeImage::generate(const Options& opt) {
   }
   // transfer metadata
   if (img.HasOption(wxIMAGE_OPTION_PNG_DESCRIPTION)) {
-    String metadata = transformAllEncodedRects(img.GetOption(wxIMAGE_OPTION_PNG_DESCRIPTION), RealRect::translate, dw, dh);
+    String metadata = transformAllEncodedRects(img.GetOption(wxIMAGE_OPTION_PNG_DESCRIPTION).ToStdWstring(), RealRect::translate, dw, dh);
     larger.SetOption(wxIMAGE_OPTION_PNG_DESCRIPTION, metadata);
   }
   // done
@@ -434,7 +434,7 @@ Image BleedEdgedImage::generate(const Options& opt) {
   if (!mirror_bleed_edge(img, dw, dh)) return base_img; // too small, error already reported
   // transfer metadata
   if (base_img.HasOption(wxIMAGE_OPTION_PNG_DESCRIPTION)) {
-    String metadata = transformAllEncodedRects(base_img.GetOption(wxIMAGE_OPTION_PNG_DESCRIPTION), RealRect::translate, dw, dh);
+    String metadata = transformAllEncodedRects(base_img.GetOption(wxIMAGE_OPTION_PNG_DESCRIPTION).ToStdWstring(), RealRect::translate, dw, dh);
     img.SetOption(wxIMAGE_OPTION_PNG_DESCRIPTION, metadata);
   }
   // done

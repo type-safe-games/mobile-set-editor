@@ -80,7 +80,7 @@ DateTime DateTime::addDays(int days) const {
 String DateTime::format(const String& fmt_in) const {
   if (!isValid()) return String();
   // wx extension: %l is the milliseconds, strftime doesn't know it
-  std::wstring fmt = toStdString(fmt_in);
+  std::wstring fmt = fmt_in;
   std::wstring fmt2;
   fmt2.reserve(fmt.size());
   for (size_t i = 0; i < fmt.size(); ++i) {
@@ -357,6 +357,6 @@ namespace {
 
 DateTime DateTime::parse(const String& str) {
   DateParser parser;
-  parser.s = toStdString(str);
+  parser.s = str;
   return parser.parse();
 }

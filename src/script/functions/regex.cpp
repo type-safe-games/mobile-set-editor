@@ -165,7 +165,7 @@ SCRIPT_FUNCTION_WITH_SIMPLIFY(filter_text) {
     ret.append(pos.first, pos.second);  // the match
     if (pos.second == start) {
       // regex matched the empty string, would cause an infinite loop
-      throw ScriptError("Regular expression matches empty string");
+      throw ScriptError(_("Regular expression matches empty string"));
     } else {
       start = pos.second;
     }
@@ -226,7 +226,7 @@ SCRIPT_FUNCTION_WITH_SIMPLIFY(split_text) {
     start = pos.second;
   }
   if (include_empty || start != input.end()) {
-    ret->value.push_back(to_script( String(start,input.end()) ));
+    ret->value.push_back(to_script( String(start,input.cend()) ));
   }
   return ret;
 }

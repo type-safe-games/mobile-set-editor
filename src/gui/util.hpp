@@ -43,17 +43,17 @@ Image generate_disabled_image(Image const& image);
 void set_menu_item_image(wxMenuItem* item, const String& resource);
 
 // menu items with images.
-// resource may be nullptr
-wxMenuItem* make_menu_item(wxMenu*, int id, const char* resource, const String& text, const String& help, wxItemKind kind = wxITEM_NORMAL, wxMenu* submenu = nullptr);
-wxMenuItem* make_menu_item_tr(wxMenu*, int id, const char* resource, const String& locale_key, wxItemKind kind = wxITEM_NORMAL, wxMenu* submenu = nullptr);
-wxMenuItem* add_menu_item(wxMenu*, int id, const char* resource, const String& text, const String& help, wxItemKind kind = wxITEM_NORMAL, wxMenu* submenu = nullptr);
-wxMenuItem* add_menu_item_tr(wxMenu*, int id, const char* resource, const String& locale_key, wxItemKind kind = wxITEM_NORMAL, wxMenu* submenu = nullptr);
+// resource may be empty
+wxMenuItem* make_menu_item(wxMenu*, int id, const String& resource, const String& text, const String& help, wxItemKind kind = wxITEM_NORMAL, wxMenu* submenu = nullptr);
+wxMenuItem* make_menu_item_tr(wxMenu*, int id, const String& resource, const String& locale_key, wxItemKind kind = wxITEM_NORMAL, wxMenu* submenu = nullptr);
+wxMenuItem* add_menu_item(wxMenu*, int id, const String& resource, const String& text, const String& help, wxItemKind kind = wxITEM_NORMAL, wxMenu* submenu = nullptr);
+wxMenuItem* add_menu_item_tr(wxMenu*, int id, const String& resource, const String& locale_key, wxItemKind kind = wxITEM_NORMAL, wxMenu* submenu = nullptr);
 
 // toolbars with images loaded from resource
-// resource may be nullptr
-wxToolBarToolBase* add_tool(wxToolBar*, int id, const char* resource, const String& label, const String& tooltip, const String& help, wxItemKind kind = wxITEM_NORMAL);
+// resource may be empty
+wxToolBarToolBase* add_tool(wxToolBar*, int id, const String& resource, const String& label, const String& tooltip, const String& help, wxItemKind kind = wxITEM_NORMAL);
 // add a tool to a toolbar, translate tooltip and help using locale
-wxToolBarToolBase* add_tool_tr(wxToolBar*, int id, const char* resource, const String& locale_key, bool label = false, wxItemKind kind = wxITEM_NORMAL);
+wxToolBarToolBase* add_tool_tr(wxToolBar*, int id, const String& resource, const String& locale_key, bool label = false, wxItemKind kind = wxITEM_NORMAL);
 
 // ----------------------------------------------------------------------------- : Resource related
 

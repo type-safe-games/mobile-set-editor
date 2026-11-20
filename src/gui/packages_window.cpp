@@ -182,7 +182,7 @@ PackagesProgressDialog::PackagesProgressDialog(Window* parent, int to_download, 
   , cancelled(false)
 {
   const int text_style = wxST_NO_AUTORESIZE | wxST_ELLIPSIZE_MIDDLE | wxALIGN_LEFT;
-  String summary = _LABEL_2_("downloading updates", String("0"), String()<<to_download);
+  String summary = _LABEL_2_("downloading updates", String(_("0")), int_to_string(to_download));
   summary_text  = new wxStaticText(this, wxID_ANY, summary, wxDefaultPosition, wxDefaultSize, text_style);
   overall_gauge = new wxGauge(this, wxID_ANY, max_steps,    wxDefaultPosition, wxSize(-1,18), wxGA_HORIZONTAL | wxGA_SMOOTH);
   package_text  = new wxStaticText(this, wxID_ANY, _(" "),  wxDefaultPosition, wxDefaultSize, text_style);
@@ -215,7 +215,7 @@ bool PackagesProgressDialog::setOverall(int step, const String& summary, const S
   summary_text->SetLabelText(summary);
   overall_gauge->SetValue(min(step, max_steps));
   // start of a new package
-  package_text->SetLabelText(package_name.empty() ? String(" ") : _LABEL_1_("current package", package_name));
+  package_text->SetLabelText(package_name.empty() ? String(_(" ")) : _LABEL_1_("current package", package_name));
   detail_text->SetLabelText(_(" "));
   detail_gauge->SetValue(0);
   refresh();
@@ -400,7 +400,7 @@ bool PackagesWindow::checkReadOnlyFilesBeforeRemoving() {
       _TITLE_("packages window"),
       wxICON_EXCLAMATION | wxYES_NO
     );
-    dlg.SetYesNoLabels(_BUTTON_("uninstall anyway"), _BUTTON_("abort"));
+    dlg.SetYesNoLabels(wxString(_BUTTON_("uninstall anyway")), wxString(_BUTTON_("abort")));
     if (dlg.ShowModal() != wxID_YES) {
       // Abort: un-schedule all pending removals
       FOR_EACH(ip2, installable_packages) {
@@ -449,8 +449,8 @@ void PackagesWindow::onOk(wxCommandEvent& ev) {
   // Warn about removing
   if (to_remove) {
     int result = wxMessageBox(
-      with_modifications == 0 ? _ERROR_1_("remove packages",           String()<<to_remove)
-                              : _ERROR_2_("remove packages modified",  String()<<to_remove,  String()<<with_modifications),
+      with_modifications == 0 ? _ERROR_1_("remove packages",           int_to_string(to_remove))
+                              : _ERROR_2_("remove packages modified",  int_to_string(to_remove),  int_to_string(with_modifications)),
       _TITLE_("packages window"), wxICON_EXCLAMATION | wxYES_NO);
     if (result == wxNO) return;
   }
@@ -462,7 +462,7 @@ void PackagesWindow::onOk(wxCommandEvent& ev) {
     FOR_EACH(ip, installable_packages) {
       if (ip->description->name == mse_package) continue;
       if (ip->has(PACKAGE_ACT_INSTALL) && ip->installer && !ip->installer->installer) {
-        if (!progress.setOverall(step++, _LABEL_2_("downloading updates", String()<<++package_pos, String()<<to_download), ip->description->short_name)) {
+        if (!progress.setOverall(step++, _LABEL_2_("downloading updates", int_to_string(++package_pos), int_to_string(to_download)), ip->description->short_name)) {
           return; // aborted
         }
         ip->ensureIsDownloaded([&](long long received, long long total) {
@@ -473,7 +473,7 @@ void PackagesWindow::onOk(wxCommandEvent& ev) {
             details = _LABEL_3_("downloaded updates",
                                 wxFileName::GetHumanReadableSize(wxULongLong((wxULongLong_t)received)),
                                 wxFileName::GetHumanReadableSize(wxULongLong((wxULongLong_t)total)),
-                                String()<<(int)min<long long>(100, received * 100 / total));
+                                int_to_string((int)min<long long>(100, received * 100 / total)));
           } else {
             // the server did not tell us how large the package is
             details = _LABEL_1_("downloaded updates unknown",
@@ -491,7 +491,7 @@ void PackagesWindow::onOk(wxCommandEvent& ev) {
     FOR_EACH(ip, installable_packages) {
       if (ip->description->name == mse_package) continue; // app, we'll do that last
       if (ip->has(PACKAGE_ACT_NOTHING)) continue; // package unchanged
-      progress.setOverall(step++, _LABEL_2_("installing updates", String()<<++package_pos, String()<<to_change), ip->description->short_name);
+      progress.setOverall(step++, _LABEL_2_("installing updates", int_to_string(++package_pos), int_to_string(to_change)), ip->description->short_name);
       if (ip->has(PACKAGE_ACT_REMOVE)) {
         progress.setDetail(0, 0, _LABEL_("removing updates"));
       }
@@ -501,9 +501,9 @@ void PackagesWindow::onOk(wxCommandEvent& ev) {
         if (files_done > 0 && files_done < files_total && since_update.Time() < 50) return;
         since_update.Start();
         progress.setDetail(files_done, files_total, _LABEL_3_("installed updates",
-                                                              String()<<files_done,
-                                                              String()<<files_total,
-                                                              String()<<min(100, files_done * 100 / files_total)));
+                                                              int_to_string(files_done),
+                                                              int_to_string(files_total),
+                                                              int_to_string(min(100, files_done * 100 / files_total))));
       });
       if (ok) {
         install += ip->has(PACKAGE_ACT_INSTALL) && !ip->installed;
@@ -522,9 +522,9 @@ void PackagesWindow::onOk(wxCommandEvent& ev) {
     // Report on package status
     progress.finish();
     if (to_change > 0) {
-      String report_message = install == success ? _ERROR_1_("install packages successful",String()<<success):
-                              remove  == success ? _ERROR_1_("remove packages successful", String()<<success):
-                                                    _ERROR_1_("change packages successful", String()<<success);
+      String report_message = install == success ? _ERROR_1_("install packages successful",int_to_string(success)):
+                              remove  == success ? _ERROR_1_("remove packages successful", int_to_string(success)):
+                                                    _ERROR_1_("change packages successful", int_to_string(success));
       wxMessageDialog report = wxMessageDialog(this, report_message, _TITLE_("packages window"), wxICON_INFORMATION | wxOK | wxSTAY_ON_TOP);
       report.ShowModal();
     }
@@ -536,9 +536,9 @@ void PackagesWindow::onOk(wxCommandEvent& ev) {
       if (updater_package) {
         Updater* updater = dynamic_cast<Updater*>(updater_package.get());
         if (updater) {
-          String darkmode = String("darkmode") << settings.darkMode();
-          String locale   = String("locale")   << settings.locale;
-          locale.Replace("-", "");
+          String darkmode = _("darkmode") + int_to_string(settings.darkMode());
+          String locale   = _("locale")   + settings.locale;
+          locale = replace_all(locale, _("-"), _(""));
           updater->updateApplication(darkmode + _(" ") + locale);
         }
         else {
@@ -557,9 +557,9 @@ void PackagesWindow::onOk(wxCommandEvent& ev) {
       //  PackagedP updater_package = package_manager.openAny(p->description->name);
       //  Updater* updater = dynamic_cast<Updater*>(updater_package.get());
       //  if (updater) {
-      //    String darkmode = String("darkmode") << settings.darkMode();
-      //    String locale   = String("locale")   << settings.locale;
-      //    locale.Replace("-", "");
+      //    String darkmode = _("darkmode") + int_to_string(settings.darkMode());
+      //    String locale   = _("locale")   + settings.locale;
+      //    locale = replace_all(locale, _("-"), _(""));
       //    updater->updateApplication(darkmode + _(" ") + locale);
       //    break;
       //  }

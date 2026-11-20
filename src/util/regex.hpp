@@ -31,19 +31,6 @@
 // ----------------------------------------------------------------------------- : Boost implementation
 
 #if USE_BOOST_REGEX
-  // needed for boost::regex to compute hash values of unicode chars
-  #if BOOST_VERSION < 107600
-    inline std::size_t hash_value(wxUniChar const& x) {
-      boost::hash<int> hasher;
-      return hasher(static_cast<int>(x));
-    }
-  #else
-    // boost > 1.76 uses its own hash function that needs operator +
-    inline int operator + (wxUniChar x, unsigned int y) {
-      return static_cast<int>(x) + y;
-    }
-  #endif
-
   /// Our own regular expression wrapper
   /** Has an interface like boost::regex, but compatible with wxStrings.
    */
@@ -70,7 +57,7 @@
     
     void assign(const String& code);
     inline bool matches(const String& str) const {
-      return regex_search(toStdString(str), regex);
+      return regex_search(str, regex);
     }
     inline bool matches(Results& results, const String& str, size_t start = 0) const {
       return matches(results, str.begin() + start, str.end());

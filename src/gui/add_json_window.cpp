@@ -39,8 +39,8 @@ AddJSONWindow::AddJSONWindow(Window* parent, const SetP& set, bool sizer)
   json_type = new wxChoice(this, ID_CARD_ADD_JSON_ARRAY, wxDefaultPosition, wxDefaultSize, 0, nullptr);
   json_type->Clear();
   FOR_EACH(type, set->game->json_paths) {
-    int delimiter_pos = type.find("//");
-    json_type->Append(type.substr(0, delimiter_pos).Trim().Trim(false));
+    int delimiter_pos = type.find(_("//"));
+    json_type->Append(trim_ascii_left(trim_ascii_right(type.substr(0, delimiter_pos))));
   }
   json_type->Append(_LABEL_("add card json custom"));
   json_type->SetSelection(0);
@@ -73,11 +73,11 @@ void AddJSONWindow::setJSONType() {
     card_array_path->Enable();
   }
   else {
-    String selection = json_type->GetString(sel);
+    String selection = json_type->GetString(sel).ToStdWstring();
     FOR_EACH(type, set->game->json_paths) {
-      if (type.starts_with(selection)) {
-        int delimiter_pos = type.find("//");
-        card_array_path->ChangeValue(delimiter_pos + 2 < type.Length() ? type.substr(delimiter_pos + 2).Trim().Trim(false) : wxString());
+      if (starts_with(type, selection)) {
+        int delimiter_pos = type.find(_("//"));
+        card_array_path->ChangeValue(delimiter_pos + 2 < type.length() ? trim_ascii_left(trim_ascii_right(type.substr(delimiter_pos + 2))) : String());
         card_array_path->Enable(false);
         break;
       }
@@ -92,7 +92,7 @@ void AddJSONWindow::onJSONTypeChange(wxCommandEvent&) {
 void AddJSONWindow::onBrowseFiles(wxCommandEvent&) {
   wxFileDialog* dlg = new wxFileDialog(this, _TITLE_("add card json file"), settings.default_import_dir, _(""), _("JSON files|*.json|All files (*.*)|*"), wxFD_OPEN);
   if (dlg->ShowModal() == wxID_OK) {
-    const String& path = dlg->GetPath();
+    const wxString& path = dlg->GetPath();
     file_path->SetValue(path);
     settings.default_import_dir = wxPathOnly(path);
   }
@@ -155,7 +155,7 @@ void AddJSONWindow::onBrowseFiles(wxCommandEvent&) {
       boost::json::string_view jview = it->key();
       std::string_view stdview = std::string_view(jview.data(), jview.size());
       std::string stdstring = { stdview.begin(), stdview.end() };
-      String key(stdstring.c_str(), wxConvUTF8);
+      String key = decode_utf8(stdstring);
       if (std::find(headers_out.begin(), headers_out.end(), key) == headers_out.end()) {
         headers_out.push_back(key);
       }
@@ -166,7 +166,7 @@ void AddJSONWindow::onBrowseFiles(wxCommandEvent&) {
     std::vector<ScriptValueP> row;
     auto& card = card_array[i].as_object();
     for (int h = 0; h < headers_out.size(); ++h) {
-      const auto& value = card[headers_out[h].ToStdString()];
+      const auto& value = card[encode_utf8(headers_out[h])];
       row.push_back(json_to_mse(value, set.get()));
     }
     table_out.push_back(row);

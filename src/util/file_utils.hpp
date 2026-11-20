@@ -16,7 +16,7 @@
 
 // ----------------------------------------------------------------------------- : Path components
 
-/// Convert a path to a std::filesystem path, the way wx converted file names (wxConvFileName)
+/// Convert a path to a std::filesystem path (UTF-8 on POSIX, as wxConvFileName did in the C and UTF-8 locales)
 std::filesystem::path to_fs_path(const String& path);
 
 // These work on String paths, and follow the conventions of the wxFileName functions they replaced:

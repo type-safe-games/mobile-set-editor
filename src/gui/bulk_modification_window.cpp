@@ -125,8 +125,8 @@ void BulkModificationWindow::onSelectionChange(wxCommandEvent&) {
 
 void BulkModificationWindow::parsePredicate() {
   vector<ScriptParseError> parse_errors;
-  String value = predicate->GetValue();
-  if (value.StartsWith("{") && value.EndsWith("}")) value = value.substr(1, value.length()-2);
+  String value = predicate->GetValue().ToStdWstring();
+  if (starts_with(value, _("{")) && ends_with(value, _("}"))) value = value.substr(1, value.length()-2);
   predicate_script = parse(value, nullptr, false, parse_errors);
   if (parse_errors.empty()) {
     predicate_errors->SetLabel(_(""));
@@ -145,7 +145,7 @@ void BulkModificationWindow::onPredicateChange(wxCommandEvent&) {
 
 void BulkModificationWindow::parseModification() {
   vector<ScriptParseError> parse_errors;
-  modification_script = parse(modification->GetValue(), nullptr, true, parse_errors);
+  modification_script = parse(modification->GetValue().ToStdWstring(), nullptr, true, parse_errors);
   if (parse_errors.empty()) {
     modification_errors->SetLabel(_(""));
     modification_parsed = true;
@@ -205,7 +205,7 @@ void BulkModificationWindow::onOk(wxCommandEvent&) {
   }
   // get the new script values
   vector<ActionP> actions;
-  String field_name = field_type->GetString(field_type->GetSelection());
+  String field_name = field_type->GetString(field_type->GetSelection()).ToStdWstring();
   // stylesheet, notes or id change
   if (field_name == _("stylesheet") || field_name == _("notes") || field_name == _("id")) {
     vector<String> new_values;
@@ -337,7 +337,7 @@ void BulkModificationWindow::onOk(wxCommandEvent&) {
         if (new_values[i]->type() == SCRIPT_NIL) continue;
         if (ExternalImage* img = dynamic_cast<ExternalImage*>(new_values[i].get())) {
           ImageValue* value = dynamic_cast<ImageValue*>(values[i]);
-          ImageValue::ValueType new_value = LocalFileName::fromReadString(img->toString(), "");
+          ImageValue::ValueType new_value = LocalFileName::fromReadString(img->toString(), _(""));
           intrusive_ptr<SimpleValueAction<ImageValue, false>> action = make_intrusive<SimpleValueAction<ImageValue, false>>(value, new_value);
           action->setCard(cards[i]);
           actions.push_back(action);
@@ -354,7 +354,7 @@ void BulkModificationWindow::onOk(wxCommandEvent&) {
         if (new_values[i]->type() == SCRIPT_NIL) continue;
         if (ExternalImage* img = dynamic_cast<ExternalImage*>(new_values[i].get())) {
           SymbolValue* value = dynamic_cast<SymbolValue*>(values[i]);
-          SymbolValue::ValueType new_value = LocalFileName::fromReadString(img->toString(), "");
+          SymbolValue::ValueType new_value = LocalFileName::fromReadString(img->toString(), _(""));
           intrusive_ptr<SimpleValueAction<SymbolValue, false>> action = make_intrusive<SimpleValueAction<SymbolValue, false>>(value, new_value);
           action->setCard(cards[i]);
           actions.push_back(action);
@@ -380,7 +380,7 @@ void BulkModificationWindow::onOk(wxCommandEvent&) {
   else {
     set->actions.addAction(make_unique<BulkAction>(actions, set, actions.size() > 1), false);
     set->actions.tellListeners(GlobalDisplayChangeAction(),true);
-    wxMessageDialog dial = wxMessageDialog(this, _ERROR_1_("bulk modify success", String() << actions.size()));
+    wxMessageDialog dial = wxMessageDialog(this, _ERROR_1_("bulk modify success", int_to_string(actions.size())));
     dial.ShowModal();
     EndModal(wxID_OK);
   }
