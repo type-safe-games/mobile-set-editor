@@ -98,7 +98,13 @@ PackagedP PackageManager::openAny(const String& name_, bool just_header) {
     else {
       throw PackageError(_("Unrecognized package type: '") + ext + _("'\nwhile trying to open: ") + name);
     }
-    p->open(filename, just_header);
+    try {
+      p->open(filename, just_header);
+    } catch (...) {
+      // don't keep a package that could not be opened: the next open tries again
+      loaded_packages.erase(filename);
+      throw;
+    }
   } else if (!just_header) {
     p->loadFully();
   }

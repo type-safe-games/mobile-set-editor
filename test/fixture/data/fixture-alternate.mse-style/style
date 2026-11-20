@@ -1,0 +1,78 @@
+mse version: 2.6.0
+game: fixture
+short name: Alternate
+full name: Test fixture alternate style
+icon: icon.png
+version: 2026-11-20
+depends on:
+	package: fixture.mse-game
+	version: 2026-11-19
+depends on:
+	package: fixture-symbols.mse-symbol-font
+	version: 2026-11-19
+card width: 280
+card height: 400
+card dpi: 150
+card background: rgb(240,240,232)
+
+styling field:
+	type: choice
+	name: accent
+	choice: red
+	choice: blue
+	initial: red
+styling field:
+	type: text
+	name: footer
+
+card style:
+	frame:
+		left: 200
+		top: 370
+		width: 60
+		height: 20
+		render style: text
+		font:
+			name: DejaVu Sans
+			size: 8
+			color: black
+	name:
+		left: 16
+		top: 14
+		width: 190
+		height: 24
+		font:
+			name: DejaVu Sans
+			size: 12
+			weight: bold
+			color: { if styling.accent == "blue" then rgb(0,0,160) else rgb(160,0,0) }
+	level:
+		left: 214
+		top: 14
+		width: 50
+		height: 24
+		alignment: middle right
+		render style: text
+		font:
+			name: DejaVu Sans
+			size: 12
+			weight: bold
+			color: black
+	picture:
+		left: 16
+		top: 44
+		width: 248
+		height: 140
+	rules:
+		left: 20
+		top: 196
+		width: 240
+		height: 160
+		font:
+			name: DejaVu Sans
+			size: 10
+			color: black
+		symbol font:
+			name: fixture-symbols
+			size: 10
+		alignment: top left

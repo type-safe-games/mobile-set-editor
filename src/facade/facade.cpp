@@ -35,6 +35,7 @@
 #include <gfx/font_registry.hpp>
 #include <script/script.hpp>
 #include <atomic>
+#include <filesystem>
 #include <mutex>
 
 namespace mse::facade {
@@ -162,10 +163,14 @@ public:
       if (a->card) addCard(a->card->uid); else stale.all = true;
     } else if (const OneWayLinkCardsAction* a = dynamic_cast<const OneWayLinkCardsAction*>(&action)) {
       addCard(a->card->uid);
+    } else if (const ChangeCardStyleAction* a = dynamic_cast<const ChangeCardStyleAction*>(&action)) {
+      addCard(a->card->uid);
+    } else if (const ChangeCardHasStylingAction* a = dynamic_cast<const ChangeCardHasStylingAction*>(&action)) {
+      addCard(a->card->uid);
     } else if (dynamic_cast<const BulkAction*>(&action)) {
       // a BulkAction's parts are reported one by one
     } else {
-      // display changes, keywords, ...
+      // display changes, the Set's Style, keywords, ...
       stale.all = true;
     }
   }
@@ -324,6 +329,23 @@ Result refreshTemplates() {
 
 // ----------------------------------------------------------------------------- : Sessions
 
+/// Write a new session's working copy, if it has one (while holding loading_mutex)
+static void make_working_copy(Session& s, const std::string& working_copy_dir) {
+  if (working_copy_dir.empty()) return;
+  // the working copy is a directory, so autosaving never rewrites a whole zip
+  String work = from_utf8(working_copy_dir);
+  if (file_exists(work) || dir_exists(work)) fail(Status::InvalidArgument, "the working copy '" + working_copy_dir + "' already exists");
+  s.set->saveAs(work, false, true);
+  s.working_copy = work;
+}
+
+/// Register a new session
+static void add_session(unique_ptr<Session> s, OpenResult& r) {
+  s->set->actions.addListener(&s->stale);
+  r.session = next_session++;
+  sessions[r.session] = std::move(s);
+}
+
 OpenResult openSession(const std::string& set_path, const std::string& working_copy_dir) {
   return guarded<OpenResult>("", "", [&](OpenResult& r) {
     if (!initialized) fail(Status::Failed, "the facade is not initialised");
@@ -334,18 +356,44 @@ OpenResult openSession(const std::string& set_path, const std::string& working_c
       if (!file_exists(path) && !dir_exists(path)) fail(Status::NotFound, "no set at '" + set_path + "'");
       SetP set = make_intrusive<Set>();
       set->open(path);
-      if (!working_copy_dir.empty()) {
-        // the working copy is a directory, so autosaving never rewrites a whole zip
-        String work = from_utf8(working_copy_dir);
-        if (file_exists(work) || dir_exists(work)) fail(Status::InvalidArgument, "the working copy '" + working_copy_dir + "' already exists");
-        set->saveAs(work, false, true);
-        s->working_copy = work;
-      }
       s->set = set;
+      make_working_copy(*s, working_copy_dir);
     }
-    s->set->actions.addListener(&s->stale);
-    r.session = next_session++;
-    sessions[r.session] = std::move(s);
+    add_session(std::move(s), r);
+  });
+}
+
+/// Open an installed package of type T by its package name, with the given extension
+template <typename T>
+static intrusive_ptr<T> open_package(const std::string& name, const Char* ext, const char* what) {
+  String n = from_utf8(name);
+  if (!ends_with(n, ext)) fail(Status::InvalidArgument, "'" + name + "' is not " + what);
+  return package_manager.open<T>(n);
+}
+
+/// An installed Style of a Game
+static StyleSheetP open_stylesheet(const Game& game, const std::string& name) {
+  StyleSheetP stylesheet = open_package<StyleSheet>(name, _(".mse-style"), "a Style");
+  if (stylesheet->game.get() != &game) {
+    fail(Status::InvalidArgument, "'" + name + "' is not a Style of '" + to_utf8(game.relativeFilename()) + "'");
+  }
+  return stylesheet;
+}
+
+OpenResult newSession(const std::string& game, const std::string& stylesheet, const std::string& working_copy_dir) {
+  return guarded<OpenResult>("", "", [&](OpenResult& r) {
+    if (!initialized) fail(Status::Failed, "the facade is not initialised");
+    auto s = make_unique<Session>();
+    {
+      std::lock_guard<std::mutex> lock(loading_mutex);
+      GameP g = open_package<Game>(game, _(".mse-game"), "a Game");
+      // as the desktop's new set window: the Game's default set info, and one card
+      SetP set = make_intrusive<Set>(open_stylesheet(*g, stylesheet));
+      set->validate();
+      s->set = set;
+      make_working_copy(*s, working_copy_dir);
+    }
+    add_session(std::move(s), r);
   });
 }
 
@@ -399,6 +447,8 @@ CardList listCards(SessionHandle h) {
       info.uid        = to_utf8(c->uid);
       info.name       = to_utf8(untag(c->identification()));
       info.stylesheet = to_utf8(s.set->stylesheetFor(c).relativeFilename());
+      info.own_stylesheet = (bool)c->stylesheet;
+      info.own_styling    = c->has_styling;
       for (int i = 0 ; i < Card::MAX_LINKS ; ++i) {
         const String& uid = c->getLinkedUID(i);
         if (!uid.empty()) info.links.push_back(CardLinkInfo{to_utf8(uid), to_utf8(c->getLinkedRelation(i))});
@@ -519,6 +569,50 @@ ActionResult moveCards(SessionHandle h, const std::vector<std::string>& card_uid
       return;
     }
     with_action(s, r, [&] { set.actions.addAction(make_unique<MoveCardsAction>(set, order), false); });
+  });
+}
+
+// ----------------------------------------------------------------------------- : Styles
+
+ActionResult setCardStyle(SessionHandle h, const std::string& card_uid, const std::string& stylesheet) {
+  return guarded<ActionResult>(card_uid, "", [&](ActionResult& r) {
+    Session& s = get_session(h);
+    Set& set = *s.set;
+    CardP card = find_card(set, card_uid);
+    StyleSheetP style = stylesheet.empty() ? StyleSheetP() : open_stylesheet(*set.game, stylesheet);
+    // as the desktop's style panel: the Set's Style means no Style of its own
+    if (style == set.stylesheet) style = StyleSheetP();
+    if (style == card->stylesheet) {
+      fill_undo_state(s, r); // no change: no undo step
+      return;
+    }
+    with_action(s, r, [&] { set.actions.addAction(make_unique<ChangeCardStyleAction>(card, style)); });
+  });
+}
+
+ActionResult setSetStyle(SessionHandle h, const std::string& stylesheet) {
+  return guarded<ActionResult>("", "", [&](ActionResult& r) {
+    Session& s = get_session(h);
+    Set& set = *s.set;
+    StyleSheetP style = open_stylesheet(*set.game, stylesheet);
+    if (style == set.stylesheet) {
+      fill_undo_state(s, r);
+      return;
+    }
+    with_action(s, r, [&] { set.actions.addAction(make_unique<ChangeSetStyleAction>(set, style)); });
+  });
+}
+
+ActionResult setCardOwnStyling(SessionHandle h, const std::string& card_uid, bool own_styling) {
+  return guarded<ActionResult>(card_uid, "", [&](ActionResult& r) {
+    Session& s = get_session(h);
+    Set& set = *s.set;
+    CardP card = find_card(set, card_uid);
+    if (card->has_styling == own_styling) {
+      fill_undo_state(s, r);
+      return;
+    }
+    with_action(s, r, [&] { set.actions.addAction(make_unique<ChangeCardHasStylingAction>(set, card)); });
   });
 }
 
@@ -922,6 +1016,82 @@ BytesResult exportCardImage(SessionHandle h, const std::string& card_uid, const 
     StringOutputStream out;
     if (!image_codec().encode(img, _("png"), out) || !out.close()) fail(Status::Failed, "could not encode the image");
     r.data.assign(out.str().begin(), out.str().end());
+  });
+}
+
+// ----------------------------------------------------------------------------- : Installed Templates
+
+/// What listTemplates shows of a Style that only its data file's header says: its Game and card size
+/** The top level "key: value" lines, read the way read_header in template_import.cpp reads them,
+ *  so the Style (and its Game) need not be loaded. */
+static void read_style_header(Packaged& style, TemplateInfo& info) {
+  // StyleSheet's defaults
+  info.card_width  = 100;
+  info.card_height = 100;
+  info.card_dpi    = 96;
+  String data = decode_utf8(style.openIn(_("style"))->readAll());
+  if (!data.empty() && data[0] == 0xFEFF) data.erase(0, 1); // byte order mark
+  size_t pos = 0;
+  while (pos < data.size()) {
+    size_t eol = data.find(_('\n'), pos);
+    if (eol == String::npos) eol = data.size();
+    String line = data.substr(pos, eol - pos);
+    pos = eol + 1;
+    if (line.empty() || line[0] == _('\t') || line[0] == _(' ') || line[0] == _('#')) continue;
+    size_t colon = line.find(_(':'));
+    if (colon == String::npos) continue;
+    String key   = replace_all(trim(line.substr(0, colon)), _("_"), _(" "));
+    String value = trim(line.substr(colon + 1));
+    auto number = [&](double& out) {
+      try { out = std::stod(to_utf8(value)); } catch (...) {}
+    };
+    if (key == _("game")) {
+      info.game = to_utf8(ends_with(value, _(".mse-game")) ? value : value + _(".mse-game"));
+    }
+    else if (key == _("card width"))  number(info.card_width);
+    else if (key == _("card height")) number(info.card_height);
+    else if (key == _("card dpi"))    number(info.card_dpi);
+  }
+}
+
+TemplateList listTemplates(const std::string& type) {
+  return guarded<TemplateList>("", "", [&](TemplateList& r) {
+    if (!initialized) fail(Status::Failed, "the facade is not initialised");
+    namespace fs = std::filesystem;
+    std::vector<std::string> names;
+    std::error_code ec;
+    for (fs::directory_iterator it(fs::u8path(template_dir_), ec), end ; !ec && it != end ; it.increment(ec)) {
+      std::string name = it->path().filename().u8string();
+      size_t ext = name.rfind(".mse-");
+      // hidden ones are left out (import's temporary directories among them)
+      if (name.empty() || name[0] == '.' || ext == std::string::npos || ext == 0) continue;
+      std::string t = name.substr(ext + 5);
+      if (t == "locale" || t == "installer") continue; // not Templates
+      if (!type.empty() && t != type) continue;
+      names.push_back(name);
+    }
+    if (ec) fail(Status::Failed, "can't read the template store '" + template_dir_ + "': " + ec.message());
+    std::sort(names.begin(), names.end());
+    for (const std::string& name : names) {
+      try {
+        PackagedP p = package_manager.openAny(from_utf8(name), true);
+        TemplateInfo info;
+        info.name = name;
+        info.type = name.substr(name.rfind(".mse-") + 5);
+        String base = from_utf8(name.substr(0, name.rfind(".mse-")));
+        info.short_name = to_utf8(p->short_name.empty() ? base : p->short_name);
+        info.full_name  = p->full_name.empty() ? info.short_name : to_utf8(p->full_name);
+        if (p->version != Version()) info.version = to_utf8(p->version.toString());
+        if (!p->icon_filename.empty()) {
+          String icon = p->absoluteFilename() + _("/") + p->icon_filename;
+          if (file_exists(icon)) info.icon_path = to_utf8(icon);
+        }
+        if (info.type == "style") read_style_header(*p, info);
+        r.templates.push_back(std::move(info));
+      } catch (const Error& e) {
+        queue_message(MESSAGE_WARNING, _("Can't read the installed Template ") + from_utf8(name) + _(": ") + e.what());
+      }
+    }
   });
 }
 

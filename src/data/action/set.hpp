@@ -135,18 +135,20 @@ public:
   IndexMap<FieldP,ValueP> styling_data; ///< Its old styling data
 };
 
-/// Changing the style of a set to that of a card
+/// Changing the style of a set to that of a card, or to another stylesheet
 class ChangeSetStyleAction : public DisplayChangeAction {
 public:
   ChangeSetStyleAction(Set& set, const CardP& card);
+  /// Change the style of the set to a stylesheet of its game (no card's style changes)
+  ChangeSetStyleAction(Set& set, const StyleSheetP& stylesheet);
   
   String getName(bool to_undo) const override;
   void perform(bool to_undo) override;
   
 private:
   Set&        set;      ///< The affected set
-  CardP       card;      ///< The card whos stylesheet is copied to the set
-  StyleSheetP stylesheet;    ///< The old stylesheet of the set
+  CardP       card;      ///< The card whos stylesheet is copied to the set, if any
+  StyleSheetP stylesheet;    ///< The other stylesheet: the old one of the set while performed, otherwise the new one
   vector<int> has_styling;    ///< The old has_styling values of all cards (vector<bool> is evil)
 };
 

@@ -900,6 +900,343 @@ TEST(no_exception_escapes) {
   F::closeSession(s);
 }
 
+// ----------------------------------------------------------------------------- : Installed Templates
+
+static const F::TemplateInfo* find_template(const F::TemplateList& list, const std::string& name) {
+  for (const F::TemplateInfo& t : list.templates) if (t.name == name) return &t;
+  return nullptr;
+}
+
+TEST(list_templates) {
+  F::TemplateList all = F::listTemplates();
+  REQUIRE_OK(all);
+  CHECK(all.messages.empty());
+  const F::TemplateInfo* game = find_template(all, "fixture.mse-game");
+  CHECK(game != nullptr);
+  if (game) {
+    CHECK_EQ(game->type, "game");
+    CHECK_EQ(game->short_name, "Fixture");
+    CHECK_EQ(game->full_name, "Test fixture game");
+    CHECK_EQ(game->version, "2026-11-19");
+    CHECK(game->game.empty());
+  }
+  const F::TemplateInfo* standard = find_template(all, "fixture-standard.mse-style");
+  CHECK(standard != nullptr);
+  if (standard) {
+    CHECK_EQ(standard->type, "style");
+    CHECK_EQ(standard->short_name, "Standard");
+    CHECK_EQ(standard->game, "fixture.mse-game");
+    CHECK_EQ(standard->card_width, 300.0);
+    CHECK_EQ(standard->card_height, 420.0);
+    CHECK_EQ(standard->card_dpi, 150.0);
+    CHECK(standard->icon_path.empty());
+  }
+  const F::TemplateInfo* alternate = find_template(all, "fixture-alternate.mse-style");
+  CHECK(alternate != nullptr);
+  if (alternate) {
+    CHECK_EQ(alternate->full_name, "Test fixture alternate style");
+    CHECK_EQ(alternate->version, "2026-11-20");
+    CHECK_EQ(alternate->game, "fixture.mse-game");
+    CHECK_EQ(alternate->card_width, 280.0);
+    CHECK_EQ(alternate->card_height, 400.0);
+    CHECK(!alternate->icon_path.empty() && fs::exists(alternate->icon_path));
+    CHECK_EQ(fs::path(alternate->icon_path).filename().string(), "icon.png");
+  }
+  const F::TemplateInfo* symbols = find_template(all, "fixture-symbols.mse-symbol-font");
+  CHECK(symbols != nullptr && symbols->type == "symbol-font");
+  // by name
+  for (size_t i = 1 ; i < all.templates.size() ; ++i) CHECK(all.templates[i - 1].name < all.templates[i].name);
+  // one type
+  F::TemplateList styles = F::listTemplates("style");
+  REQUIRE_OK(styles);
+  CHECK_EQ(styles.templates.size(), (size_t)2);
+  for (const F::TemplateInfo& t : styles.templates) CHECK_EQ(t.type, "style");
+  // a package that can't be read is left out, with a warning
+  fs::create_directories(templates_dir / "fixture-broken.mse-style");
+  F::TemplateList with_broken = F::listTemplates("style");
+  CHECK_OK(with_broken);
+  CHECK_EQ(with_broken.templates.size(), (size_t)2);
+  CHECK(has_message(with_broken, "fixture-broken.mse-style"));
+  fs::remove_all(templates_dir / "fixture-broken.mse-style");
+  // only on the core thread
+  F::Status other_thread = F::Status::Ok;
+  std::thread([&] { other_thread = F::listTemplates().status; }).join();
+  CHECK_EQ(other_thread, F::Status::WrongThread);
+}
+
+// ----------------------------------------------------------------------------- : New sets
+
+/// Creates a Set, edits it and saves it; reopens it through the facade. The test
+/// `facade-new-set-desktop` then opens the saved set in the desktop build and runs the commands
+/// written here, which check the same.
+TEST(new_set_save_and_reopen) {
+  fs::path work = work_dir / "sessions" / "new-set.mse-set";
+  F::OpenResult r = F::newSession("fixture.mse-game", "fixture-standard.mse-style", work.string());
+  REQUIRE_OK(r);
+  F::SessionHandle s = r.session;
+  CHECK(fs::exists(work / "set"));
+  F::SessionInfo info = F::sessionInfo(s);
+  CHECK_EQ(info.game, "fixture.mse-game");
+  CHECK_EQ(info.stylesheet, "fixture-standard.mse-style");
+  CHECK(!info.dirty);
+  CHECK(!info.can_undo);
+  // as on the desktop, a new set has one card with the Game's initial values
+  F::CardList cards = F::listCards(s);
+  REQUIRE_OK(cards);
+  CHECK_EQ(cards.cards.size(), (size_t)1);
+  if (cards.cards.size() != 1) return;
+  std::string first = cards.cards[0].uid;
+  CHECK(!first.empty());
+  CHECK_EQ(cards.cards[0].stylesheet, "fixture-standard.mse-style");
+  CHECK_EQ(F::getValue(s, F::Target::card(first), "frame").value, "grey");
+  CHECK_EQ(F::getValue(s, F::Target::card(first), "level").value, "1");
+  CHECK_EQ(F::getValue(s, F::Target::set(), "title").value, "");
+  std::vector<std::uint8_t> buf(300 * 420 * 4);
+  F::RenderResult rendered = F::renderCard(s, first, buf.data(), 300, 420, 1200);
+  CHECK_OK(rendered);
+  CHECK(rendered.messages.empty());
+  // edit it
+  CHECK_OK(F::setValue(s, F::Target::set(), "title", "New Set"));
+  CHECK_OK(F::setValue(s, F::Target::card(first), "name", "First Card"));
+  F::NewCardsResult added = F::addCard(s);
+  REQUIRE_OK(added);
+  std::string second = added.uids.at(0);
+  CHECK_OK(F::setValue(s, F::Target::card(second), "name", "Second Card"));
+  CHECK_OK(F::setCardStyle(s, second, "fixture-alternate.mse-style"));
+  CHECK_OK(F::setValue(s, F::Target::cardStyle(second), "accent", "blue"));
+  CHECK_OK(F::flush(s));
+  CHECK(F::sessionInfo(s).dirty);
+  // its first save: the host's "Save as"
+  fs::path out = work_dir / "new-set.mse-set";
+  int fd = ::open(out.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
+  F::ActionResult saved = F::saveTo(s, fd);
+  ::close(fd);
+  REQUIRE_OK(saved);
+  CHECK(!saved.dirty);
+  F::OpenResult again = F::openSession(out.string(), "");
+  REQUIRE_OK(again);
+  CHECK_EQ(F::sessionInfo(again.session).stylesheet, "fixture-standard.mse-style");
+  CHECK_EQ(card_order(again.session), uids({first, second}));
+  CHECK_EQ(F::getValue(again.session, F::Target::set(), "title").value, "New Set");
+  CHECK_EQ(F::getValue(again.session, F::Target::card(first), "name").value, "First Card");
+  F::CardList b = F::listCards(again.session);
+  if (b.cards.size() == 2) {
+    CHECK_EQ(b.cards[1].stylesheet, "fixture-alternate.mse-style");
+    CHECK(b.cards[1].own_stylesheet);
+  }
+  CHECK_EQ(F::getValue(again.session, F::Target::cardStyle(second), "accent").value, "blue");
+  F::closeSession(again.session);
+  F::closeSession(s);
+  // the same checks for the desktop build, as commands for `magicseteditor --cli`
+  std::ofstream cli(work_dir / "new-set.mse-cli", std::ios::binary);
+  cli << "assert(set.title == \"New Set\")\n";
+  cli << "assert(length(set.cards) == 2)\n";
+  cli << "assert(set.cards[0].uid == \"" << first << "\")\n";
+  cli << "assert(set.cards[0].name == \"First Card\")\n";
+  cli << "assert(set.cards[1].name == \"Second Card\")\n";
+  cli << "assert(set.cards[1].stylesheet.short_name == \"Alternate\")\n";
+  cli << "write_image_file(set.cards[1], file:\"new-set-card-2.png\")\n";
+}
+
+TEST(new_set_errors) {
+  F::OpenResult no_game = F::newSession("nonexistent.mse-game", "nonexistent-standard.mse-style", "");
+  CHECK_EQ(no_game.status, F::Status::MissingTemplate);
+  CHECK_EQ(no_game.missing_package, "nonexistent.mse-game");
+  CHECK_EQ(no_game.session, 0);
+  F::OpenResult no_style = F::newSession("fixture.mse-game", "fixture-nonexistent.mse-style", "");
+  CHECK_EQ(no_style.status, F::Status::MissingTemplate);
+  CHECK_EQ(no_style.missing_package, "fixture-nonexistent.mse-style");
+  CHECK_EQ(F::newSession("fixture-standard.mse-style", "fixture-standard.mse-style", "").status, F::Status::InvalidArgument);
+  CHECK_EQ(F::newSession("fixture.mse-game", "fixture.mse-game", "").status, F::Status::InvalidArgument);
+  // the working copy must not exist yet
+  fs::create_directories(work_dir / "existing-new.mse-set");
+  CHECK_EQ(F::newSession("fixture.mse-game", "fixture-standard.mse-style", (work_dir / "existing-new.mse-set").string()).status,
+           F::Status::InvalidArgument);
+  // after a failure, the same Templates still open
+  F::OpenResult ok = F::newSession("fixture.mse-game", "fixture-alternate.mse-style", "");
+  REQUIRE_OK(ok);
+  CHECK_EQ(F::sessionInfo(ok.session).stylesheet, "fixture-alternate.mse-style");
+  F::closeSession(ok.session);
+}
+
+// ----------------------------------------------------------------------------- : Styles
+
+static F::CardInfo card_info(F::SessionHandle s, const std::string& uid) {
+  F::CardList list = F::listCards(s);
+  const F::CardInfo* c = find_card(list, uid);
+  return c ? *c : F::CardInfo();
+}
+
+TEST(change_card_style) {
+  F::SessionHandle s = open_fixture();
+  F::ActionResult a = F::setCardStyle(s, "fixture-wrap", "fixture-alternate.mse-style");
+  REQUIRE_OK(a);
+  CHECK(!a.stale.all);
+  CHECK(!a.stale.card_list);
+  CHECK(contains(a.stale.card_uids, "fixture-wrap"));
+  CHECK(!contains(a.stale.card_uids, "fixture-back"));
+  CHECK(a.dirty);
+  CHECK(a.can_undo);
+  CHECK(!a.undo_name.empty());
+  F::CardInfo wrap = card_info(s, "fixture-wrap");
+  CHECK_EQ(wrap.stylesheet, "fixture-alternate.mse-style");
+  CHECK(wrap.own_stylesheet);
+  CHECK(!card_info(s, "fixture-front").own_stylesheet);
+  CHECK_EQ(F::sessionInfo(s).stylesheet, "fixture-standard.mse-style");
+  F::CardSize size = F::cardSize(s, "fixture-wrap");
+  CHECK_EQ(size.width, 280.0);
+  CHECK_EQ(size.height, 400.0);
+  std::vector<std::uint8_t> buf(280 * 400 * 4);
+  F::RenderResult rendered = F::renderCard(s, "fixture-wrap", buf.data(), 280, 400, 280 * 4);
+  CHECK_OK(rendered);
+  CHECK(rendered.messages.empty());
+  // undo and redo
+  F::ActionResult u = F::undo(s);
+  REQUIRE_OK(u);
+  CHECK(!u.stale.all);
+  CHECK(contains(u.stale.card_uids, "fixture-wrap"));
+  CHECK(!u.dirty);
+  CHECK_EQ(card_info(s, "fixture-wrap").stylesheet, "fixture-standard.mse-style");
+  CHECK(!card_info(s, "fixture-wrap").own_stylesheet);
+  CHECK_EQ(F::cardSize(s, "fixture-wrap").width, 300.0);
+  F::ActionResult re = F::redo(s);
+  CHECK(contains(re.stale.card_uids, "fixture-wrap"));
+  CHECK_EQ(card_info(s, "fixture-wrap").stylesheet, "fixture-alternate.mse-style");
+  // the Set's Style (or "") makes the card follow the Set's Style again
+  F::ActionResult back = F::setCardStyle(s, "fixture-wrap", "fixture-standard.mse-style");
+  REQUIRE_OK(back);
+  CHECK(!card_info(s, "fixture-wrap").own_stylesheet);
+  CHECK_EQ(card_info(s, "fixture-wrap").stylesheet, "fixture-standard.mse-style");
+  // no change: no undo step
+  CHECK_OK(F::setCardStyle(s, "fixture-wrap", ""));
+  CHECK_OK(F::undo(s));
+  CHECK_EQ(card_info(s, "fixture-wrap").stylesheet, "fixture-alternate.mse-style");
+  CHECK_OK(F::undo(s));
+  CHECK(!F::sessionInfo(s).can_undo);
+  // errors
+  CHECK_EQ(F::setCardStyle(s, "fixture-wrap", "fixture.mse-game").status, F::Status::InvalidArgument);
+  F::ActionResult missing = F::setCardStyle(s, "fixture-wrap", "fixture-nonexistent.mse-style");
+  CHECK_EQ(missing.status, F::Status::MissingTemplate);
+  CHECK_EQ(missing.missing_package, "fixture-nonexistent.mse-style");
+  CHECK_EQ(F::setCardStyle(s, "nope", "fixture-alternate.mse-style").status, F::Status::NotFound);
+  CHECK(!F::sessionInfo(s).can_undo);
+  F::closeSession(s);
+}
+
+TEST(change_set_style) {
+  F::SessionHandle s = open_fixture();
+  F::ActionResult a = F::setSetStyle(s, "fixture-alternate.mse-style");
+  REQUIRE_OK(a);
+  CHECK(a.stale.all);
+  CHECK(a.dirty);
+  CHECK_EQ(F::sessionInfo(s).stylesheet, "fixture-alternate.mse-style");
+  for (const F::CardInfo& c : F::listCards(s).cards) {
+    CHECK_EQ(c.stylesheet, "fixture-alternate.mse-style");
+    CHECK(!c.own_stylesheet);
+    CHECK_EQ(F::cardSize(s, c.uid).width, 280.0);
+  }
+  // the Set's style options are those of its Style
+  F::FieldList options = F::listFields(s, F::Target::setStyle());
+  REQUIRE_OK(options);
+  CHECK_EQ(options.fields.size(), (size_t)2);
+  CHECK_EQ(F::getValue(s, F::Target::setStyle(), "accent").value, "red");
+  // undo and redo
+  F::ActionResult u = F::undo(s);
+  CHECK(u.stale.all);
+  CHECK(!u.dirty);
+  CHECK_EQ(F::sessionInfo(s).stylesheet, "fixture-standard.mse-style");
+  CHECK_EQ(F::cardSize(s, "fixture-back").width, 300.0);
+  CHECK_EQ(F::listFields(s, F::Target::setStyle()).fields.size(), (size_t)0);
+  CHECK(F::redo(s).stale.all);
+  CHECK_EQ(F::sessionInfo(s).stylesheet, "fixture-alternate.mse-style");
+  // a card with a Style of its own keeps it
+  CHECK_OK(F::setCardStyle(s, "fixture-front", "fixture-standard.mse-style"));
+  CHECK_OK(F::setSetStyle(s, "fixture-standard.mse-style"));
+  CHECK_EQ(card_info(s, "fixture-wrap").stylesheet, "fixture-standard.mse-style");
+  CHECK_EQ(card_info(s, "fixture-front").stylesheet, "fixture-standard.mse-style");
+  CHECK_OK(F::undo(s));
+  CHECK_EQ(card_info(s, "fixture-wrap").stylesheet, "fixture-alternate.mse-style");
+  CHECK_EQ(card_info(s, "fixture-front").stylesheet, "fixture-standard.mse-style");
+  // no change: no undo step
+  F::ActionResult same = F::setSetStyle(s, "fixture-alternate.mse-style");
+  CHECK_OK(same);
+  CHECK(same.stale.empty());
+  CHECK_OK(F::undo(s)); // the card's Style
+  CHECK_OK(F::undo(s)); // the Set's Style
+  CHECK(!F::sessionInfo(s).can_undo);
+  // errors
+  CHECK_EQ(F::setSetStyle(s, "").status, F::Status::InvalidArgument);
+  CHECK_EQ(F::setSetStyle(s, "fixture-nonexistent.mse-style").status, F::Status::MissingTemplate);
+  F::closeSession(s);
+}
+
+TEST(own_styling_toggle) {
+  F::SessionHandle s = open_fixture();
+  REQUIRE_OK(F::setSetStyle(s, "fixture-alternate.mse-style"));
+  REQUIRE_OK(F::setValue(s, F::Target::setStyle(), "accent", "blue"));
+  // without options of its own, a card uses the Set's
+  CHECK(!card_info(s, "fixture-wrap").own_styling);
+  CHECK_EQ(F::getValue(s, F::Target::cardStyle("fixture-wrap"), "accent").value, "blue");
+  // switched on: a copy of the Set's
+  F::ActionResult on = F::setCardOwnStyling(s, "fixture-wrap", true);
+  REQUIRE_OK(on);
+  CHECK(!on.stale.all);
+  CHECK(contains(on.stale.card_uids, "fixture-wrap"));
+  CHECK(!contains(on.stale.card_uids, "fixture-front"));
+  CHECK(card_info(s, "fixture-wrap").own_styling);
+  CHECK(!card_info(s, "fixture-front").own_styling);
+  CHECK_EQ(F::getValue(s, F::Target::cardStyle("fixture-wrap"), "accent").value, "blue");
+  // its own options change without the Set's
+  CHECK_OK(F::setValue(s, F::Target::cardStyle("fixture-wrap"), "accent", "red"));
+  CHECK_OK(F::setValue(s, F::Target::cardStyle("fixture-wrap"), "footer", "Mine"));
+  CHECK_EQ(F::getValue(s, F::Target::cardStyle("fixture-wrap"), "accent").value, "red");
+  CHECK_EQ(F::getValue(s, F::Target::cardStyle("fixture-wrap"), "footer").value, "Mine");
+  CHECK_EQ(F::getValue(s, F::Target::setStyle(), "accent").value, "blue");
+  CHECK_EQ(F::getValue(s, F::Target::setStyle(), "footer").value, "");
+  CHECK_EQ(F::getValue(s, F::Target::cardStyle("fixture-front"), "accent").value, "blue");
+  std::vector<std::uint8_t> buf(280 * 400 * 4);
+  F::RenderResult rendered = F::renderCard(s, "fixture-wrap", buf.data(), 280, 400, 280 * 4);
+  CHECK_OK(rendered);
+  CHECK(rendered.messages.empty());
+  // already on: no undo step
+  F::ActionResult again = F::setCardOwnStyling(s, "fixture-wrap", true);
+  CHECK_OK(again);
+  CHECK(again.stale.empty());
+  // switched off: the Set's again
+  F::ActionResult off = F::setCardOwnStyling(s, "fixture-wrap", false);
+  REQUIRE_OK(off);
+  CHECK(contains(off.stale.card_uids, "fixture-wrap"));
+  CHECK(!card_info(s, "fixture-wrap").own_styling);
+  CHECK_EQ(F::getValue(s, F::Target::cardStyle("fixture-wrap"), "accent").value, "blue");
+  CHECK_EQ(F::getValue(s, F::Target::cardStyle("fixture-wrap"), "footer").value, "");
+  // undo brings back the card's own options, redo drops them again
+  F::ActionResult u = F::undo(s);
+  CHECK(contains(u.stale.card_uids, "fixture-wrap"));
+  CHECK(card_info(s, "fixture-wrap").own_styling);
+  CHECK_EQ(F::getValue(s, F::Target::cardStyle("fixture-wrap"), "accent").value, "red");
+  CHECK_OK(F::redo(s));
+  CHECK_EQ(F::getValue(s, F::Target::cardStyle("fixture-wrap"), "accent").value, "blue");
+  CHECK_OK(F::undo(s));
+  CHECK_OK(F::undo(s)); // footer
+  CHECK_OK(F::undo(s)); // accent
+  CHECK_EQ(F::getValue(s, F::Target::cardStyle("fixture-wrap"), "accent").value, "blue");
+  CHECK_OK(F::undo(s)); // switched on
+  CHECK(!card_info(s, "fixture-wrap").own_styling);
+  // a card's own Style starts without options of its own
+  CHECK_OK(F::setCardOwnStyling(s, "fixture-wrap", true));
+  CHECK_OK(F::setCardStyle(s, "fixture-wrap", "fixture-standard.mse-style"));
+  CHECK(!card_info(s, "fixture-wrap").own_styling);
+  CHECK_OK(F::undo(s));
+  CHECK(card_info(s, "fixture-wrap").own_styling);
+  // changing the Set's Style drops the options of cards that follow it, as on the desktop
+  CHECK_OK(F::setSetStyle(s, "fixture-standard.mse-style"));
+  CHECK(!card_info(s, "fixture-wrap").own_styling);
+  CHECK_OK(F::undo(s));
+  CHECK(card_info(s, "fixture-wrap").own_styling);
+  CHECK_EQ(F::setCardOwnStyling(s, "nope", true).status, F::Status::NotFound);
+  F::closeSession(s);
+}
+
 // ----------------------------------------------------------------------------- : Template import
 
 static void write_zip_entry(ZipWriter& zip, const std::string& name, const std::string& data) {

@@ -117,6 +117,14 @@ struct OpenResult : Result {
  *  working_copy_dir the Set is edited in memory only. */
 OpenResult openSession(const std::string& set_path, const std::string& working_copy_dir);
 
+/// Start a new Set from a Game and one of its Styles, as the desktop's "new set" does.
+/** game is a package name such as "magic.mse-game", stylesheet one such as "magic-m15.mse-style"
+ *  (both as listTemplates() gives them). The Set has the Game's default set info and one card with
+ *  the Game's initial values, as on the desktop. It has no file: save it with saveTo() (the host's
+ *  "Save as"). working_copy_dir works as for openSession(). A Game or Style that is not installed
+ *  is a MissingTemplate result; a Style of another Game is an InvalidArgument. */
+OpenResult newSession(const std::string& game, const std::string& stylesheet, const std::string& working_copy_dir);
+
 Result closeSession(SessionHandle session);
 
 /// Autosave: write the working copy if the Set changed since the last flush.
@@ -145,6 +153,8 @@ struct CardInfo {
   std::string uid;
   std::string name;       ///< the card's identification (its name, usually)
   std::string stylesheet; ///< the Style it renders with
+  bool own_stylesheet = false; ///< has the card a Style of its own? (otherwise it follows the Set's)
+  bool own_styling    = false; ///< has the card its own style options? (otherwise it uses the Set's for its Style)
   std::vector<CardLinkInfo> links;
 };
 
@@ -181,6 +191,29 @@ ActionResult removeCards(SessionHandle session, const std::vector<std::string>& 
 /** `position` in the new order (0 <= position <= number of cards - number moved). Moving cards to
  *  where they already are changes nothing and adds no undo step. */
 ActionResult moveCards(SessionHandle session, const std::vector<std::string>& card_uids, int position);
+
+// ----------------------------------------------------------------------------- : Styles
+
+// Each call is one undo step (none when nothing changes), as the desktop's Style panel makes it.
+// Styles are package names as listTemplates() gives them, e.g. "magic-m15.mse-style"; they must be
+// Styles of the Set's Game (otherwise InvalidArgument), and a Style that is not installed is a
+// MissingTemplate result.
+
+/// Change the Style of a card. The empty string, or the Set's Style, makes the card follow the
+/** Set's Style again. The card's own style options are dropped (undo brings them back). Reports
+ *  the card as stale. */
+ActionResult setCardStyle(SessionHandle session, const std::string& card_uid, const std::string& stylesheet);
+
+/// Change the Style of the Set, which every card without a Style of its own renders with.
+/** Cards that follow the Set's Style stop using style options of their own, as on the desktop
+ *  (Target::CardStyle then reads the Set's options for the new Style). Reports stale.all. */
+ActionResult setSetStyle(SessionHandle session, const std::string& stylesheet);
+
+/// Switch a card's own style options on or off (the desktop's "use custom styling options").
+/** Switched on, the card starts from a copy of the Set's options for its Style, and from then on
+ *  Target::CardStyle edits the card's own; switched off, it uses the Set's again. Switching to the
+ *  state the card is already in changes nothing. Reports the card as stale. */
+ActionResult setCardOwnStyling(SessionHandle session, const std::string& card_uid, bool own_styling);
 
 // ----------------------------------------------------------------------------- : Fields and values
 
@@ -347,6 +380,32 @@ struct BytesResult : Result {
 };
 /// The finished PNG of a card, as the desktop's "export card image" makes it
 BytesResult exportCardImage(SessionHandle session, const std::string& card_uid, const ExportOptions& options = ExportOptions());
+
+// ----------------------------------------------------------------------------- : Installed Templates
+
+/// An installed Template
+struct TemplateInfo {
+  std::string name;       ///< the package name, e.g. "magic-m15.mse-style"
+  std::string type;       ///< "game", "style", "symbol-font", "export-template", "include", ...
+  std::string short_name; ///< for pickers (derived from the name if the package has none)
+  std::string full_name;  ///< (the short name if the package has none)
+  std::string version;    ///< as declared by the package, e.g. "2026-11-19"; empty if none
+  std::string icon_path;  ///< the full path of the package's icon image, empty if it has none
+  // Styles only
+  std::string game;       ///< the Game it is a Style of, e.g. "magic.mse-game"
+  double card_width = 0, card_height = 0; ///< the card's natural size in pixels (as cardSize())
+  double card_dpi = 0;
+};
+
+struct TemplateList : Result {
+  std::vector<TemplateInfo> templates; ///< by name
+};
+
+/// The Templates installed in the template store (only the package headers are read, so this is
+/** quick). type selects one type, e.g. "style"; empty for every type. A package that can't be read
+ *  is left out with a warning message. On the core thread; after an import, call
+ *  refreshTemplates() first. */
+TemplateList listTemplates(const std::string& type = std::string());
 
 // ----------------------------------------------------------------------------- : Template import
 

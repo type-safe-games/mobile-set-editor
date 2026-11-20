@@ -195,6 +195,9 @@ void ChangeCardStyleAction::perform(bool to_undo) {
 ChangeSetStyleAction::ChangeSetStyleAction(Set& set, const CardP& card)
   : set(set), card(card)
 {}
+ChangeSetStyleAction::ChangeSetStyleAction(Set& set, const StyleSheetP& stylesheet)
+  : set(set), stylesheet(stylesheet)
+{}
 String ChangeSetStyleAction::getName(bool to_undo) const {
   return _ACTION_("change all styles");
 }
@@ -208,12 +211,14 @@ void ChangeSetStyleAction::perform(bool to_undo) {
         card->has_styling = false; // this card has custom style options for the default stylesheet
       }
     }
-    stylesheet       = set.stylesheet;
-    set.stylesheet   = card->stylesheet;
-    card->stylesheet = StyleSheetP();
+    if (card) {
+      stylesheet       = card->stylesheet;
+      card->stylesheet = StyleSheetP();
+    }
+    swap(set.stylesheet, stylesheet);
   } else {
-    card->stylesheet = set.stylesheet;
-    set.stylesheet   = stylesheet;
+    swap(set.stylesheet, stylesheet);
+    if (card) card->stylesheet = stylesheet;
     // restore has_styling
     FOR_EACH_2(card, set.cards, has, has_styling) {
       card->has_styling = has;

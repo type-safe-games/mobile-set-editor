@@ -66,3 +66,12 @@ add_test(
           -P ${test_dir}/run_cli.cmake
 )
 set_tests_properties(facade-card-list-desktop PROPERTIES ENVIRONMENT "${fixture_env}" FIXTURES_REQUIRED facade-output)
+
+# A Set the facade created, edited (with a second Style) and saved opens in the desktop build
+add_test(
+  NAME facade-new-set-desktop
+  COMMAND ${CMAKE_COMMAND} -DMSE=$<TARGET_FILE:magicseteditor> -DSET=${facade_output}/new-set.mse-set
+          -DCOMMANDS=${facade_output}/new-set.mse-cli -DWORKDIR=${PROJECT_BINARY_DIR}/test-output
+          -P ${test_dir}/run_cli.cmake
+)
+set_tests_properties(facade-new-set-desktop PROPERTIES ENVIRONMENT "${fixture_env}" FIXTURES_REQUIRED facade-output)
