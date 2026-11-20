@@ -16,10 +16,8 @@
 #include <util/io/package_manager.hpp>
 #include <util/platform.hpp>
 #include <gfx/image_load.hpp>
-#include <wx/filename.h>
 #include <wx/wfstream.h>
 #include <wx/zipstrm.h>
-#include <wx/stdpaths.h>
 #include <unordered_set>
 
 // Don't do this check for now, because we can't bless packages
@@ -61,8 +59,7 @@ void Installer::validate(Version file_app_version) {
 // ----------------------------------------------------------------------------- : Creating
 
 void Installer::addPackage(const String& package) {
-  wxFileName fn(package);
-  if (fn.GetExt() == _("mse-installer")) {
+  if (file_ext(package) == _("mse-installer")) {
     prefered_filename = package;
   } else {
     PackagedP p = package_manager.openAny(package);
@@ -235,7 +232,7 @@ bool InstallablePackage::ensureIsDownloaded(const DownloadProgressCallback& prog
   if (installer->installer) return true; // Already loaded
   if (installer->installer_url.empty()) return false; // No URL
   // download installer
-  String installer_file = wxFileName::CreateTempFileName(_("mse-installer"));
+  String installer_file = make_temp_file_name(_("mse-installer"));
   unique_ptr<wxFileOutputStream> os;
   retry_io([&]{
     os = make_unique<wxFileOutputStream>(installer_file);

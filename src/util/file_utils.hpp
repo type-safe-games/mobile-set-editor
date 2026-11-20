@@ -12,12 +12,45 @@
 #include <chrono>
 #include <thread>
 #include <data/settings.hpp>
-class wxFileName;
+
+// ----------------------------------------------------------------------------- : Path components
+
+// These work on String paths, and follow the conventions of the wxFileName functions they replaced:
+// the last component of a path is its 'full name' (name+extension), everything before it its 'path'.
+
+/// The native path separator ('/', or '\\' on Windows)
+Char path_separator();
+
+/// The directory part of a path, without a trailing separator (except for the root): "a/b/c.txt" -> "a/b"
+/** Returns "" if there is no directory part. */
+String path_only(const String& path);
+
+/// The last component of a path (name+extension): "a/b/c.txt" -> "c.txt"
+String file_full_name(const String& path);
+
+/// The name of the last component of a path, without the extension: "a/b/c.txt" -> "c"
+String file_name_no_ext(const String& path);
+
+/// The extension of a path, without the dot: "a/b/c.txt" -> "txt", "a/.hidden" -> ""
+String file_ext(const String& path);
+
+/// Append a relative name to a directory, adding a separator if needed: ("a/b","c.txt") -> "a/b/c.txt"
+String join_path(const String& dir, const String& name);
+
+/// Replace the last component of a path (its full name): ("a/b/c.txt","d.png") -> "a/b/d.png"
+String replace_file_name(const String& path, const String& full_name);
+
+/// Is the path relative (as opposed to absolute)?
+bool is_relative_path(const String& path);
 
 // ----------------------------------------------------------------------------- : File names
 
 /// Normalize a filename as much as possible, for real files.
-String normalize_filename(const String& filename);
+/** Expands environment variables and '~', makes the path absolute (relative to base_dir, or to the
+ *  current directory if base_dir is empty), and collapses '.' and '..' directory components.
+ *  Symbolic links are not resolved.
+ */
+String normalize_filename(const String& filename, const String& base_dir = String());
 
 /// Normalize a filename as much as possible, for files in packages.
 String normalize_internal_filename(const String& filename);
@@ -39,14 +72,55 @@ String add_extension(const String& filename, String const& extension);
 /// Make sure a string is safe to use as a filename.
 String clean_filename(const String& name);
 
-/// Change the filename fn if it already exists, in the way described by conflicts.
+/// Change the filename if it already exists, in the way described by conflicts.
 /** Returns true if the filename should be used, false if failed. */
-bool resolve_filename_conflicts(wxFileName& fn, FilenameConflicts conflicts, set<String>& used);
+bool resolve_filename_conflicts(String& filename, FilenameConflicts conflicts, set<String>& used);
+
+/// Create a new, empty, uniquely named file in the system temp directory, and return its name
+/** The name starts with the given prefix. Returns "" on failure. */
+String make_temp_file_name(const String& prefix);
 
 // ----------------------------------------------------------------------------- : File info
 
+/// Does a (regular) file exist at the given path? (symlinks are followed)
+bool file_exists(const String& path);
+
+/// Does a directory exist at the given path? (symlinks are followed)
+bool dir_exists(const String& path);
+
 /// Get the last modified time of a file
 time_t file_modified_time(const String& name);
+
+// ----------------------------------------------------------------------------- : Directory listing
+
+enum ListDirFlags {
+  LIST_FILES  = 0x01, ///< include files (all entries that are not directories)
+  LIST_DIRS   = 0x02, ///< include directories
+  LIST_HIDDEN = 0x04, ///< include hidden entries (names starting with '.')
+  LIST_ALL    = LIST_FILES | LIST_DIRS | LIST_HIDDEN,
+};
+
+/// List the names (not paths) of the entries of a directory, in the order the OS returns them.
+/** Only entries matching the wildcard pattern are returned (see match_filename_wildcard), if it is not empty.
+ *  '.' and '..' are never included. Returns false if the directory can't be read.
+ */
+bool list_directory(const String& dir, vector<String>& names_out, int flags = LIST_ALL, const String& pattern = String());
+
+/// Is the given path a directory without any entries?
+bool is_empty_dir(const String& path);
+
+// ----------------------------------------------------------------------------- : Standard locations
+
+/// Full path of the running executable, "" if unknown
+String executable_path();
+
+/// Directory with the application's installed (read-only) data files
+/** Like wxStandardPaths::GetDataDir: on Linux <install prefix>/share/magicseteditor. */
+String app_data_dir();
+
+/// Directory for the user's own data and settings files (it may not exist yet)
+/** Like wxStandardPaths::GetUserDataDir: on Linux ~/.magicseteditor. */
+String user_data_dir();
 
 // ----------------------------------------------------------------------------- : Retrying flaky file operations
 
@@ -80,13 +154,20 @@ bool retry_io(Op op, RetryOptions const& opts = RetryOptions()) {
 
 // ----------------------------------------------------------------------------- : Removing and renaming
 
+/// Create a single directory, returns false if it can't be created or already exists
 bool create_directory(const String& path);
+
+/// Create a directory and all its missing parents, returns true if the directory exists afterwards
+bool create_directories(const String& path);
+
+/// Remove an empty directory
+bool remove_empty_dir(const String& path);
 
 /// Ensure that the parent directories of the given filename exist.
 bool create_parent_dirs(const String& file);
 
 /// Remove the given file
-/** This is identical to wxRemoveFile, except that it doesn't show an error message if the file doesn't exist
+/** This doesn't show an error message if the file doesn't exist
  *  (who thought that that was a good idea?), and it retries a few times before throwing.
  */
 bool remove_file(const String& file);

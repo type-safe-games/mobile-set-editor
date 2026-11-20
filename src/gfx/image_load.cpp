@@ -10,7 +10,6 @@
 #include <gfx/image_load.hpp>
 #include <util/error.hpp>
 #include <util/file_utils.hpp>
-#include <wx/stdpaths.h>
 #include <wx/mstream.h>
 
 // ----------------------------------------------------------------------------- : Seekable stream
@@ -135,20 +134,20 @@ Image load_resource_image(const String& name) {
     wxLogNull noLog;
     return wxImage(stream);
   #elif defined(__GNUC__)
-    static String path = wxStandardPaths::Get().GetDataDir() + _("/resource/");
+    static String path = app_data_dir() + _("/resource/");
     String file = path + name;
     wxImage resource;
-    if (wxFileExists(file + _(".png"))) image_load_file(resource, file + _(".png"));
-    else if (wxFileExists(file + _(".bmp"))) image_load_file(resource, file + _(".bmp"));
-    else if (wxFileExists(file + _(".ico"))) image_load_file(resource, file + _(".ico"));
-    else if (wxFileExists(file + _(".cur"))) image_load_file(resource, file + _(".cur"));
+    if (file_exists(file + _(".png"))) image_load_file(resource, file + _(".png"));
+    else if (file_exists(file + _(".bmp"))) image_load_file(resource, file + _(".bmp"));
+    else if (file_exists(file + _(".ico"))) image_load_file(resource, file + _(".ico"));
+    else if (file_exists(file + _(".cur"))) image_load_file(resource, file + _(".cur"));
     if (resource.Ok()) return resource;
-        static String local_path = wxStandardPaths::Get().GetUserDataDir() + _("/resource/");
+        static String local_path = user_data_dir() + _("/resource/");
         file = local_path + name;
-        if (wxFileExists(file + _(".png"))) image_load_file(resource, file + _(".png"));
-        else if (wxFileExists(file + _(".bmp"))) image_load_file(resource, file + _(".bmp"));
-        else if (wxFileExists(file + _(".ico"))) image_load_file(resource, file + _(".ico"));
-        else if (wxFileExists(file + _(".cur"))) image_load_file(resource, file + _(".cur"));
+        if (file_exists(file + _(".png"))) image_load_file(resource, file + _(".png"));
+        else if (file_exists(file + _(".bmp"))) image_load_file(resource, file + _(".bmp"));
+        else if (file_exists(file + _(".ico"))) image_load_file(resource, file + _(".ico"));
+        else if (file_exists(file + _(".cur"))) image_load_file(resource, file + _(".cur"));
         if (!resource.Ok()) handle_error(InternalError(String(_("Cannot find resource file at ")) + path + name + _(" or ") + file));
     return resource;
   #else

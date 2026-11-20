@@ -20,8 +20,7 @@
 #include <data/card.hpp>
 #include <data/game.hpp>
 #include <random>
-#include <wx/filename.h>
-#include <wx/stdpaths.h>
+#include <util/file_utils.hpp>
 #include <wx/wfstream.h>
 #include <boost/json.hpp>
 
@@ -32,8 +31,7 @@ SCRIPT_FUNCTION(get_mse_version) {
 }
 
 SCRIPT_FUNCTION(get_mse_path) {
-  wxFileName app_path(wxStandardPaths::Get().GetExecutablePath());
-  String app_folder = app_path.GetPath();
+  String app_folder = path_only(executable_path());
   app_folder.Replace("\\", "/");
   SCRIPT_RETURN(app_folder);
 }

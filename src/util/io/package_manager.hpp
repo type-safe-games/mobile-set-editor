@@ -10,7 +10,6 @@
 
 #include <util/prec.hpp>
 #include <util/io/package.hpp>
-#include <wx/filename.h>
 
 DECLARE_POINTER_TYPE(Packaged);
 DECLARE_POINTER_TYPE(PackageVersion);
@@ -77,8 +76,8 @@ public:
   /// Get the package directory
   inline String getDirectory() const { return directory; }
   
-  /// Find all packages that match a filename pattern (using wxFindFirst)
-  String findFirstMatching(const String& pattern) const;
+  /// Find all files and directories (full paths) that match a filename pattern, hidden ones excluded
+  vector<String> findMatching(const String& pattern) const;
 
   /// Verify that a package contains its titular file
   bool checkForPackageFile(const String& package_name);

@@ -113,7 +113,7 @@ void read_mse1_card(Set& set, wxFileInputStream& f, wxTextInputStream& file) {
         break;
       } case 'C': case 'D': { // image filename
         LocalFileName image_file = set.newFileName(_("image"),_("")); // a new unique name in the package
-        if (wxCopyFile(line, set.nameOut(image_file), true)) {
+        if (file_exists(line) && copy_file(line, set.nameOut(image_file))) {
           card->value<ImageValue>(_("image")).filename = image_file;
         }
         break;

@@ -19,9 +19,8 @@
 #include <util/io/reader.hpp>
 #include <util/io/writer.hpp>
 #include <util/delayed_index_maps.hpp>
-#include <wx/filename.h>
+#include <util/file_utils.hpp>
 #include <wx/wfstream.h>
-#include <wx/stdpaths.h>
 
 // ----------------------------------------------------------------------------- : Extra types
 
@@ -231,9 +230,7 @@ Settings::Settings()
 
 void Settings::addRecentFile(const String& filename) {
   // get absolute path
-  wxFileName fn(filename);
-  fn.Normalize();
-  String filenameAbs = fn.GetFullPath();
+  String filenameAbs = normalize_filename(filename);
   // remove duplicates
   recent_sets.erase(
     remove(recent_sets.begin(), recent_sets.end(), filenameAbs),
@@ -330,8 +327,8 @@ Settings::ExportSettings Settings::clipboardSettingsFor(const StyleSheet& styles
 
 /// Retrieve the directory to use for settings and other data files
 String user_settings_dir() {
-  String dir = wxStandardPaths::Get().GetUserDataDir();
-  if (!wxDirExists(dir)) wxMkdir(dir);
+  String dir = user_data_dir();
+  if (!dir_exists(dir)) create_directory(dir);
   return dir + _("/");
 }
 
@@ -404,7 +401,7 @@ void Settings::read() {
   clear();
   // (re)load settings
   String filename = settingsFile();
-  if (wxFileExists(filename)) {
+  if (file_exists(filename)) {
     // settings file not existing is not an error
     wxFileInputStream file(filename);
     if (!file.Ok()) return; // failure is not an error

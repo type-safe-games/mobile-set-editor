@@ -30,27 +30,27 @@ bool run_svn(const Char** arguments) {
   
 }
 
-void SubversionVCS::addFile(const wxFileName& filename)
+void SubversionVCS::addFile(const String& filename)
 {
-  String name = filename.GetFullPath();
+  String name = filename;
   const Char* name_c[] = {_("svn"), _("add"), name.c_str(), nullptr};
   if (!run_svn(name_c)) {
     VCS::addFile(filename);
   }
 }
 
-void SubversionVCS::moveFile(const wxFileName& source, const wxFileName& dest)
+void SubversionVCS::moveFile(const String& source, const String& dest)
 {
-  String source_name = source.GetFullPath(), dest_name = dest.GetFullPath();
+  String source_name = source, dest_name = dest;
   const Char* name_c[] = {_("svn"), _("mv"), source_name.c_str(), dest_name.c_str(), nullptr};
   if (!run_svn(name_c)) {
     VCS::moveFile(source, dest);
   }
 }
 
-void SubversionVCS::removeFile(const wxFileName& filename)
+void SubversionVCS::removeFile(const String& filename)
 {
-  String name = filename.GetFullPath();
+  String name = filename;
   const Char* name_c[] = {_("svn"), _("rm"), name.c_str(), nullptr};
   queue_message(MESSAGE_WARNING, String(name_c[0]) + name_c[1] + name_c[2]);
   // TODO: do we really need to remove the file before calling "svn remove"?

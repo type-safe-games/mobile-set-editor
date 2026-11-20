@@ -15,6 +15,7 @@
 #include <data/stylesheet.hpp>
 #include <wx/clipbrd.h>
 #include <gui/util.hpp>
+#include <wx/filename.h>
 
 // ----------------------------------------------------------------------------- : ImageValueEditor
 

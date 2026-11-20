@@ -202,7 +202,7 @@ protected:
   virtual VCSP getVCS() { return make_intrusive<VCS>(); }
 
   /// true if this is a zip file, false if a directory
-  bool isZipfile() const { return !wxDirExists(filename); }
+  bool isZipfile() const { return !dir_exists(filename); }
 
   // --------------------------------------------------- : Private stuff
   private:

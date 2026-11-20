@@ -145,15 +145,15 @@ SetP MtgEditorFileFormat::importSet(const String& filename) {
     } else if (line == _("#ILLUSTRATION##") || line == _("#ILLUSTRATION8#")) {    // image
       target = nullptr;
       line = file.ReadLine();
-      if (!wxFileExists(line)) {
+      if (!file_exists(line)) {
         // based on card name and date
         line = filter1(filename) + set_date + _("/") +
                filter2(current_card->value<TextValue>(_("name")).value) + card_date + _(".jpg");
       }
       // copy image into set
-      if (wxFileExists(line)) {
+      if (file_exists(line)) {
         LocalFileName image_file = set->newFileName(_("image"),_(""));
-        if (wxCopyFile(line, set->nameOut(image_file), true)) {
+        if (copy_file(line, set->nameOut(image_file))) {
           current_card->value<ImageValue>(_("image")).filename = image_file;
         }
       }

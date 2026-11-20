@@ -12,7 +12,6 @@
 #include <util/real_point.hpp>
 #include <util/file_utils.hpp>
 #include <boost/json.hpp>
-#include <wx/filename.h>
 #include <fstream>
 #include <filesystem>
 
@@ -194,11 +193,11 @@ inline static bool UTF8ToFile(const std::string& filepath, std::string& data) {
 /// Encode an image in a string
 inline static std::string encodeImageInString(const Image& img) {
   wxLogNull noLog; // suppress popups from cleaning up a possibly-missing temp file below
-  String temppath = wxFileName::CreateTempFileName(_("mse")) + _(".png");
+  String temppath = make_temp_file_name(_("mse")) + _(".png");
   retry_io([&]{ return img.SaveFile(temppath, wxBITMAP_TYPE_PNG); });
   std::string s = "<mse-image-data>" + fileToUTF8(temppath.ToStdString()) + "</mse-image-data>";
-  retry_io([&]{ return wxRemoveFile(temppath); });
-  retry_io([&]{ return wxRemoveFile(temppath.substr(0, temppath.size() - 4)); });
+  remove_file(temppath);
+  remove_file(temppath.substr(0, temppath.size() - 4));
   return s;
 }
 
@@ -212,12 +211,12 @@ inline static bool decodeImageFromString(const String& string, Image& img_out) {
   if (s.empty()) return true;
 
   wxLogNull noLog; // suppress popups from cleaning up a possibly-missing temp file below
-  const std::string& temppath = (wxFileName::CreateTempFileName(_("mse")) + _(".png")).ToStdString();
+  const std::string& temppath = (make_temp_file_name(_("mse")) + _(".png")).ToStdString();
   if (UTF8ToFile(temppath, s)) {
     retry_io([&]{ return img_out.LoadFile(temppath, wxBITMAP_TYPE_PNG); });
   }
-  retry_io([&]{ return wxRemoveFile(temppath); });
-  retry_io([&]{ return wxRemoveFile(temppath.substr(0, temppath.size() - 4)); });
+  remove_file(temppath);
+  remove_file(temppath.substr(0, temppath.size() - 4));
   return true;
 }
 

@@ -22,9 +22,9 @@ SpellChecker* SpellChecker::get(const String& language) {
     String global_dir = package_manager.getDictionaryDir(false);
     String aff_path = language + _(".aff");
     String dic_path = language + _(".dic");
-    if (wxFileExists(local_dir + aff_path) && wxFileExists(local_dir + dic_path)) {
+    if (file_exists(local_dir + aff_path) && file_exists(local_dir + dic_path)) {
       speller = make_intrusive<SpellChecker>((local_dir + aff_path).mb_str(), (local_dir + dic_path).mb_str());
-    } else if (wxFileExists(global_dir + aff_path) && wxFileExists(global_dir + dic_path)) {
+    } else if (file_exists(global_dir + aff_path) && file_exists(global_dir + dic_path)) {
       speller = make_intrusive<SpellChecker>((global_dir + aff_path).mb_str(), (global_dir + dic_path).mb_str());
     } else {
       queue_message(MESSAGE_ERROR, _("Dictionary not found for language: ") + language);
@@ -41,12 +41,12 @@ SpellChecker* SpellChecker::get(const String& filename, const String& language) 
     String global_dir = package_manager.getDictionaryDir(false);
     String aff_path = language + _(".aff");
     String dic_path = language + _(".dic");
-    if (wxFileExists(prefix + dic_path)) {
-      if (wxFileExists(prefix + aff_path)) {
+    if (file_exists(prefix + dic_path)) {
+      if (file_exists(prefix + aff_path)) {
         speller = make_intrusive<SpellChecker>((prefix + aff_path).mb_str(), (prefix + dic_path).mb_str());
-      } else if (wxFileExists(local_dir + aff_path)) {
+      } else if (file_exists(local_dir + aff_path)) {
         speller = make_intrusive<SpellChecker>((local_dir + aff_path).mb_str(), (prefix + dic_path).mb_str());
-      } else if (wxFileExists(global_dir + aff_path)) {
+      } else if (file_exists(global_dir + aff_path)) {
         speller = make_intrusive<SpellChecker>((global_dir + aff_path).mb_str(), (prefix + dic_path).mb_str());
       }
     }

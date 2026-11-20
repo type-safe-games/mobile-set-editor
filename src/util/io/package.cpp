@@ -16,7 +16,6 @@
 #include <data/set.hpp>
 #include <wx/wfstream.h>
 #include <wx/zipstrm.h>
-#include <wx/dir.h>
 
 // ----------------------------------------------------------------------------- : Package : outside
 
@@ -66,17 +65,17 @@ void Package::open(const String& n, bool fast) {
   assert(!isOpened()); // not already opened
   PROFILER(_("open package"));
   // get absolute path
-  wxFileName fn(n);
-  fn.Normalize();
-  filename = fn.GetFullPath();
+  filename = normalize_filename(n);
   // get modified time
-  if (!fn.FileExists() || !fn.GetTimes(0, &modified, 0)) {
+  if (file_exists(filename)) {
+    modified = wxDateTime(file_modified_time(filename));
+  } else {
     modified = wxDateTime(time_t(0)); // long time ago
   }
   // type of package
-  if (wxDirExists(filename)) {
+  if (dir_exists(filename)) {
     openDirectory(fast);
-  } else if (wxFileExists(filename)) {
+  } else if (file_exists(filename)) {
     openZipfile();
   } else {
     throw PackageNotFoundError(_ERROR_1_("package not found", filename), filename);
@@ -84,7 +83,7 @@ void Package::open(const String& n, bool fast) {
 }
 
 void Package::reopen() {
-  if (wxDirExists(filename)) {
+  if (dir_exists(filename)) {
     // make sure we have no zip open
     zipStream.reset();
   } else {
@@ -102,7 +101,7 @@ void Package::save(bool remove_unused) {
 void Package::saveAs(const String& name, bool remove_unused, bool as_directory) {
   if (Set* s = dynamic_cast<Set*>(this)) s->referenceActionStackFiles();
   // type of package
-  if (wxDirExists(name) || as_directory) {
+  if (dir_exists(name) || as_directory) {
     saveToDirectory(name, remove_unused, false);
   } else {
     saveToZipfile  (name, remove_unused, false);
@@ -204,11 +203,11 @@ bool Package::contains(const String& file) {
     // written to this file, open the temp file
     retry_io([&]{ stream = make_unique<wxFileInputStream>(it->second.tempName); return stream->IsOk(); });
   }
-  else if (wxFileExists(filename + _("/") + file)) {
+  else if (file_exists(filename + _("/") + file)) {
     // a file in directory package
     retry_io([&]{ stream = make_unique<wxFileInputStream>(filename + _("/") + file); return stream->IsOk(); });
   }
-  else if (wxFileExists(filename) && it != files.end() && it->second.zipEntry) {
+  else if (file_exists(filename) && it != files.end() && it->second.zipEntry) {
     // a file in a zip archive
     retry_io([&]{ stream = make_unique<ZipFileInputStream>(filename, it->second.zipEntry); return stream->IsOk(); });
   }
@@ -232,8 +231,8 @@ unique_ptr<wxInputStream> Package::openIn(const String& file) {
     if (pos != String::npos) {
       // check for nested folder
       pos = filename.find_last_of(_("/\\"));
-      String nestedFilename = filename + filename.SubString(pos, filename.size()) + wxFileName::GetPathSeparator() + file;
-      if (wxFileExists(nestedFilename)) {
+      String nestedFilename = filename + filename.SubString(pos, filename.size()) + path_separator() + file;
+      if (file_exists(nestedFilename)) {
         throw PackageError(_ERROR_1_("nested folder", filename));
       }
       else {
@@ -245,10 +244,10 @@ unique_ptr<wxInputStream> Package::openIn(const String& file) {
   if (it != files.end() && it->second.wasWritten()) {
     // written to this file, open the temp file
     retry_io([&]{ stream = make_unique<wxFileInputStream>(it->second.tempName); return stream->IsOk(); });
-  } else if (wxFileExists(filename+_("/")+file)) {
+  } else if (file_exists(filename+_("/")+file)) {
     // a file in directory package
     retry_io([&]{ stream = make_unique<wxFileInputStream>(filename+_("/")+file); return stream->IsOk(); });
-  } else if (wxFileExists(filename) && it != files.end() && it->second.zipEntry) {
+  } else if (file_exists(filename) && it != files.end() && it->second.zipEntry) {
     // a file in a zip archive
     retry_io([&]{ stream = make_unique<ZipFileInputStream>(filename, it->second.zipEntry); return stream->IsOk(); });
   } else {
@@ -284,7 +283,7 @@ String Package::nameOut(const String& file) {
     return it->second.tempName;
   } else {
     // create temp file
-    String name = wxFileName::CreateTempFileName(_("mse"));
+    String name = make_temp_file_name(_("mse"));
     it->second.tempName = name;
     return name;
   }
@@ -329,7 +328,7 @@ String Package::absoluteName(const LocalFileName& file) {
   if (it->second.wasWritten()) {
     // written to this file, return the temp file
     return it->second.tempName;
-  } else if (wxFileExists(filename + _("/") + file.fn)) {
+  } else if (file_exists(filename + _("/") + file.fn)) {
     // dir package
     return filename + _("/") + file.fn;
   } else {
@@ -416,11 +415,10 @@ void Package::openDirectory(bool fast) {
 }
 
 void Package::openSubdir(const String& name) {
-  wxDir d(filename + _("/") + name);
-  if (!d.IsOpened()) return; // ignore errors here
+  vector<String> entries;
+  if (!list_directory(filename + _("/") + name, entries, LIST_FILES | LIST_HIDDEN)) return; // ignore errors here
   // find files
-  String f; // filename
-  for(bool ok = d.GetFirst(&f, _(""), wxDIR_FILES | wxDIR_HIDDEN) ; ok ; ok = d.GetNext(&f)) {
+  for (const String& f : entries) {
     if (ignore_file(f)) continue;
     // add file to list of known files
     addFile(name + f);
@@ -429,7 +427,9 @@ void Package::openSubdir(const String& name) {
     modified = max(modified,file_time);
   }
   // find subdirs
-  for(bool ok = d.GetFirst(&f, _(""), wxDIR_DIRS | wxDIR_HIDDEN) ; ok ; ok = d.GetNext(&f)) {
+  entries.clear();
+  list_directory(filename + _("/") + name, entries, LIST_DIRS | LIST_HIDDEN);
+  for (const String& f : entries) {
     if (!f.empty() && f.GetChar(0) != _('.')) {
       // skip directories starting with '.', like ., .. and .svn
       openSubdir(name+f+_("/"));
@@ -506,7 +506,7 @@ void Package::saveToZipfile(const String& saveAs, bool remove_unused, bool is_co
   // tempFile is deliberately NOT saveAs + ".tmp". CreateTempFileName guarantees
   // it will be in a local drive. To create it we need to do a lot of writes, so
   // we don't want to do that on a potential cloud-synced drive.
-  String tempFile    = wxFileName::CreateTempFileName(_("mse-zip"));
+  String tempFile    = make_temp_file_name(_("mse-zip"));
   String bakFile     = saveAs + _(".bak");
   String bakTempFile = saveAs + _(".bak.tmp");
   // open temp zip file
@@ -570,7 +570,7 @@ void Package::saveToZipfile(const String& saveAs, bool remove_unused, bool is_co
     wxLogNull noLog;
     // move .bak to .bak.temp
     bool bak_temp_created = false;
-    if (wxFileExists(bakFile)) {
+    if (file_exists(bakFile)) {
       remove_file(bakTempFile); // clear out any stale leftover from an earlier crash
       bak_temp_created = rename_file_or_dir(bakFile, bakTempFile);
       if (!bak_temp_created) {
@@ -586,7 +586,7 @@ void Package::saveToZipfile(const String& saveAs, bool remove_unused, bool is_co
         );
       }
     }
-    if (wxFileExists(saveAs)) {
+    if (file_exists(saveAs)) {
       // move old .mse-set to .bak
       if (!rename_file_or_dir(saveAs, bakFile)) {
         // failed, restore .bak.tmp to .bak, bail
@@ -647,11 +647,12 @@ Package::FileInfos::iterator Package::addFile(const String& name) {
 
 DateTime Package::modificationTime(const pair<String, FileInfo>& fi) const {
   if (fi.second.wasWritten()) {
-    return wxFileName(fi.first).GetModificationTime();
+    // note: this looks at fi.first relative to the working directory, as before
+    return file_exists(fi.first) ? DateTime(file_modified_time(fi.first)) : DateTime();
   } else if (fi.second.zipEntry) {
     return fi.second.zipEntry->GetDateTime();
-  } else if (wxFileExists(filename+_("/")+fi.first)) {
-    return wxFileName(filename+_("/")+fi.first).GetModificationTime();
+  } else if (file_exists(filename+_("/")+fi.first)) {
+    return DateTime(file_modified_time(filename+_("/")+fi.first));
   } else {
     return DateTime((wxLongLong)0ul);
   }

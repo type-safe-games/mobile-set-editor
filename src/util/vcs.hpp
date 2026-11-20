@@ -10,7 +10,6 @@
 
 #include <util/prec.hpp>
 #include <util/file_utils.hpp>
-#include <wx/filename.h>
 
 class VCS;
 
@@ -31,15 +30,17 @@ class VCS : public IntrusivePtrVirtualBase
 {
 public:
   /// Add a file - it's assumed to already have been created
-  virtual void addFile (const wxFileName& filename) {
+  virtual void addFile (const String& filename) {
   }
   /// Rename a file (currently unused)
-  virtual void moveFile (const wxFileName& source, const wxFileName& destination) {
-    wxRenameFile(source.GetFullName(), destination.GetFullName());
+  /** Note: this works on the file names only (relative to the working directory), as it always has */
+  virtual void moveFile (const String& source, const String& destination) {
+    rename_file_or_dir(file_full_name(source), file_full_name(destination));
   }
   /// Delete a file right off the disk
-  virtual void removeFile (const wxFileName& filename) {
-    remove_file(filename.GetFullName());
+  /** Note: this works on the file name only (relative to the working directory), as it always has */
+  virtual void removeFile (const String& filename) {
+    remove_file(file_full_name(filename));
   }
   
   DECLARE_REFLECTION_VIRTUAL();

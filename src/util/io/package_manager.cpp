@@ -17,9 +17,7 @@
 #include <data/locale.hpp>
 #include <data/export_template.hpp>
 #include <data/installer.hpp>
-#include <wx/stdpaths.h>
 #include <wx/wfstream.h>
-#include <wx/dir.h>
 
 // ----------------------------------------------------------------------------- : PackageManager : in memory
 
@@ -31,8 +29,8 @@ void PackageManager::init() {
   global.init(false);
   if (!(local.valid() || global.valid()))
     throw Error(_("The MSE data files can not be found, there should be a directory called 'data' with these files. ")
-                _("The expected place to find it in was either ") + wxStandardPaths::Get().GetDataDir() + _(" or ") +
-                wxStandardPaths::Get().GetUserDataDir());
+                _("The expected place to find it in was either ") + app_data_dir() + _(" or ") +
+                user_data_dir());
   local.deleteEmptyFolders();
   global.deleteEmptyFolders();
 }
@@ -57,10 +55,10 @@ String PackageManager::cleanFilename(const String& name_) {
 String PackageManager::normalizeFilename(const String& name) {
   String filename;
   // Attempt to load local data first.
-  if (wxFileName(name).IsRelative()) {
+  if (is_relative_path(name)) {
     // local data dir?
     filename = normalize_filename(local.name(name));
-    if (!wxFileExists(filename) && !wxDirExists(filename)) {
+    if (!file_exists(filename) && !dir_exists(filename)) {
       // global data dir
       filename = normalize_filename(global.name(name));
     }
@@ -77,8 +75,7 @@ PackagedP PackageManager::openAny(const String& name_, bool just_header) {
   PackagedP& p = loaded_packages[filename];
   if (!p) {
     // load with the right type, based on extension
-    wxFileName fn(filename);
-    String ext = fn.GetExt();
+    String ext = file_ext(filename);
     if      (ext == _("mse-style"))           p = make_intrusive<StyleSheet>();
     else if (ext == _("mse-symbol-font"))     p = make_intrusive<SymbolFont>();
     else if (ext == _("mse-include"))         p = make_intrusive<IncludePackage>();
@@ -88,7 +85,7 @@ PackagedP PackageManager::openAny(const String& name_, bool just_header) {
     //else if (ext == _("mse-import-template")) p = make_intrusive<ImportTemplate>();
     else if (ext == _("mse-updater"))         p = make_intrusive<Updater>();
     else {
-      throw PackageError(_("Unrecognized package type: '") + fn.GetExt() + _("'\nwhile trying to open: ") + name);
+      throw PackageError(_("Unrecognized package type: '") + ext + _("'\nwhile trying to open: ") + name);
     }
     p->open(filename, just_header);
   } else if (!just_header) {
@@ -99,23 +96,19 @@ PackagedP PackageManager::openAny(const String& name_, bool just_header) {
 
 void PackageManager::findMatching(const String& pattern, vector<PackagedP>& out) {
   // first find local packages
-  String file = local.findFirstMatching(pattern);
-  while (!file.empty()) {
+  for (const String& file : local.findMatching(pattern)) {
     if (local.checkForPackageFile(file)) {
       out.push_back(openAny(file, true));
     }
-    file = wxFindNextFile();
   }
   // then global packages not already in the list
-  file = global.findFirstMatching(pattern);
-  while (!file.empty()) {
+  for (const String& file : global.findMatching(pattern)) {
     if (global.checkForPackageFile(file)) {
       PackagedP p = openAny(file, true);
       if (find(out.begin(), out.end(), p) == out.end()) {
         out.push_back(p);
       }
     }
-    file = wxFindNextFile();
   }
 }
 
@@ -239,9 +232,9 @@ bool PackageManager::install(const InstallablePackage& package, const InstallPro
 
 /// Walk up from start until a directory containing 'data' is found, return that 'data' path or "" if none
 static String find_data_dir_above(String dir) {
-  while (!wxDirExists(dir + _("/data"))) {
+  while (!dir_exists(dir + _("/data"))) {
     String d = dir;
-    dir = wxPathOnly(dir);
+    dir = path_only(dir);
     if (d == dir || dir.empty()) return String();
   }
   return dir + _("/data");
@@ -251,11 +244,11 @@ void PackageDirectory::init(bool local) {
   is_local = local;
   if (local) {
     // MSE_TEMPLATES_DIR (ADR 0008) points the test host at a template pack outside the user's data dir
-    String templates_dir;
-    if (wxGetEnv(_("MSE_TEMPLATES_DIR"), &templates_dir) && !templates_dir.empty()) {
-      init(templates_dir);
+    const char* templates_dir = std::getenv("MSE_TEMPLATES_DIR");
+    if (templates_dir && *templates_dir) {
+      init(String(templates_dir, *wxConvFileName));
     } else {
-      init(wxStandardPaths::Get().GetUserDataDir() + _("/data"));
+      init(user_data_dir() + _("/data"));
     }
   } else {
     // determine data directory
@@ -263,26 +256,24 @@ void PackageDirectory::init(bool local) {
     // the data may be higher up:
     //  exe path  = mse/build/debug/mse.exe
     //  data path = mse/data
-    String dir = find_data_dir_above(wxStandardPaths::Get().GetDataDir());
-    // On Linux GetDataDir() is the install prefix, so a build tree also looks above the executable
-    if (dir.empty()) dir = find_data_dir_above(wxPathOnly(wxStandardPaths::Get().GetExecutablePath()));
-    if (dir.empty()) dir = wxStandardPaths::Get().GetDataDir() + _("/data");
+    String dir = find_data_dir_above(app_data_dir());
+    // On Linux app_data_dir() is in the install prefix, so a build tree also looks above the executable
+    if (dir.empty()) dir = find_data_dir_above(path_only(executable_path()));
+    if (dir.empty()) dir = app_data_dir() + _("/data");
     init(dir);
   }
 }
 void PackageDirectory::init(const String& dir) {
-  if (wxDirExists(dir))
+  if (dir_exists(dir))
     directory = dir;
   else
     directory.clear();
 }
 
 void PackageDirectory::deleteEmptyFolders() {
-  for (String file = findFirstMatching(_("*.mse-*")) ; !file.empty() ; file = wxFindNextFile()) {
-    if (!wxDir::Exists(file)) continue;
-    wxDir outerDir(file);
-    if (!outerDir.HasFiles() && !outerDir.HasSubDirs()) {
-      retry_io([&]{ return wxRmdir(file); });
+  for (const String& file : findMatching(_("*.mse-*"))) {
+    if (is_empty_dir(file)) {
+      retry_io([&]{ return remove_empty_dir(file); });
     }
   }
 }
@@ -293,12 +284,17 @@ String PackageDirectory::name(const String& name) const {
 
 bool PackageDirectory::exists(const String& filename) const {
   String fn = name(filename);
-  return wxFileExists(fn) || wxDirExists(fn);
+  return file_exists(fn) || dir_exists(fn);
 }
 
-String PackageDirectory::findFirstMatching(const String& pattern) const {
-  if (!wxDirExists(directory)) return String();
-  return wxFindFirstFile(directory + _("/") + pattern, 0);
+vector<String> PackageDirectory::findMatching(const String& pattern) const {
+  vector<String> names;
+  if (!dir_exists(directory)) return names;
+  list_directory(directory, names, LIST_FILES | LIST_DIRS, pattern);
+  String prefix = directory;
+  if (!prefix.EndsWith(String(path_separator()))) prefix += path_separator();
+  for (String& name : names) name = prefix + name;
+  return names;
 }
 
 bool compare_name(const PackageVersionP& a, const PackageVersionP& b) {
@@ -312,8 +308,8 @@ bool PackageDirectory::checkForPackageFile(const String& folder_name) {
     return false;
   }
   String package_name = folder_name.substr(package_pos+5);
-  String package_file = folder_name + wxFileName::GetPathSeparator() + package_name;
-  if (!wxFileExists(package_file) && !wxFileExists(directory + wxFileName::GetPathSeparator() + package_file)) {
+  String package_file = folder_name + path_separator() + package_name;
+  if (!file_exists(package_file) && !file_exists(directory + path_separator() + package_file)) {
     queue_message(MESSAGE_WARNING, _ERROR_2_("file not found package like init", package_name, folder_name));
     return false;
   }
@@ -324,7 +320,7 @@ void PackageDirectory::installedPackages(vector<InstallablePackageP>& packages_o
   loadDatabase();
   // find all package files
   vector<String> in_dir;
-  for (String s = findFirstMatching(_("*.mse-*")) ; !s.empty() ; s = wxFindNextFile()) {
+  for (String s : findMatching(_("*.mse-*"))) {
     size_t pos = s.find_last_of(_("/\\"));
     if (pos != String::npos) s = s.substr(pos+1);
     // TODO : check for valid package names
@@ -410,7 +406,7 @@ IMPLEMENT_REFLECTION(PackageDirectory) {
 void PackageDirectory::loadDatabase() {
   if (!packages.empty()) return;
   String filename = databaseFile();
-  if (wxFileExists(filename)) {
+  if (file_exists(filename)) {
     // packages file not existing is not an error
     wxFileInputStream file_stream = {filename};
     if (!file_stream.Ok()) return; // failure is not an error

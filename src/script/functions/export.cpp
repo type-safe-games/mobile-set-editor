@@ -18,8 +18,8 @@
 #include <util/tagged_string.hpp>
 #include <gfx/generated_image.hpp>
 #include <util/error.hpp>
+#include <util/file_utils.hpp>
 #include <wx/wfstream.h>
-#include <wx/filename.h>
 
 // ----------------------------------------------------------------------------- : Utility
 
@@ -37,27 +37,23 @@ void guard_export_info(const String& fun, bool need_template = false) {
 String get_export_full_path(String& rel_name) {
   ExportInfo& ei = *export_info();
   // the absolute path
-  wxFileName fn(rel_name);
-  fn.Normalize(wxPATH_NORM_ALL, ei.directory_absolute);
+  String p1 = normalize_filename(rel_name, ei.directory_absolute);
   if (!ei.allow_writes_outside) {
     // check if path is okay
-    wxFileName fn2(_("x"));
-    fn2.Normalize(wxPATH_NORM_ALL, ei.directory_absolute);
-    String p1 = fn.GetFullPath();
-    String p2 = fn2.GetFullPath();
+    String p2 = normalize_filename(_("x"), ei.directory_absolute);
     p2.resize(p2.size() - 1); // drop the x
     if (p2.empty() || p1.size() < p2.size() || p1.substr(0,p2.size()-1) != p2.substr(0,p2.size()-1)) {
       throw ScriptError(_("Not a relative filename: ") + rel_name);
     }
   }
-  rel_name = fn.GetFullName(); // TODO: does this work correctly with subdirectories in target dir?
-  return fn.GetFullPath();
+  rel_name = file_full_name(p1); // TODO: does this work correctly with subdirectories in target dir?
+  return p1;
 }
 
 void ensure_dir_valid(String& path) {
-  if (!wxDirExists(path)) {
-    wxFileName filename = path;
-    if (!retry_io([&]{ return filename.Mkdir(wxS_DIR_DEFAULT, wxPATH_MKDIR_FULL); })) {
+  if (!dir_exists(path)) {
+    // note: like wxFileName::Mkdir this creates the directory part of path, the last component is seen as a file name
+    if (!retry_io([&]{ return create_directories(path_only(path)); })) {
       throw Error(_("Unable to create export folder for '") + path + _("'"));
     }
   }
@@ -201,10 +197,7 @@ String symbols_to_html(const String& str, SymbolFont& symbol_font, double size) 
     if (it == ei.exported_images.end()) {
       // save symbol image
       Image img = symbol_font.getImage(size, sym);
-      wxFileName fn;
-      fn.SetPath(ei.directory_absolute);
-      fn.SetFullName(filename);
-      String out_path = fn.GetFullPath();
+      String out_path = join_path(ei.directory_absolute, filename);
       if (!retry_io([&]{ return img.SaveFile(out_path); })) {
         throw Error(_("Unable to write symbol image file '") + out_path + _("'"));
       }

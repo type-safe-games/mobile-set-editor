@@ -13,9 +13,9 @@
 // ----------------------------------------------------------------------------- : Updater
 
 void Updater::updateApplication(String argv) {
-  String path = absoluteFilename() + wxFileName::GetPathSeparator() + updater_name;
+  String path = absoluteFilename() + path_separator() + updater_name;
   path = path + _(".exe");
-  if (wxFileExists(path)) {
+  if (file_exists(path)) {
     vector<String> args = {path};
     size_t start = 0;
     while (start <= argv.size()) {

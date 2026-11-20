@@ -313,9 +313,8 @@ static String export_filename(const SetP& set, const ExportGroup& group, const S
     Context& ctx = set->getContext(group[i].card);
     String name = clean_filename(untag(ctx.eval(filename_script)->toString()));
     if (!name) return String(); // no filename -> no saving
-    wxFileName part(name);
-    if (i == 0) ext = part.GetExt(); else result += _(" -- ");
-    result += part.GetName();
+    if (i == 0) ext = file_ext(name); else result += _(" -- ");
+    result += file_name_no_ext(name);
   }
   if (!ext.empty()) result += _(".") + ext;
   return result;
@@ -324,8 +323,6 @@ static String export_filename(const SetP& set, const ExportGroup& group, const S
 void export_image(const SetP& set, const vector<CardP>& cards, const String& path, const String& filename_template, FilenameConflicts conflicts) {
   // Script
   ScriptP filename_script = parse(filename_template, nullptr, true);
-  // Path
-  wxFileName fn(path);
   // Export, one file per card or front/back pair
   std::set<String> used; // for CONFLICT_NUMBER_OVERWRITE
   for (const ExportGroup& group : group_faces(set, cards, settings_for_mode(set, ExportImageMode::EXPORT))) {
@@ -333,11 +330,10 @@ void export_image(const SetP& set, const vector<CardP>& cards, const String& pat
     String name = export_filename(set, group, *filename_script);
     if (!name) continue; // no filename -> no saving
     // full path
-    fn.SetFullName(name);
+    String filename = replace_file_name(path, name);
     // does the file exist?
-    if (!resolve_filename_conflicts(fn, conflicts, used)) continue;
+    if (!resolve_filename_conflicts(filename, conflicts, used)) continue;
     // write image
-    String filename = fn.GetFullPath();
     used.insert(filename);
     save_image(render_row(set, group, DEFAULT_FACE_PADDING, true), filename);
   }

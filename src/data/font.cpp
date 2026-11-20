@@ -8,8 +8,7 @@
 
 #include <util/prec.hpp>
 #include <data/font.hpp>
-#include <wx/stdpaths.h>
-#include <wx/dir.h>
+#include <util/file_utils.hpp>
 #include <wx/font.h>
 
 // ----------------------------------------------------------------------------- : Font
@@ -35,15 +34,13 @@ FontRef::FontRef()
 
 bool FontRef::PreloadResourceFonts(bool recursive) {
 #if wxUSE_PRIVATE_FONTS
-  String pathSeparator(wxFileName::GetPathSeparator());
-  String appPath(wxFileName(wxStandardPaths::Get().GetExecutablePath()).GetPath());
-  wxDir appDir(appPath);
-  if (!appDir.IsOpened()) return true;
+  String pathSeparator(path_separator());
+  String appPath(path_only(executable_path()));
+  vector<String> folders;
+  if (!list_directory(appPath, folders, LIST_DIRS)) return true;
 
   bool preloadHadErrors = false;
-  wxString folder;
-  bool cont = appDir.GetFirst(&folder, _(""), wxDIR_DIRS);
-  while (cont)
+  for (const String& folder : folders)
   {
     if (folder.Lower().Contains("fonts")) {
       String folderPath = appPath + pathSeparator + folder + pathSeparator;
@@ -59,7 +56,6 @@ bool FontRef::PreloadResourceFonts(bool recursive) {
         }
       }
     }
-    cont = appDir.GetNext(&folder);
   }
 
   return preloadHadErrors;
@@ -69,20 +65,18 @@ bool FontRef::PreloadResourceFonts(bool recursive) {
 }
 
 void FontRef::TallyResourceFonts(String fontsDirectoryPath, vector<String>& fontFilePaths, bool recursive) {
-  wxDir fontsDirectory(fontsDirectoryPath);
-  String fontFileName = _("");
-  bool hasNext = fontsDirectory.GetFirst(&fontFileName);
-  while (hasNext) {
+  vector<String> fontFileNames;
+  list_directory(fontsDirectoryPath, fontFileNames);
+  for (const String& fontFileName : fontFileNames) {
     String fontFilePath = fontsDirectoryPath + fontFileName;
-    if (wxDirExists(fontFilePath)) {
+    if (dir_exists(fontFilePath)) {
       if (recursive) {
-        TallyResourceFonts(fontFilePath + wxFileName::GetPathSeparator(), fontFilePaths, true);
+        TallyResourceFonts(fontFilePath + path_separator(), fontFilePaths, true);
       }
     }
     else if (fontFilePath.EndsWith(_(".ttf")) || fontFilePath.EndsWith(_(".otf"))) {
       fontFilePaths.push_back(fontFilePath);
     }
-    hasNext = fontsDirectory.GetNext(&fontFileName);
   }
 }
 
