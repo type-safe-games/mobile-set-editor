@@ -17,7 +17,7 @@
 // ----------------------------------------------------------------------------- : ValueAction
 
 ValueAction::ValueAction(const ValueP& value)
-  : valueP(value), card(nullptr), old_time_modified(wxDateTime::Now())
+  : valueP(value), card(nullptr), old_time_modified(DateTime::now())
 {}
 ValueAction::~ValueAction() {} // here because we need the destructor of Card
 

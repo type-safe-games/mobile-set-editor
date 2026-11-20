@@ -117,7 +117,7 @@ String format_input(const String& format, const ScriptValue& input) {
   // determine type of input
   ScriptType type = input.type();
   if (type == SCRIPT_DATETIME) {
-    return input.toDateTime().Format(format.c_str());
+    return input.toDateTime().format(format);
   } else {
     // determine type expected by format string
     String fmt = _("%") + replace_all(format, _("%"), _(""));
@@ -264,10 +264,10 @@ SCRIPT_FUNCTION(to_date) {
   try {
     SCRIPT_PARAM_C(String, input);
     if (input == "now") {
-      SCRIPT_RETURN(wxDateTime::Now());
+      SCRIPT_RETURN(DateTime::now());
     }
     else {
-      SCRIPT_PARAM_C(wxDateTime, input);
+      SCRIPT_PARAM_C(DateTime, input);
       SCRIPT_RETURN(input);
     }
   }

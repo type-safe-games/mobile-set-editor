@@ -48,7 +48,7 @@ public:
   const ValueP valueP; ///< The modified value
   const CardP  card;   ///< The card the value is on, or null if it is not a card value
 private:
-  wxDateTime old_time_modified;
+  DateTime old_time_modified;
 };
 
 // ----------------------------------------------------------------------------- : Simple

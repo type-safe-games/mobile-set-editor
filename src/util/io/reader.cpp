@@ -340,10 +340,11 @@ template <> void Reader::handle(tribool& tb) {
 
 // ----------------------------------------------------------------------------- : Handling less basic util types
 
-template <> void Reader::handle(wxDateTime& date) {
-  auto str = getValue();
-  String::const_iterator end;
-  if (!date.ParseDateTime(str,&end) || end != str.end()) {
+template <> void Reader::handle(DateTime& date) {
+  DateTime parsed = DateTime::parse(getValue());
+  if (parsed.isValid()) {
+    date = parsed;
+  } else {
     throw ParseError(_("Expected a date and time"));
   }
 }

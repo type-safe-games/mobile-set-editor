@@ -64,8 +64,7 @@ void export_mws(const SetP& set, const String& name) {
   // Write header
   file.WriteString(set->value<TextValue>(_("title")).value + _(" Spoiler List\n"));
   file.WriteString(_("Set exported using Magic Set Editor 2, version ") + app_version.toString() + _("\n\n"));
-  wxDateTime now = wxDateTime::Now();
-  file.WriteString(_("Spoiler List created on ") + now.FormatISODate() + _(" ") + now.FormatISOTime());
+  file.WriteString(_("Spoiler List created on ") + DateTime::now().format(_("%Y-%m-%d %H:%M:%S")));
   file.WriteString(_("\n\n"));
   
   // Write cards

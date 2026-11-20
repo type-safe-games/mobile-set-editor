@@ -496,6 +496,29 @@ bool PackageDirectory::actual_install(const InstallablePackage& package, const S
 
 // ----------------------------------------------------------------------------- : PackageVersion
 
+// Parse the "%Y%m%dT%H%M%S" (local time) prefix of a string, as wxDateTime::ParseFormat did.
+// Returns an invalid date if the prefix is not in that format.
+static DateTime parse_compact_date_time(const String& s) {
+  if (s.size() < 15 || s.GetChar(8) != _('T')) return DateTime();
+  int fields[6], widths[6] = {4,2,2,2,2,2};
+  size_t pos = 0;
+  for (int i = 0; i < 6; ++i) {
+    if (i == 3) ++pos; // the 'T'
+    fields[i] = 0;
+    for (int j = 0; j < widths[i]; ++j, ++pos) {
+      Char c = s.GetChar(pos);
+      if (c < _('0') || c > _('9')) return DateTime();
+      fields[i] = fields[i] * 10 + (c - _('0'));
+    }
+  }
+  static const int days_in_month[] = {31,29,31,30,31,30,31,31,30,31,30,31};
+  int y = fields[0], mo = fields[1], d = fields[2];
+  if (mo < 1 || mo > 12 || d < 1 || d > days_in_month[mo-1]) return DateTime();
+  if (mo == 2 && d == 29 && !((y % 4 == 0 && y % 100 != 0) || y % 400 == 0)) return DateTime();
+  if (fields[3] > 23 || fields[4] > 59 || fields[5] > 60) return DateTime();
+  return DateTime::fromLocal(y, mo, d, fields[3], fields[4], fields[5]);
+}
+
 template <> void Writer::handle(const PackageVersion::FileInfo& f) {
   if (f.status == PackageVersion::FILE_DELETED) {
     handle(_("D ") + f.file);
@@ -503,7 +526,7 @@ template <> void Writer::handle(const PackageVersion::FileInfo& f) {
     handle(format_string(_("%s%s %s"),
         f.status == PackageVersion::FILE_ADDED    ? _("A")
       : f.status == PackageVersion::FILE_MODIFIED ? _("M") : _(""),
-      f.time.Format(_("%Y%m%dT%H%M%S")),
+      f.time.format(_("%Y%m%dT%H%M%S")),
       f.file));
   }
 }
@@ -525,7 +548,8 @@ template <> void Reader::handle(PackageVersion::FileInfo& f) {
   if (s.size() < 8+1+6+1)         {f.status = PackageVersion::FILE_ADDED; return; }
   if (s.GetChar(8+1+6) != _(' ')) {f.status = PackageVersion::FILE_ADDED; return; } // invalid format
   // read time, filename
-  f.time.ParseFormat(s, _("%Y%m%dT%H%M%S"));
+  DateTime time = parse_compact_date_time(s);
+  if (time.isValid()) f.time = time;
   f.file = s.substr(8+1+6+1);
 }
 IMPLEMENT_REFLECTION_NO_SCRIPT(PackageVersion) {

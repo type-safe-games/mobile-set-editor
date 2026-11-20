@@ -33,7 +33,7 @@ double ScriptValue::toDouble() const {
 Color ScriptValue::toColor() const {
   throw ScriptErrorConversion(typeName(), _TYPE_("color"));
 }
-wxDateTime ScriptValue::toDateTime() const {
+DateTime ScriptValue::toDateTime() const {
   throw ScriptErrorConversion(typeName(), _TYPE_("date"));
 }
 GeneratedImageP ScriptValue::toImage() const {
@@ -155,7 +155,7 @@ public:
   int toInt() const override { throw error; }
   bool toBool() const override { throw error; }
   Color toColor() const override { throw error; }
-  wxDateTime toDateTime() const override { throw error; }
+  DateTime toDateTime() const override { throw error; }
   GeneratedImageP toImage() const override { throw error; }
   int itemCount() const override { throw error; }
   CompareWhat compareAs(String&, void const*&) const override { throw error; }
@@ -363,10 +363,9 @@ public:
     }
     return *c;
   }
-  wxDateTime toDateTime() const override {
-    wxDateTime date;
-    String::const_iterator end;
-    if (!date.ParseDateTime(value,&end) || end != value.end()) {
+  DateTime toDateTime() const override {
+    DateTime date = DateTime::parse(value);
+    if (!date.isValid()) {
       throw ScriptErrorConversion(value, typeName(), _TYPE_("date"));
     }
     return date;
@@ -421,21 +420,21 @@ ScriptValueP to_script(Color v) {
 
 // ----------------------------------------------------------------------------- : DateTime
 
-// wxDateTime values
+// DateTime values
 class ScriptDateTime : public ScriptValue {
 public:
-  ScriptDateTime(const wxDateTime& v) : value(v) {}
+  ScriptDateTime(const DateTime& v) : value(v) {}
   ScriptType type() const override { return SCRIPT_DATETIME; }
   String typeName() const override { return _TYPE_("date"); }
-  wxDateTime toDateTime() const override { return value; }
+  DateTime toDateTime() const override { return value; }
   String toString() const override {
-    return value.Format(_("%Y-%m-%d %H:%M:%S"));
+    return value.format(DATE_TIME_PERSIST_FORMAT);
   }
 private:
-  wxDateTime value;
+  DateTime value;
 };
 
-ScriptValueP to_script(wxDateTime v) {
+ScriptValueP to_script(DateTime v) {
   return make_intrusive<ScriptDateTime>(v);
 }
 

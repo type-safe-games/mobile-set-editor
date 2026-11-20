@@ -68,9 +68,9 @@ void Package::open(const String& n, bool fast) {
   filename = normalize_filename(n);
   // get modified time
   if (file_exists(filename)) {
-    modified = wxDateTime(file_modified_time(filename));
+    modified = DateTime::fromTimeT(file_modified_time(filename));
   } else {
-    modified = wxDateTime(time_t(0)); // long time ago
+    modified = DateTime::fromTimeT(0); // long time ago
   }
   // type of package
   if (dir_exists(filename)) {
@@ -423,7 +423,7 @@ void Package::openSubdir(const String& name) {
     // add file to list of known files
     addFile(name + f);
     // get modified time
-    wxDateTime file_time = file_modified_time(filename + _("/") + name + f);
+    DateTime file_time = DateTime::fromTimeT(file_modified_time(filename + _("/") + name + f));
     modified = max(modified,file_time);
   }
   // find subdirs
@@ -648,13 +648,13 @@ Package::FileInfos::iterator Package::addFile(const String& name) {
 DateTime Package::modificationTime(const pair<String, FileInfo>& fi) const {
   if (fi.second.wasWritten()) {
     // note: this looks at fi.first relative to the working directory, as before
-    return file_exists(fi.first) ? DateTime(file_modified_time(fi.first)) : DateTime();
+    return file_exists(fi.first) ? DateTime::fromTimeT(file_modified_time(fi.first)) : DateTime();
   } else if (fi.second.zipEntry) {
-    return fi.second.zipEntry->GetDateTime();
+    return DateTime::fromTimeT(fi.second.zipEntry->GetDateTime().GetTicks()); // TODO: zip moves off wx in #29 part 2
   } else if (file_exists(filename+_("/")+fi.first)) {
-    return DateTime(file_modified_time(filename+_("/")+fi.first));
+    return DateTime::fromTimeT(file_modified_time(filename+_("/")+fi.first));
   } else {
-    return DateTime((wxLongLong)0ul);
+    return DateTime::fromTimeT(0);
   }
 }
 

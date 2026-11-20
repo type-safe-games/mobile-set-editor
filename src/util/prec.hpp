@@ -54,8 +54,6 @@ typedef wxBitmap Bitmap;
 typedef wxImage  Image;
 typedef wxDC     DC;
 
-typedef wxDateTime DateTime;
-
 typedef wxOutputStream OutputStream;
 
 // ----------------------------------------------------------------------------- : Compatability fixes
@@ -91,6 +89,7 @@ typedef unsigned int  UInt;
 // MSE utility headers (ones unlikely to change and used everywhere)
 #include "for_each.hpp"
 #include "string.hpp"
+#include "date_time.hpp"
 #include "smart_ptr.hpp"
 #include "index_map.hpp"
 #include "locale.hpp"

@@ -459,7 +459,7 @@ ScriptValueP to_script(int           v);
 ScriptValueP to_script(double        v);
 ScriptValueP to_script(const String& v);
 ScriptValueP to_script(Color         v);
-ScriptValueP to_script(wxDateTime    v);
+ScriptValueP to_script(DateTime      v);
 
 inline ScriptValueP to_script(long v) {
   return to_script((int) v);
@@ -513,6 +513,6 @@ template <> inline int          from_script<int>         (const ScriptValueP& va
 template <> inline double       from_script<double>      (const ScriptValueP& value) { return value->toDouble(); }
 template <> inline bool         from_script<bool>        (const ScriptValueP& value) { return value->toBool(); }
 template <> inline Color        from_script<Color>       (const ScriptValueP& value) { return value->toColor(); }
-template <> inline wxDateTime   from_script<wxDateTime>  (const ScriptValueP& value) { return value->toDateTime(); }
+template <> inline DateTime     from_script<DateTime>    (const ScriptValueP& value) { return value->toDateTime(); }
 template <> inline GeneratedImageP from_script<GeneratedImageP>(const ScriptValueP& value) { return value->toImage(); }
 

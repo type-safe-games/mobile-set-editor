@@ -131,9 +131,9 @@ template <> void Writer::handle(const tribool& value) {
 
 // ----------------------------------------------------------------------------- : Handling less basic util types
 
-template <> void Writer::handle(const wxDateTime& date) {
-  if (date.IsValid()) {
-    handle(date.Format(_("%Y-%m-%d %H:%M:%S")));
+template <> void Writer::handle(const DateTime& date) {
+  if (date.isValid()) {
+    handle(date.format(DATE_TIME_PERSIST_FORMAT));
   }
 }
 template <> void Writer::handle(const Vector2D& vec) {

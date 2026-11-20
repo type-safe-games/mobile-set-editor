@@ -67,8 +67,8 @@ public:
   virtual bool toBool() const;
   /// Convert this value to a color
   virtual Color toColor() const;
-  /// Convert this value to a wxDateTime
-  virtual wxDateTime toDateTime() const;
+  /// Convert this value to a DateTime
+  virtual DateTime toDateTime() const;
   /// Convert this value to an image
   virtual GeneratedImageP toImage() const;
 

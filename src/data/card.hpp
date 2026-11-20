@@ -148,7 +148,7 @@ public:
   String linked_relation_31;
   String linked_relation_32;
   /// Time the card was created/last modified
-  wxDateTime time_created, time_modified;
+  DateTime time_created, time_modified;
   /// Alternative style to use for this card
   /** Optional; if not set use the card style from the set */
   StyleSheetP stylesheet;

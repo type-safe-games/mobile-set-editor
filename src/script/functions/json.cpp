@@ -1050,7 +1050,7 @@ boost::json::value mse_to_json(const ScriptValueP& sv, Set* set, bool suppress_w
   if (type == SCRIPT_STRING)   return boost::json::value(to_json_string(sv->toString()));
   if (type == SCRIPT_REGEX)    return boost::json::value(to_json_string(sv->toString()));
   if (type == SCRIPT_COLOR)    return boost::json::value(format_color(sv->toColor()));
-  if (type == SCRIPT_DATETIME) return boost::json::value(sv->toDateTime().FormatISOCombined(' '));
+  if (type == SCRIPT_DATETIME) return boost::json::value(to_json_string(sv->toDateTime().format(DATE_TIME_PERSIST_FORMAT)));
   if (type == SCRIPT_COLLECTION) {
     ScriptCustomCollection* custom = dynamic_cast<ScriptCustomCollection*>(sv.get());
     if (custom) {

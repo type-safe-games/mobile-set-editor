@@ -106,7 +106,7 @@ public:
   /// Return the absolute filename of this file
   const String& absoluteFilename() const;
   /// The time this package was last modified
-  inline wxDateTime lastModified() const { return modified; }
+  inline DateTime lastModified() const { return modified; }
 
   /// Open a package
   /**
