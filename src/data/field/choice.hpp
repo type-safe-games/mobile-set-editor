@@ -15,7 +15,6 @@
 #include <gfx/gfx.hpp> // for ImageCombine
 #include <script/scriptable.hpp>
 #include <script/image.hpp>
-#include <wx/image.h>
 #include <mutex>
 
 // ----------------------------------------------------------------------------- : ChoiceField
@@ -143,7 +142,7 @@ enum ThumbnailStatus
 class ChoiceThumbnail {
 public:
   ThumbnailStatus status = THUMB_NOT_MADE;
-  wxBitmap bitmap;
+  Image image;
   std::recursive_mutex mutex;
 };
 using ChoiceThumbnailLock = std::lock_guard<std::recursive_mutex>;

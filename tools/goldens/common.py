@@ -96,6 +96,8 @@ def mse_env(pack: Path, out_dir: Path) -> dict[str, str]:
     env = dict(os.environ)
     env["MSE_TEMPLATES_DIR"] = str(pack / "data")
     env["FONTCONFIG_FILE"] = str(fontconfig_file(pack, out_dir))
+    # the same directory as the font registry's shared font store (it doesn't change what wx draws)
+    env["MSE_FONT_STORE"] = str(pack / "Magic - Fonts")
     return env
 
 

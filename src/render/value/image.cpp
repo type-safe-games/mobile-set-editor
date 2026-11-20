@@ -7,7 +7,6 @@
 // ----------------------------------------------------------------------------- : Includes
 
 #include <util/prec.hpp>
-#include <gfx/wx_image_adapter.hpp>
 #include <render/value/image.hpp>
 #include <render/card/viewer.hpp>
 #include <gfx/dc_util.hpp>
@@ -24,7 +23,7 @@ void ImageValueViewer::draw(RotatedDC& dc) {
   Radians a = dc.getAngle();
   const AlphaMask& alpha_mask = getMask(w,h);
   if (bitmap.Ok() && (a != angle || size.width != w || size.height != h)) {
-    bitmap = Bitmap();
+    bitmap = Image();
   }
   // try to load image
   if (!bitmap.Ok()) {
@@ -47,7 +46,7 @@ void ImageValueViewer::draw(RotatedDC& dc) {
       if ((what & DRAW_EDITING) && field().editable) {
         bitmap = imagePlaceholder(dc, w, h, image, true);
         if (alpha_mask.isLoaded() || !is_rad0(a)) {
-          image = from_bitmap(bitmap); // we need to convert back to an image
+          image = bitmap.Copy(); // we need to convert back to an image
         } else {
           image = Image();
         }
@@ -59,7 +58,7 @@ void ImageValueViewer::draw(RotatedDC& dc) {
       bitmap = imagePlaceholder(dc, w, h, Image(), (what & DRAW_EDITING) && field().editable);
       if (alpha_mask.isLoaded() || !is_rad0(a)) {
         // we need to convert back to an image
-        image = from_bitmap(bitmap);
+        image = bitmap.Copy();
       }
     }
     // done
@@ -68,25 +67,25 @@ void ImageValueViewer::draw(RotatedDC& dc) {
       alpha_mask.setAlpha(image);
       size = RealSize(image);
       image = rotate_image(image, angle);
-      bitmap = to_bitmap(image);
+      bitmap = image;
     }
   }
   // border
   drawFieldBorder(dc);
   // draw image, if any
   if (bitmap.Ok()) {
-    dc.DrawPreRotatedBitmap(bitmap, dc.getInternalRect());
+    dc.DrawPreRotatedPlainImage(bitmap, dc.getInternalRect());
   }
 }
 
 void ImageValueViewer::onValueChange() {
-  bitmap = Bitmap();
+  bitmap = Image();
 }
 
 void ImageValueViewer::onStyleChange(int changes) {
   if ((changes & CHANGE_MASK) ||
       ((changes & CHANGE_DEFAULT) && is_default)) {
-    bitmap = Bitmap();
+    bitmap = Image();
   }
   ValueViewer::onStyleChange(changes);
 }
@@ -101,19 +100,16 @@ bool very_light(const Image& image) {
   return total >= 210 * 3;
 }
 
-Bitmap ImageValueViewer::imagePlaceholder(const Rotation& rot, UInt w, UInt h, const Image& default_image, bool editing) {
-  // Bitmap and memory dc
-  Bitmap bmp(w, h, 32);
-  wxMemoryDC mdc;
-  mdc.SelectObject(bmp);
+Image ImageValueViewer::imagePlaceholder(const Rotation& rot, UInt w, UInt h, const Image& default_image, bool editing) {
+  // canvas with alpha
+  OffscreenCanvasP mdc = new_canvas(w, h, CanvasFormat::RGBA);
   RealRect rect(0,0,w,h);
-  RotatedDC dc(mdc, 0, rect, 1.0, QUALITY_AA);
+  RotatedDC dc(*mdc, 0, rect, 1.0, QUALITY_AA);
   // Draw (checker) background
   if (!default_image.Ok()) {
     draw_checker(dc, rect);
   }
   else {
-    if (default_image.HasAlpha()) bmp.UseAlpha(true);
     dc.DrawImage(default_image, RealPoint(0,0));
   }
   // Draw text
@@ -121,7 +117,7 @@ Bitmap ImageValueViewer::imagePlaceholder(const Rotation& rot, UInt w, UInt h, c
     // only when in editor mode
     String label = _LABEL_("load image");
     for (UInt size = 12 ; size > 2 ; --size) {
-      dc.SetFont(wxFont(size, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL));
+      dc.SetFont(CanvasFont::generic(size, CanvasFont::Family::SWISS));
       RealSize rs = dc.GetTextExtent(label);
       if (rs.width <= w - 10 && rs.height < h - 10) {
         // text fits
@@ -132,6 +128,5 @@ Bitmap ImageValueViewer::imagePlaceholder(const Rotation& rot, UInt w, UInt h, c
     }
   }
   // Done
-  mdc.SelectObject(wxNullBitmap);
-  return bmp;
+  return mdc->getImage();
 }

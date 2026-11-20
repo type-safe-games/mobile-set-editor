@@ -149,8 +149,8 @@ void TreeList::onPaint(wxPaintEvent& ev) {
   // draw header
   dc.SetFont(*wxNORMAL_FONT);
   dc.SetTextForeground(wxSystemSettings::GetColour(wxSYS_COLOUR_BTNTEXT));
-  dc.SetPen(lerp(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW),
-                 wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOWTEXT),0.4));
+  dc.SetPen(wxColour(lerp(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW),
+                 wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOWTEXT),0.4)));
   int x = 0, y = 0;
   for (size_t j = 0 ; j < cols ; ++j) {
     int w = columnWidth(j);
@@ -168,12 +168,12 @@ void TreeList::onPaint(wxPaintEvent& ev) {
     if (!item.visible()) continue; // invisible
     x = level_width * (item.level + 1);
     // line below
-    dc.SetPen(lerp(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW),
-                   wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOWTEXT),0.2));
+    dc.SetPen(wxColour(lerp(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW),
+                   wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOWTEXT),0.2)));
     dc.DrawLine(x,y+item_height-1,cs.x,y+item_height-1);
     // draw lines
-    dc.SetPen(lerp(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW),
-                   wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOWTEXT),0.4));
+    dc.SetPen(wxColour(lerp(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW),
+                   wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOWTEXT),0.4)));
     for (int j = 0 ; j < 32 && j <= item.level ; ++j) {
       if (item.lines & (1 << j)) {
         // draw line
@@ -188,8 +188,8 @@ void TreeList::onPaint(wxPaintEvent& ev) {
     if (hasChildren(i)) {
       int left = x - 13, top = y + (item_height - 9)/2;
       wxRect rect(left, top, 9, 9);
-      dc.SetPen(lerp(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW),
-                     wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOWTEXT),0.4));
+      dc.SetPen(wxColour(lerp(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW),
+                     wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOWTEXT),0.4)));
       dc.SetBrush(wxSystemSettings::GetColour(wxSYS_COLOUR_BTNFACE));
       dc.DrawRectangle(rect);
       dc.DrawLine(left+2,top+4,left+7,top+4);

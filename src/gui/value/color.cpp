@@ -24,7 +24,7 @@ protected:
   size_t itemCount() const override;
   bool   lineBelow(size_t item) const override;
   String itemText(size_t item) const override;
-  void   drawIcon(DC& dc, int x, int y, size_t item, bool selected) const override;
+  void   drawIcon(wxDC& dc, int x, int y, size_t item, bool selected) const override;
   
   void   select(size_t item) override;
   size_t selection() const override;
@@ -73,7 +73,7 @@ String DropDownColorList::itemText(size_t item) const {
   }
 }
 
-void DropDownColorList::drawIcon(DC& dc, int x, int y, size_t item, bool selected) const {
+void DropDownColorList::drawIcon(wxDC& dc, int x, int y, size_t item, bool selected) const {
   Color col;
   if (isDefault(item)) {
     col = default_color;
@@ -84,7 +84,7 @@ void DropDownColorList::drawIcon(DC& dc, int x, int y, size_t item, bool selecte
   }
   // draw a rectangle with the right color
   dc.SetPen(wxSystemSettings::GetColour(selected ? wxSYS_COLOUR_HIGHLIGHTTEXT : wxSYS_COLOUR_WINDOWTEXT));
-  dc.SetBrush(col);
+  dc.SetBrush(wxColour(col));
   dc.DrawRectangle(x+1, y+1, (int)icon_size.width-2, (int)item_size.height-2);
 }
 
@@ -144,7 +144,7 @@ void ColorValueEditor::onLoseFocus() {
 void ColorValueEditor::draw(RotatedDC& dc) {
   ColorValueViewer::draw(dc);
   if (nativeLook()) {
-    draw_drop_down_arrow(&editor(), dc.getDC(), dc.trRectToBB(dc.getInternalRect().grow(1)), drop_down->IsShown());
+    draw_drop_down_arrow(&editor(), wx_dc(dc), dc.trRectToBB(dc.getInternalRect().grow(1)), drop_down->IsShown());
   }
 }
 void ColorValueEditor::determineSize(bool) {

@@ -7,7 +7,7 @@
 // ----------------------------------------------------------------------------- : Includes
 
 #include <util/prec.hpp>
-#include <gfx/wx_image_adapter.hpp>
+#include <gfx/canvas.hpp>
 #include <gfx/image_load.hpp>
 #include <util/tagged_string.hpp>
 #include <data/format/formats.hpp>
@@ -101,13 +101,9 @@ static Image render_face(const SetP& set, const ExportPart& part) {
   viewer.setSet(set);
   viewer.setCard(part.card);
   RealSize size = viewer.getRotation().getExternalSize();
-  Bitmap bitmap((int)size.width + 2 * bleed, (int)size.height + 2 * bleed);
-  if (!bitmap.Ok()) throw InternalError(_("Unable to create bitmap"));
-  wxMemoryDC dc;
-  dc.SelectObject(bitmap);
-  viewer.draw(dc);
-  dc.SelectObject(wxNullBitmap);
-  Image img = from_bitmap(bitmap);
+  OffscreenCanvasP canvas = new_canvas((int)size.width + 2 * bleed, (int)size.height + 2 * bleed, CanvasFormat::RGB);
+  viewer.draw(*canvas);
+  Image img = canvas->getImage();
   // rotate
   img = rotate_image(img, face_settings.angle_radians);
   // add print bleed edge (reports an error and leaves the image as is if it is too small)
@@ -155,12 +151,8 @@ String card_layout_dump(const SetP& set, const CardP& card) {
   viewer.setSet(set);
   viewer.setCard(card);
   RealSize size = viewer.getRotation().getExternalSize();
-  Bitmap bitmap((int)size.width, (int)size.height);
-  if (!bitmap.Ok()) throw InternalError(_("Unable to create bitmap"));
-  wxMemoryDC dc;
-  dc.SelectObject(bitmap);
-  viewer.draw(dc);
-  dc.SelectObject(wxNullBitmap);
+  OffscreenCanvasP canvas = new_canvas((int)size.width, (int)size.height, CanvasFormat::RGB);
+  viewer.draw(*canvas);
   // Fixed key order and number format; fields in drawing (z) order, one text line per output line.
   String out = _("{\n");
   out += _("  \"fields\": [");

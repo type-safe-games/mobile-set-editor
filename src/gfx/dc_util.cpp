@@ -10,28 +10,13 @@
 #include <gfx/dc_util.hpp>
 #include <gfx/color.hpp>
 #include <util/rotation.hpp>
+#include <gfx/canvas.hpp>
 
-// ----------------------------------------------------------------------------- : DC related
-
-/// Fill a DC with a single color
-void clearDC(DC& dc, const wxBrush& brush) {
-  wxSize size = dc.GetSize();
-  wxPoint pos = dc.GetDeviceOrigin(); // don't you love undocumented methods?
-  dc.SetPen(*wxTRANSPARENT_PEN);
-  dc.SetBrush(brush);
-  dc.DrawRectangle(-pos.x, -pos.y, size.GetWidth(), size.GetHeight());
-}
-
-void clearDC_black(DC& dc) {
-  #if !BITMAPS_DEFAULT_BLACK
-    // On windows 9x it seems that bitmaps are not black by default
-    clearDC(dc, *wxBLACK_BRUSH);
-  #endif
-}
+// ----------------------------------------------------------------------------- : Drawing helpers
 
 void draw_checker(RotatedDC& dc, const RealRect& rect) {
-  dc.SetPen(*wxTRANSPARENT_PEN);
-  dc.SetBrush(*wxWHITE_BRUSH);
+  dc.SetPen(Pen::none());
+  dc.SetBrush(Color(255,255,255));
   dc.DrawRectangle(rect);
   dc.SetBrush(Color(235,235,235));
   const double checker_size = 10;
@@ -50,11 +35,19 @@ void draw_checker(RotatedDC& dc, const RealRect& rect) {
 }
 
 
-void draw_checkbox_portable(DC& dc, const wxRect& rect, bool checked, bool enabled) {
+void draw_checkbox_portable(Canvas& dc, const wxRect& rect, bool checked, bool enabled) {
   if (checked) {
-    dc.DrawCheckMark(wxRect(rect.x+1,rect.y+1,rect.width-2,rect.height-2));
+    // a tick, drawn like wxDC::DrawCheckMark does it
+    int x1 = rect.x + 1, y1 = rect.y + 1, width = rect.width - 2, height = rect.height - 2;
+    int x2 = x1 + width, y2 = y1 + height;
+    // the pen width is calibrated to give 3 for width == height == 10
+    dc.setPen(Pen(dc.getTextColor(), (width + height + 1) / 7));
+    int x3 = x1 + (4 * width) / 10, // x of the tick bottom
+        y3 = y1 + height / 2;       // y of the left tick branch
+    dc.drawLine(x1, y3, x3, y2);
+    dc.drawLine(x3, y2, x2, y1);
   }
-  dc.SetPen(ui_color(enabled ? UIColor::WINDOW_TEXT : UIColor::GRAY_TEXT));
-  dc.SetBrush(*wxTRANSPARENT_BRUSH);
-  dc.DrawRectangle(rect.x, rect.y, rect.width, rect.height);
+  dc.setPen(ui_color(enabled ? UIColor::WINDOW_TEXT : UIColor::GRAY_TEXT));
+  dc.setBrush(Brush::none());
+  dc.drawRectangle(rect.x, rect.y, rect.width, rect.height);
 }

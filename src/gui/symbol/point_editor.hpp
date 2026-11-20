@@ -25,21 +25,21 @@ public:
   
   // --------------------------------------------------- : Drawing
   
-  void draw(DC& dc) override;
+  void draw(wxDC& dc) override;
   
 private:
   /// Draws a gradient on the selected line to indicate curve dragging
-  void drawHoveredLine(DC& dc);
+  void drawHoveredLine(wxDC& dc);
   /// Draw all handles belonging to selected points
-  void drawHandles(DC& dc);
+  void drawHandles(wxDC& dc);
   /// Draws the point to be inserted
-  void drawNewPoint(DC& dc);
+  void drawNewPoint(wxDC& dc);
   /// Draw a single control point
-  void drawControlPoint(DC& dc, const ControlPoint& p, bool drawHandleBefore, bool drawHandleAfter);
+  void drawControlPoint(wxDC& dc, const ControlPoint& p, bool drawHandleBefore, bool drawHandleAfter);
   /// Draws a handle as a box
-  void drawHandleBox(DC& dc, UInt px, UInt py, bool active);
+  void drawHandleBox(wxDC& dc, UInt px, UInt py, bool active);
   /// Draws a handle as a circle
-  void drawHandleCircle(DC& dc, UInt px, UInt py);
+  void drawHandleCircle(wxDC& dc, UInt px, UInt py);
   
   enum WhichPen {
     PEN_NORMAL,    ///< Pen for normal handles

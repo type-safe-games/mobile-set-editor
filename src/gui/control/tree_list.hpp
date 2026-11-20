@@ -58,7 +58,7 @@ protected:
   virtual void initItems() = 0;
   
   /// Draw the text of an item
-  virtual void drawItem(DC& dc, size_t index, size_t column, int x, int y, bool selected) const = 0;
+  virtual void drawItem(wxDC& dc, size_t index, size_t column, int x, int y, bool selected) const = 0;
   
   /// The number of columns
   virtual size_t columnCount() const = 0;

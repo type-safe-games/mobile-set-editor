@@ -23,6 +23,6 @@ public:
   void onValueChange() override;
   
 protected:
-  vector<Bitmap> symbols;  ///< Cached images
+  vector<Image> symbols;  ///< Cached images
 };
 

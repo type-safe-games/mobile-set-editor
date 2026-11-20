@@ -7,7 +7,6 @@
 // ----------------------------------------------------------------------------- : Includes
 
 #include <util/prec.hpp>
-#include <gfx/wx_image_adapter.hpp>
 #include <gfx/color.hpp>
 #include <render/value/package_choice.hpp>
 #include <util/io/package_manager.hpp>
@@ -38,7 +37,7 @@ void PackageChoiceValueViewer::initItems() {
     Image image;
     auto stream = p->openIconFile();
     if (stream && image_load_file(image, *stream)) {
-      i.image = to_bitmap(resample(image, 16,16));
+      i.image = resample(image, 16,16);
     }
     items.push_back(i);
   }
@@ -49,12 +48,12 @@ void PackageChoiceValueViewer::draw(RotatedDC& dc) {
   // draw background
   if (nativeLook()) {
     dc.SetBrush(ui_color(UIColor::WINDOW));
-    dc.SetPen(*wxTRANSPARENT_PEN);
+    dc.SetPen(Pen::none());
     dc.DrawRectangle(RealRect(0, 0, dc.getWidth(), dc.getHeight()));
   }
   // find item
   String text = value().package_name;
-  Bitmap image;
+  Image image;
   if (value().package_name.empty()) {
     text = field().empty_name;
   } else {
@@ -67,7 +66,7 @@ void PackageChoiceValueViewer::draw(RotatedDC& dc) {
   }
   // draw image
   if (image.Ok()) {
-    dc.DrawBitmap(image, RealPoint(0,0));
+    dc.DrawPlainImage(image, RealPoint(0,0));
   }
   // draw text
   FontRef& font = style().font;

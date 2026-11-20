@@ -183,25 +183,26 @@ int SymbolControl::gridDensity() const {
 
 // ----------------------------------------------------------------------------- : Drawing
 
-void SymbolControl::draw(DC& dc) {
+void SymbolControl::draw(wxDC& dc) {
   // clear the background
   clearDC(dc, Color(0, 128, 0));
   // draw symbol iself
-  SymbolViewer::draw(dc);
+  WxCanvas canvas(dc);
+  SymbolViewer::draw(canvas);
   // draw grid
   if (settings.symbol_grid) {
-    RotatedDC rdc(dc, rotation, QUALITY_LOW);
+    RotatedDC rdc(canvas, rotation, QUALITY_LOW);
     int density = gridDensity();
     double lines = settings.symbol_grid_size * density;
     for (int i = 0 ; i <= lines ; ++i) {
       double x = (double)i/lines;
       // the major lines stay where they were when the grid gets denser
       bool major = i % (5 * density) == 0;
-      rdc.SetLogicalFunction(wxAND);
+      rdc.SetRasterOp(RasterOp::AND);
       rdc.SetPen(major ? Color(191,255,191) : Color(191, 255, 191));
       rdc.DrawLine(RealPoint(0,x), RealPoint(1,x));
       rdc.DrawLine(RealPoint(x,0), RealPoint(x,1));
-      rdc.SetLogicalFunction(wxOR);
+      rdc.SetRasterOp(RasterOp::OR);
       rdc.SetPen(major ? Color(0,63,0) : Color(0, 31, 0));
       rdc.DrawLine(RealPoint(0,x), RealPoint(1,x));
       rdc.DrawLine(RealPoint(x,0), RealPoint(x,1));

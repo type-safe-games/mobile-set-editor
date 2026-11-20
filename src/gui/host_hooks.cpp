@@ -18,6 +18,9 @@
 #include <gfx/generated_image.hpp>
 #include <gfx/color.hpp>
 #include <gfx/wx_image_codec.hpp>
+#include <gfx/wx_canvas.hpp>
+#include <gfx/font_registry.hpp>
+#include <util/file_utils.hpp>
 #include <util/error.hpp>
 #include <wx/webrequest.h>
 #include <wx/evtloop.h>
@@ -105,8 +108,69 @@ static int run_program(const vector<String>& arguments, bool wait) {
 
 // ----------------------------------------------------------------------------- : Installing hooks
 
+/// Adds font file paths from the given directory into fontFilePaths
+static void tally_resource_fonts(String fontsDirectoryPath, vector<String>& fontFilePaths, bool recursive) {
+  vector<String> fontFileNames;
+  list_directory(fontsDirectoryPath, fontFileNames);
+  for (const String& fontFileName : fontFileNames) {
+    String fontFilePath = fontsDirectoryPath + fontFileName;
+    if (dir_exists(fontFilePath)) {
+      if (recursive) {
+        tally_resource_fonts(fontFilePath + path_separator(), fontFilePaths, true);
+      }
+    }
+    else if (ends_with(fontFilePath, _(".ttf")) || ends_with(fontFilePath, _(".otf"))) {
+      fontFilePaths.push_back(fontFilePath);
+    }
+  }
+}
+
+bool preload_resource_fonts(bool recursive) {
+  // the font store directories from the environment (only for the font registry, wx finds these
+  // through fontconfig or the system's installed fonts)
+  if (const char* store = std::getenv("MSE_FONT_STORE")) {
+    String dirs = decode_utf8_or_latin1(store, strlen(store));
+    size_t start = 0;
+    while (start <= dirs.size()) {
+      size_t end = dirs.find(wxPATH_SEP[0], start);
+      if (end == String::npos) end = dirs.size();
+      if (end > start) font_registry().addDirectory(dirs.substr(start, end - start), FontSource::FONT_STORE);
+      start = end + 1;
+    }
+  }
+  String pathSeparator(1, path_separator());
+  String appPath(path_only(executable_path()));
+  vector<String> folders;
+  if (!list_directory(appPath, folders, LIST_DIRS)) return true;
+
+  bool preloadHadErrors = false;
+  for (const String& folder : folders)
+  {
+    if (contains(to_lower(folder), _("fonts"))) {
+      String folderPath = appPath + pathSeparator + folder + pathSeparator;
+      
+      // tally fonts
+      vector<String> fontFilePaths;
+      tally_resource_fonts(folderPath, fontFilePaths, recursive);
+
+      // load fonts
+      for (const String& fontFilePath : fontFilePaths) {
+        font_registry().addFile(fontFilePath, FontSource::FONT_STORE);
+        #if wxUSE_PRIVATE_FONTS
+          if (!wxFont::AddPrivateFont(fontFilePath)) {
+            preloadHadErrors = true;
+          }
+        #endif
+      }
+    }
+  }
+
+  return preloadHadErrors;
+}
+
 void install_desktop_hooks() {
   set_image_codec(make_wx_image_codec()); // (needs wxInitAllImageHandlers)
+  set_canvas_factory(make_unique<WxCanvasFactory>());
   error_sink = [](MessageType type, String const& msg) {
     if (cli.haveConsole()) {
       // always write to stderr if possible

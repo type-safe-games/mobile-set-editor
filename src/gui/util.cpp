@@ -236,7 +236,7 @@ RECT msw_rect(wxRect const& rect, int dl = 0, int dt = 0, int dr = 0, int db=0) 
 #endif
 
 // Draw a basic 3D border
-void draw3DBorder(DC& dc, int x1, int y1, int x2, int y2) {
+void draw3DBorder(wxDC& dc, int x1, int y1, int x2, int y2) {
   dc.SetPen(wxSystemSettings::GetColour(wxSYS_COLOUR_3DDKSHADOW));
   dc.DrawLine(x1, y1, x2, y1);
   dc.DrawLine(x1, y1, x1, y2);
@@ -251,7 +251,7 @@ void draw3DBorder(DC& dc, int x1, int y1, int x2, int y2) {
   dc.DrawLine(x2+1, y1-1, x2+1, y2+2);
 }
 
-void draw_control_box(Window* win, DC& dc, const wxRect& rect, bool focused, bool enabled) {
+void draw_control_box(Window* win, wxDC& dc, const wxRect& rect, bool focused, bool enabled) {
   #if wxUSE_UXTHEME && defined(__WXMSW__)
     RECT r = msw_rect(rect, 1,1,1,1);
     if (wxUxThemeIsActive()) {
@@ -287,7 +287,7 @@ void draw_control_box(Window* win, DC& dc, const wxRect& rect, bool focused, boo
   #endif
 }
 
-void draw_button(Window* win, DC& dc, const wxRect& rect, bool focused, bool down, bool enabled) {
+void draw_button(Window* win, wxDC& dc, const wxRect& rect, bool focused, bool down, bool enabled) {
   #if wxVERSION_NUMBER >= 2700
     wxRendererNative& rn = wxRendererNative::GetDefault();
     rn.DrawPushButton(win, dc, rect, (focused ? wxCONTROL_FOCUSED : 0) | (down ? wxCONTROL_PRESSED : 0) | (enabled ? 0 : wxCONTROL_DISABLED));
@@ -305,7 +305,7 @@ void draw_button(Window* win, DC& dc, const wxRect& rect, bool focused, bool dow
 }
 
 // portable, based on wxRendererGeneric::DrawComboBoxDropButton
-void draw_menu_arrow(Window* win, DC& dc, const wxRect& rect, bool active) {
+void draw_menu_arrow(Window* win, wxDC& dc, const wxRect& rect, bool active) {
   wxPoint pt[] =
     {  wxPoint(0, 0)
     ,  wxPoint(4, 4)
@@ -316,7 +316,7 @@ void draw_menu_arrow(Window* win, DC& dc, const wxRect& rect, bool active) {
   dc.DrawPolygon(3, pt, rect.x + rect.width - 6, rect.y + (rect.height - 9) / 2);
 }
 
-void draw_drop_down_arrow(Window* win, DC& dc, const wxRect& rect, bool active) {
+void draw_drop_down_arrow(Window* win, wxDC& dc, const wxRect& rect, bool active) {
   wxRendererNative& rn = wxRendererNative::GetDefault();
   int w = wxSystemSettings::GetMetric(wxSYS_VSCROLL_ARROW_X); // drop down arrow is same size
   if (w == -1) {
@@ -327,7 +327,11 @@ void draw_drop_down_arrow(Window* win, DC& dc, const wxRect& rect, bool active) 
     , active ? wxCONTROL_PRESSED : 0);
 }
 
-void draw_checkbox(const Window* win, DC& dc, const wxRect& rect, bool checked, bool enabled) {
+void clearDC(wxDC& dc, const Color& color) {
+  WxCanvas(dc).clear(color);
+}
+
+void draw_checkbox(const Window* win, wxDC& dc, const wxRect& rect, bool checked, bool enabled) {
   #if defined(__WXMSW__)
     if (win == nullptr) win = dc.GetWindow();
   #endif
@@ -336,11 +340,12 @@ void draw_checkbox(const Window* win, DC& dc, const wxRect& rect, bool checked, 
     rn.DrawCheckBox(const_cast<wxWindow*>(win), dc, rect, (checked ? wxCONTROL_CHECKED : 0) | (enabled ? 0 : wxCONTROL_DISABLED));
     return;
   } else {
-    draw_checkbox_portable(dc, rect, checked, enabled);
+    WxCanvas canvas(dc);
+    draw_checkbox_portable(canvas, rect, checked, enabled);
   }
 }
 
-void draw_radiobox(const Window* win, DC& dc, const wxRect& rect, bool checked, bool enabled) {
+void draw_radiobox(const Window* win, wxDC& dc, const wxRect& rect, bool checked, bool enabled) {
   #if defined(__WXMSW__)
     if (win == nullptr) win = dc.GetWindow();
   #endif
@@ -364,7 +369,7 @@ void draw_radiobox(const Window* win, DC& dc, const wxRect& rect, bool checked, 
   }
 }
 
-void draw_selection_rectangle(Window* win, DC& dc, const wxRect& rect, bool selected, bool focused, bool hot) {
+void draw_selection_rectangle(Window* win, wxDC& dc, const wxRect& rect, bool selected, bool focused, bool hot) {
   #if wxUSE_UXTHEME && defined(__WXMSW__)
     HTHEME hTheme = (HTHEME)::OpenThemeData(GetHwndOf(win), VSCLASS_LISTVIEW);
     if (hTheme) {

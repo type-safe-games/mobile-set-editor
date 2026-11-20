@@ -49,10 +49,6 @@ public:
   inline explicit RealSize(const Image& img)
     : width(img.GetWidth()), height(img.GetHeight())
   {}
-  /// size of a bitmap
-  inline explicit RealSize(const wxBitmap& img)
-    : width(img.GetWidth()), height(img.GetHeight())
-  {}
   
   /// Negation of a size, negates both components
   inline RealSize operator - () const {

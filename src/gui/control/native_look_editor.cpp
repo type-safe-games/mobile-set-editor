@@ -26,7 +26,7 @@ Rotation NativeLookEditor::getRotation() const {
   return Rotation(0, RealRect(RealPoint(-dx,-dy),GetClientSize()));
 }
 
-void NativeLookEditor::draw(DC& dc) {
+void NativeLookEditor::draw(Canvas& dc) {
   RotatedDC rdc(dc, getRotation(), QUALITY_LOW);
   DataViewer::draw(rdc, wxSystemSettings::GetColour(wxSYS_COLOUR_3DFACE));
 }
@@ -35,9 +35,9 @@ void NativeLookEditor::drawViewer(RotatedDC& dc, ValueViewer& v) {
   ValueEditor* e = v.getEditor();
   if (!e || e->drawLabel()) {
     // draw control border and box
-    draw_control_box(this, dc.getDC(), dc.getExternalRect().grow(1), current_editor == e, e != nullptr);
+    draw_control_box(this, wx_dc(dc), dc.getExternalRect().grow(1), current_editor == e, e != nullptr);
     // draw label
-    dc.SetFont(*wxNORMAL_FONT);
+    dc.SetFont(CanvasFont::systemFont());
     dc.SetTextForeground(wxSystemSettings::GetColour(wxSYS_COLOUR_BTNTEXT));
     dc.DrawText(v.getField()->caption.get(), RealPoint(margin_left - v.bounding_box.x, 1));
   }

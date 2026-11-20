@@ -25,7 +25,7 @@ Rotation TextCtrl::getRotation() const {
   return Rotation(0, RealRect(RealPoint(0,0),GetClientSize()));
 }
 
-void TextCtrl::draw(DC& dc) {
+void TextCtrl::draw(Canvas& dc) {
   RotatedDC rdc(dc, getRotation(), QUALITY_LOW);
   if (viewers.empty() || !static_cast<FakeTextValue&>(*viewers.front()->getValue()).editable) {
     DataViewer::draw(rdc, wxSystemSettings::GetColour(wxSYS_COLOUR_3DFACE));

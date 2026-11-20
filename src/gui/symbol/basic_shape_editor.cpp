@@ -27,7 +27,7 @@ SymbolBasicShapeEditor::SymbolBasicShapeEditor(SymbolControl* control)
 
 // ----------------------------------------------------------------------------- : Drawing
 
-void SymbolBasicShapeEditor::draw(DC& dc) {
+void SymbolBasicShapeEditor::draw(wxDC& dc) {
   // highlight the part we are drawing
   if (shape) {
     control.highlightPart(dc, *shape, HIGHLIGHT_BORDER);

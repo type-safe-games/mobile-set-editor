@@ -7,7 +7,7 @@
 // ----------------------------------------------------------------------------- : Includes
 
 #include <util/prec.hpp>
-#include <gfx/wx_image_adapter.hpp>
+#include <gfx/canvas.hpp>
 #include <gfx/gfx.hpp>
 #include <data/symbol_font.hpp>
 #include <data/stylesheet.hpp>
@@ -65,11 +65,11 @@ public:
   /// Get a shrunk, zoomed image
   Image getImage(Package& pkg, double size);
   
-  /// Get a shrunk, zoomed bitmap
-  Bitmap getBitmap(Package& pkg, double size);
+  /// Get a shrunk, zoomed image, cached
+  Image getCachedImage(Package& pkg, double size);
   
-  /// Get a bitmap with the given size
-  Bitmap getBitmap(Package& pkg, wxSize size);
+  /// Get an image with the given size
+  Image getImage(Package& pkg, wxSize size);
   
   /// Size of a (zoomed) bitmap
   /** This is the size of the resulting image, it does NOT convert back to internal coordinates */
@@ -96,8 +96,8 @@ private:
   wxSize           actual_size;     ///< Actual image size, only known after loading the image
   Package*         local_package;   ///< The set the context belongs to, to load images stored in set fields, only valid right after an update(), don't keep it around
 
-  /// Cached bitmaps for different sizes
-  map<double, Bitmap> bitmaps;
+  /// Cached images for different sizes
+  map<double, Image> images;
   
   DECLARE_REFLECTION();
 };
@@ -137,27 +137,27 @@ Image SymbolInFont::getImage(Package& pkg, double size) {
   resample(img, resampled_image);
   return resampled_image;
 }
-Bitmap SymbolInFont::getBitmap(Package& pkg, double size) {
-  // is this bitmap already loaded/generated?
-  Bitmap& bmp = bitmaps[size];
-  if (!bmp.Ok()) {
-    // generate image, convert to bitmap, store for later use
-    bmp = to_bitmap(getImage(pkg, size));
+Image SymbolInFont::getCachedImage(Package& pkg, double size) {
+  // is this image already loaded/generated?
+  Image& img = images[size];
+  if (!img.Ok()) {
+    // generate image, store for later use
+    img = getImage(pkg, size);
   }
-  return bmp;
+  return img;
 }
-Bitmap SymbolInFont::getBitmap(Package& pkg, wxSize size) {
-  // generate new bitmap
+Image SymbolInFont::getImage(Package& pkg, wxSize size) {
+  // generate new image
   if (!image.isReady()) {
     throw Error(_("No image specified for symbol with code '") + code + _("' in symbol font."));
   }
-  return to_bitmap( image.generate(GeneratedImage::Options(size.x, size.y, &pkg, local_package, ASPECT_BORDER)) );
+  return image.generate(GeneratedImage::Options(size.x, size.y, &pkg, local_package, ASPECT_BORDER));
 }
 
 RealSize SymbolInFont::size(Package& pkg, double size) {
   if (actual_size.GetWidth() == 0) {
     // we don't know what size the image will be
-    getBitmap(pkg, size);
+    getCachedImage(pkg, size);
   }
   return RealSize(actual_size.GetWidth()  * size / img_size,
                   actual_size.GetHeight() * size / img_size);
@@ -167,7 +167,7 @@ void SymbolInFont::update(Context& ctx, Package* local_package) {
   this->local_package = local_package;
   if (image.update(ctx)) {
     // image has changed, cache is no longer valid
-    bitmaps.clear();
+    images.clear();
     actual_size = wxSize(0,0); // the new image can have a different size, measure it again
   }
   enabled.update(ctx);
@@ -304,7 +304,7 @@ void SymbolFont::draw(RotatedDC& dc, Context& ctx, const RealRect& rect, double 
 }
 
 void SymbolFont::draw(RotatedDC& dc, RealRect rect, double scale, const SymbolFontRef& font, const SplitSymbols& symbols) {
-  vector<Bitmap> bmps;
+  vector<Image> bmps;
   vector<RealSize> bmp_sizes;
   vector<RealPoint> bmp_poss;
   double stretch = dc.getStretch();
@@ -319,9 +319,9 @@ void SymbolFont::draw(RotatedDC& dc, RealRect rect, double scale, const SymbolFo
     size = RealSize(size.width*stretch, size.height);
     RealRect sym_rect = split_left(rect, size);
     SymbolInFont& sym = *dsym.symbol;
-    Bitmap bmp = sym.getBitmap(*this, font_size_ext);
+    Image bmp = sym.getCachedImage(*this, font_size_ext);
     if (!almost_equal(stretch, 1.0)) {
-      bmp = to_bitmap(resample(from_bitmap(bmp), lround(bmp.GetWidth() * stretch), bmp.GetHeight()));
+      bmp = resample(bmp, lround(bmp.GetWidth() * stretch), bmp.GetHeight());
     }
     RealSize  bmp_size = dc.trInvS(RealSize(bmp));
     RealPoint bmp_pos  = align_in_rect(font.alignment(), bmp_size, sym_rect);
@@ -329,16 +329,14 @@ void SymbolFont::draw(RotatedDC& dc, RealRect rect, double scale, const SymbolFo
     if (font.hasStroke()) {
       int blur_radius = lround(font.stroke_blur() * s_scale);
       int stroke_radius = lround(font.stroke_radius() * s_scale);
-      Image s_img = from_bitmap(bmp);
-      s_img = make_stroke_image(s_img, font.stroke_color(), stroke_radius, blur_radius);
+      Image s_img = make_stroke_image(bmp, font.stroke_color(), stroke_radius, blur_radius);
       RealSize  s_size = dc.trInvS(RealSize(s_img));
       RealPoint s_pos(bmp_pos.x - (s_size.width - bmp_size.width)/2, bmp_pos.y - (s_size.height - bmp_size.height)/2);
       dc.DrawImage(s_img, s_pos);
     }
     else if (font.hasShadow()) {
       int blur_radius = lround(font.shadow_blur() * s_scale);
-      Image s_img = from_bitmap(bmp);
-      s_img = make_stroke_image(s_img, font.shadow_color(), 0, blur_radius);
+      Image s_img = make_stroke_image(bmp, font.shadow_color(), 0, blur_radius);
       RealSize  s_size = dc.trInvS(RealSize(s_img));
       RealPoint s_pos(bmp_pos.x - (s_size.width - bmp_size.width)/2, bmp_pos.y - (s_size.height - bmp_size.height)/2);
       RealSize s_displacement = dc.trInvS(RealSize(font.shadow_displacement_x, font.shadow_displacement_y) * s_scale);
@@ -353,10 +351,10 @@ void SymbolFont::draw(RotatedDC& dc, RealRect rect, double scale, const SymbolFo
     auto const& dsym = symbols[s];
     const String& text = dsym.draw_text;
     SymbolInFont& sym = *dsym.symbol;
-    Bitmap& bmp = bmps[s];
+    Image& bmp = bmps[s];
     RealSize& bmp_size = bmp_sizes[s];
     RealPoint& bmp_pos = bmp_poss[s];
-    dc.DrawBitmap(bmp, bmp_pos);
+    dc.DrawPlainImage(bmp, bmp_pos);
     // 4. draw text
     if (text.empty() || !sym.text_font) continue;
     // only use the bitmap rectangle
@@ -401,12 +399,11 @@ Image SymbolFont::getImage(double font_size, const DrawableSymbol& sym) {
   if (!sym.symbol) return Image(1,1);
   if (sym.draw_text.empty() || !sym.symbol->text_font) return sym.symbol->getImage(*this, font_size);
   // with text
-  Bitmap bmp = to_bitmap(sym.symbol->getImage(*this, font_size));
-  // memory dc to work with
-  wxMemoryDC dc;
-  dc.SelectObject(bmp);
-  RealRect sym_rect(0,0,bmp.GetWidth(),bmp.GetHeight());
-  RotatedDC rdc(dc, 0, sym_rect, 1, QUALITY_AA);
+  Image img = sym.symbol->getImage(*this, font_size);
+  // canvas to work with
+  OffscreenCanvasP dc = new_canvas(img);
+  RealRect sym_rect(0,0,img.GetWidth(),img.GetHeight());
+  RotatedDC rdc(*dc, 0, sym_rect, 1, QUALITY_AA);
   // subtract margins from size
   sym_rect.x      += font_size * sym.symbol->text_margin_left;
   sym_rect.y      += font_size * sym.symbol->text_margin_top;
@@ -437,8 +434,7 @@ Image SymbolFont::getImage(double font_size, const DrawableSymbol& sym) {
   // draw text
   rdc.DrawTextWithShadowOrStroke(sym.draw_text, *sym.symbol->text_font, text_pos, font_size, text_stretch);
   // done
-  dc.SelectObject(wxNullBitmap);
-  return from_bitmap(bmp);
+  return dc->getImage();
 }
 
 // ----------------------------------------------------------------------------- : SymbolFont : sizes
@@ -485,7 +481,7 @@ RealSize SymbolFont::spacingSize(double font_size) {
 
 // ----------------------------------------------------------------------------- : InsertSymbolMenu
 
-Bitmap SymbolFont::insertSymbolPreview(const InsertSymbolMenu& item, wxSize size) {
+Image SymbolFont::insertSymbolPreview(const InsertSymbolMenu& item, wxSize size) {
   SymbolInFont* symbol = nullptr;
   if (item.type == InsertSymbolMenu::Type::CUSTOM) {
     symbol = defaultSymbol();
@@ -498,9 +494,9 @@ Bitmap SymbolFont::insertSymbolPreview(const InsertSymbolMenu& item, wxSize size
     }
   }
   if (symbol && symbol->preview_enabled()) {
-    return symbol->getBitmap(*this, size);
+    return symbol->getImage(*this, size);
   } else {
-    return wxNullBitmap;
+    return Image();
   }
 }
 

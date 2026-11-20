@@ -51,7 +51,7 @@ public:
   bool nativeLook() const override { return true; }
   Rotation getRotation() const override;
   
-  void draw(DC& dc) override;
+  void draw(Canvas& dc) override;
   
   bool AcceptsFocus() const override;
   

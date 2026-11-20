@@ -37,11 +37,11 @@ void ImageValueEditor::draw(RotatedDC& dc) {
   if (preview_bitmap.Ok()) {
     RealSize size(preview_bitmap.GetWidth(), preview_bitmap.GetHeight());
     // left aligned, vertically centered
-    dc.DrawBitmap(preview_bitmap, align_in_rect((Alignment)(ALIGN_MIDDLE | ALIGN_LEFT), size, rect));
+    draw_bitmap(dc, preview_bitmap, align_in_rect((Alignment)(ALIGN_MIDDLE | ALIGN_LEFT), size, rect));
   } else {
     // no image (or it could not be loaded), show a hint
-    dc.SetFont(wxFont(10,wxFONTFAMILY_SWISS,wxFONTSTYLE_NORMAL,wxFONTWEIGHT_NORMAL));
-    dc.SetTextForeground(*wxBLACK);
+    dc.SetFont(CanvasFont::generic(10, CanvasFont::Family::SWISS));
+    dc.SetTextForeground(Color(0,0,0));
     String label = _LABEL_("load image");
     RealSize text_size = dc.GetTextExtent(label);
     dc.DrawText(label, align_in_rect(ALIGN_MIDDLE_CENTER, text_size, rect));
@@ -54,7 +54,7 @@ void ImageValueEditor::updatePreview(int w, int h) {
   preview_valid = true;
   preview_w = w;
   preview_h = h;
-  preview_bitmap = Bitmap();
+  preview_bitmap = wxBitmap();
   if (value().filename.empty() || w < 1 || h < 1) return;
   try {
     auto image_file = getLocalPackage().openIn(value().filename);
@@ -66,7 +66,7 @@ void ImageValueEditor::updatePreview(int w, int h) {
     int new_h = max(1, (int)(image.GetHeight() * scale));
     wxImage preview = to_wx_image(image);
     preview.Rescale(new_w, new_h, wxIMAGE_QUALITY_HIGH);
-    preview_bitmap = Bitmap(preview);
+    preview_bitmap = wxBitmap(preview);
   } catch (const Error& e) {
     handle_error(e);
   }
@@ -75,7 +75,7 @@ void ImageValueEditor::updatePreview(int w, int h) {
 void ImageValueEditor::onValueChange() {
   ImageValueViewer::onValueChange();
   preview_valid = false;
-  preview_bitmap = Bitmap();
+  preview_bitmap = wxBitmap();
 }
 
 void ImageValueEditor::determineSize(bool) {

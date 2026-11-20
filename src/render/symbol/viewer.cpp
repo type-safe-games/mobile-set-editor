@@ -7,10 +7,9 @@
 // ----------------------------------------------------------------------------- : Includes
 
 #include <util/prec.hpp>
-#include <gfx/wx_image_adapter.hpp>
 #include <render/symbol/viewer.hpp>
-#include <util/error.hpp> // clearDC_black
-#include <gfx/dc_util.hpp>
+#include <util/error.hpp>
+#include <gfx/canvas.hpp>
 
 // ----------------------------------------------------------------------------- : Simple rendering
 
@@ -33,13 +32,10 @@ Image render_symbol(const SymbolP& symbol, double border_radius, int width, int 
     viewer.setOrigin(Vector2D(-(height-width) * 0.5,0));
     viewer.border_radius *= (double)width / height;
   }
-  Bitmap bmp(width, height);
-  wxMemoryDC dc;
-  dc.SelectObject(bmp);
-  clearDC(dc, Color(0,128,0));
-  viewer.draw(dc);
-  dc.SelectObject(wxNullBitmap);
-  return from_bitmap(bmp);
+  OffscreenCanvasP dc = new_canvas(width, height, CanvasFormat::RGB);
+  dc->clear(Color(0,128,0));
+  viewer.draw(*dc);
+  return dc->getImage();
 }
 
 // ----------------------------------------------------------------------------- : Constructor
@@ -66,72 +62,67 @@ void SymbolViewer::setOrigin(const Vector2D& origin) {
 
 // ----------------------------------------------------------------------------- : Drawing : Combining
 
-typedef shared_ptr<wxMemoryDC> MemoryDCP;
+typedef OffscreenCanvasP MemoryDCP;
 
-// Return a temporary DC with the same size as the parameter
-MemoryDCP getTempDC(DC& dc) {
-  wxSize s = dc.GetSize();
-  Bitmap buffer(s.GetWidth(), s.GetHeight(), 24);
-  MemoryDCP newDC(new wxMemoryDC);
-  newDC->SelectObject(buffer);
-  clearDC(*newDC, *wxBLACK_BRUSH);
+// Return a temporary canvas with the same size as the parameter, cleared to black
+MemoryDCP getTempDC(Canvas& dc) {
+  wxSize s = dc.getSize();
+  MemoryDCP newDC = new_canvas(s.GetWidth(), s.GetHeight(), CanvasFormat::RGB);
+  newDC->clear(Color(0,0,0));
   return newDC;
 }
 
-// Copy a DC into an image
-static Image dc_to_image(DC& from) {
-  wxSize size = from.GetSize();
-  Bitmap bmp(size.GetWidth(), size.GetHeight(), 24);
-  wxMemoryDC tmpDC;
-  tmpDC.SelectObject(bmp);
-  tmpDC.Blit(0, 0, size.GetWidth(), size.GetHeight(), &from, 0, 0, wxCOPY);
-  tmpDC.SelectObject(wxNullBitmap);
-  return from_bitmap(bmp);
+// Copy a canvas into an image
+static Image dc_to_image(Canvas& from) {
+  wxSize size = from.getSize();
+  return from.readBack(0, 0, size.GetWidth(), size.GetHeight());
 }
 
 // Combine all the temporary DCs with the main DC.
 // The borders (of the fill, of the accent, and the extra border) are OR-ed together,
 // then hidden below the interiors (fill and accent).
 // Finally the accent is painted where it is set and there is no fill, or where it is on top of the fill.
-void SymbolViewer::combineBuffers(DC& dc, Buffers& b) {
-  DC* borders[]   = {b.border.get(), b.accent_border.get(), b.extra_border.get()};
-  DC* interiors[] = {b.interior.get(), b.accent.get()};
+void SymbolViewer::combineBuffers(Canvas& dc, Buffers& b) {
+  Canvas* borders[]   = {b.border.get(), b.accent_border.get(), b.extra_border.get()};
+  Canvas* interiors[] = {b.interior.get(), b.accent.get()};
   bool any = false;
-  for (DC* d : borders)   if (d) any = true;
-  for (DC* d : interiors) if (d) any = true;
+  for (Canvas* d : borders)   if (d) any = true;
+  for (Canvas* d : interiors) if (d) any = true;
   if (!any) return;
 
-  wxSize size = dc.GetSize();
+  wxSize size = dc.getSize();
   size_t count = (size_t)size.GetWidth() * (size_t)size.GetHeight();
 
-#ifdef __WXMSW__
-  for (DC* d : borders)   if (d) dc.Blit(0, 0, size.GetWidth(), size.GetHeight(), d, 0, 0, wxOR);
-  for (DC* d : interiors) if (d) dc.Blit(0, 0, size.GetWidth(), size.GetHeight(), d, 0, 0, wxAND_INVERT);
-  if (!b.accent) return;
-  // the accent is painted by hand
-  Image out = dc_to_image(dc);
-  Byte* outData = out.GetData();
-#else
-  // wxOR and wxAND_INVERT are currently only implemented on Windows, so we have to do them manually
-  Image out = dc_to_image(dc);
-  Byte* outData = out.GetData();
-  for (DC* d : borders) {
-    if (!d) continue;
-    Image img = dc_to_image(*d);
-    Byte* data = img.GetData();
-    for (size_t i = 0; i < 3 * count; ++i) {
-      outData[i] = outData[i] | data[i];
+  Image out;
+  Byte* outData;
+  if (dc.supportsRasterOp(RasterOp::OR) && dc.supportsRasterOp(RasterOp::AND_INVERT)) {
+    for (Canvas* d : borders)   if (d) dc.blit(0, 0, size.GetWidth(), size.GetHeight(), *d, 0, 0, RasterOp::OR);
+    for (Canvas* d : interiors) if (d) dc.blit(0, 0, size.GetWidth(), size.GetHeight(), *d, 0, 0, RasterOp::AND_INVERT);
+    if (!b.accent) return;
+    // the accent is painted by hand
+    out = dc_to_image(dc);
+    outData = out.GetData();
+  } else {
+    // the canvas can't OR and AND_INVERT, so we have to do them manually
+    out = dc_to_image(dc);
+    outData = out.GetData();
+    for (Canvas* d : borders) {
+      if (!d) continue;
+      Image img = dc_to_image(*d);
+      Byte* data = img.GetData();
+      for (size_t i = 0; i < 3 * count; ++i) {
+        outData[i] = outData[i] | data[i];
+      }
+    }
+    for (Canvas* d : interiors) {
+      if (!d) continue;
+      Image img = dc_to_image(*d);
+      Byte* data = img.GetData();
+      for (size_t i = 0; i < 3 * count; ++i) {
+        outData[i] = outData[i] & (Byte)~data[i];
+      }
     }
   }
-  for (DC* d : interiors) {
-    if (!d) continue;
-    Image img = dc_to_image(*d);
-    Byte* data = img.GetData();
-    for (size_t i = 0; i < 3 * count; ++i) {
-      outData[i] = outData[i] & (Byte)~data[i];
-    }
-  }
-#endif
 
   if (b.accent) {
     Image accentImg = dc_to_image(*b.accent);
@@ -154,8 +145,7 @@ void SymbolViewer::combineBuffers(DC& dc, Buffers& b) {
     }
   }
 
-  Bitmap finalBmp = to_bitmap(out);
-  dc.DrawBitmap(finalBmp, 0, 0, false);
+  dc.drawImage(out, 0, 0, false);
 }
 
 // Is there a shape that can not be drawn directly to the dc?
@@ -173,7 +163,7 @@ static bool needs_buffering(const SymbolGroup& group) {
   return false;
 }
 
-void SymbolViewer::draw(DC& dc) {
+void SymbolViewer::draw(Canvas& dc) {
   bool paintedSomething = false;
   bool buffersFilled    = false;
   in_symmetry = 0;
@@ -195,7 +185,7 @@ void SymbolViewer::draw(DC& dc) {
     drawEditingHints(dc);
   }
 }
-void SymbolViewer::combineSymbolPart(DC& dc, const SymbolPart& part, bool& paintedSomething, bool& buffersFilled, bool allow_overlap, Buffers& buffers) {
+void SymbolViewer::combineSymbolPart(Canvas& dc, const SymbolPart& part, bool& paintedSomething, bool& buffersFilled, bool allow_overlap, Buffers& buffers) {
   if (const SymbolShape* s = part.isSymbolShape()) {
     if (s->combine == SYMBOL_COMBINE_OVERLAP && buffersFilled && allow_overlap) {
       // We will be overlapping some previous parts, write them to the screen
@@ -203,16 +193,16 @@ void SymbolViewer::combineSymbolPart(DC& dc, const SymbolPart& part, bool& paint
       // Clear the buffers
       buffersFilled = false;
       paintedSomething = true;
-      wxSize s = dc.GetSize();
+      wxSize s = dc.getSize();
       if (buffers.border) {
-        buffers.border->SetBrush(*wxBLACK_BRUSH);
-        buffers.border->SetPen(  *wxTRANSPARENT_PEN);
-        buffers.border->DrawRectangle(0, 0, s.GetWidth(), s.GetHeight());
+        buffers.border->setBrush(Color(0,0,0));
+        buffers.border->setPen(  Pen::none());
+        buffers.border->drawRectangle(0, 0, s.GetWidth(), s.GetHeight());
       }
       if (buffers.interior) { // there is no interior if only accent shapes were drawn
-        buffers.interior->SetBrush(*wxBLACK_BRUSH);
-        buffers.interior->SetPen(  *wxTRANSPARENT_PEN);
-        buffers.interior->DrawRectangle(0, 0, s.GetWidth(), s.GetHeight());
+        buffers.interior->setBrush(Color(0,0,0));
+        buffers.interior->setPen(  Pen::none());
+        buffers.interior->drawRectangle(0, 0, s.GetWidth(), s.GetHeight());
       }
       // the other masks are made again when they are needed
       buffers.accent_border.reset();
@@ -320,7 +310,7 @@ void SymbolViewer::combineSymbolPart(DC& dc, const SymbolPart& part, bool& paint
 }
 
 
-void SymbolViewer::combineSymbolShape(const SymbolShape& shape, DC& border, DC& interior, bool directB, bool directI) {
+void SymbolViewer::combineSymbolShape(const SymbolShape& shape, Canvas& border, Canvas& interior, bool directB, bool directI) {
   // what color should the interior be?
   // use black when drawing to the screen
   Byte interiorCol = directI ? 0 : 255;
@@ -334,23 +324,23 @@ void SymbolViewer::combineSymbolShape(const SymbolShape& shape, DC& border, DC& 
       drawSymbolShape(shape, &border, &interior, 255, interiorCol, directB, false);
       break;
     } case SYMBOL_COMBINE_SUBTRACT: {
-      border.SetLogicalFunction(wxAND);
+      border.setRasterOp(RasterOp::AND);
       drawSymbolShape(shape, &border, &interior, 0, ~interiorCol, directB, false);
-      border.SetLogicalFunction(wxCOPY);
+      border.setRasterOp(RasterOp::COPY);
       break;
     } case SYMBOL_COMBINE_INTERSECTION: {
       MemoryDCP keepBorder   = getTempDC(border);
       MemoryDCP keepInterior = getTempDC(interior);
       drawSymbolShape(shape, keepBorder.get(), keepInterior.get(), 255, 255, false, false);
       // combine the temporary dcs with the result using the AND operator
-      wxSize s = border.GetSize();
-      border  .Blit(0, 0, s.GetWidth(), s.GetHeight(), &*keepBorder  , 0, 0, wxAND);
-      interior.Blit(0, 0, s.GetWidth(), s.GetHeight(), &*keepInterior, 0, 0, wxAND);
+      wxSize s = border.getSize();
+      border  .blit(0, 0, s.GetWidth(), s.GetHeight(), *keepBorder  , 0, 0, RasterOp::AND);
+      interior.blit(0, 0, s.GetWidth(), s.GetHeight(), *keepInterior, 0, 0, RasterOp::AND);
       break;
     } case SYMBOL_COMBINE_DIFFERENCE: {
-      interior.SetLogicalFunction(wxXOR);
+      interior.setRasterOp(RasterOp::XOR);
       drawSymbolShape(shape, &border, &interior, 0, interiorCol, directB, true);
-      interior.SetLogicalFunction(wxCOPY);
+      interior.setRasterOp(RasterOp::COPY);
       break;
     } case SYMBOL_COMBINE_BORDER: {
       break; // not used anymore, shapes that act on the border use their own region now
@@ -362,7 +352,7 @@ void SymbolViewer::combineSymbolShape(const SymbolShape& shape, DC& border, DC& 
 // ----------------------------------------------------------------------------- : Drawing : Basic
 
 
-void SymbolViewer::combineBorderShape(const SymbolShape& shape, DC* border, DC* accent_border, DC& extra_border) {
+void SymbolViewer::combineBorderShape(const SymbolShape& shape, Canvas* border, Canvas* accent_border, Canvas& extra_border) {
   switch (shape.combine) {
     case SYMBOL_COMBINE_OVERLAP:
     case SYMBOL_COMBINE_MERGE: {
@@ -373,7 +363,7 @@ void SymbolViewer::combineBorderShape(const SymbolShape& shape, DC* border, DC* 
       break; // not used anymore, symbols with this are converted when they are read
     } case SYMBOL_COMBINE_SUBTRACT: {
       // remove the shape from the border
-      for (DC* mask : {border, accent_border, &extra_border}) {
+      for (Canvas* mask : {border, accent_border, &extra_border}) {
         if (mask) drawSymbolShape(shape, nullptr, mask, 0, 0, false, false);
       }
       break;
@@ -381,16 +371,16 @@ void SymbolViewer::combineBorderShape(const SymbolShape& shape, DC* border, DC* 
       // only keep the part of the border that is inside the shape
       MemoryDCP keep = getTempDC(extra_border);
       drawSymbolShape(shape, nullptr, keep.get(), 0, 255, false, false);
-      wxSize s = extra_border.GetSize();
-      for (DC* mask : {border, accent_border, &extra_border}) {
-        if (mask) mask->Blit(0, 0, s.GetWidth(), s.GetHeight(), &*keep, 0, 0, wxAND);
+      wxSize s = extra_border.getSize();
+      for (Canvas* mask : {border, accent_border, &extra_border}) {
+        if (mask) mask->blit(0, 0, s.GetWidth(), s.GetHeight(), *keep, 0, 0, RasterOp::AND);
       }
       break;
     } case SYMBOL_COMBINE_DIFFERENCE: {
       // toggle, where there is border it is removed, where there is none it is added.
       MemoryDCP shapeDC = getTempDC(extra_border);
       drawSymbolShape(shape, nullptr, shapeDC.get(), 0, 255, false, false);
-      wxSize size = extra_border.GetSize();
+      wxSize size = extra_border.getSize();
       Image shapeImg = dc_to_image(*shapeDC);
       Image extraImg = dc_to_image(extra_border);
       Image borderImg, accentImg;
@@ -413,15 +403,15 @@ void SymbolViewer::combineBorderShape(const SymbolShape& shape, DC* border, DC* 
           if (accentData) accentData[k] = 0;
         }
       }
-      extra_border.DrawBitmap(to_bitmap(extraImg), 0, 0, false);
-      if (border)        border       ->DrawBitmap(to_bitmap(borderImg), 0, 0, false);
-      if (accent_border) accent_border->DrawBitmap(to_bitmap(accentImg), 0, 0, false);
+      extra_border.drawImage(extraImg, 0, 0, false);
+      if (border)        border       ->drawImage(borderImg, 0, 0, false);
+      if (accent_border) accent_border->drawImage(accentImg, 0, 0, false);
       break;
     }
   }
 }
 
-void SymbolViewer::drawSymbolShape(const SymbolShape& shape, DC* border, DC* interior, Byte borderCol, Byte interiorCol, bool directB, bool clear) {
+void SymbolViewer::drawSymbolShape(const SymbolShape& shape, Canvas* border, Canvas* interior, Byte borderCol, Byte interiorCol, bool directB, bool clear) {
   // create point list
   vector<wxPoint> points;
   size_t size = shape.points.size();
@@ -431,31 +421,31 @@ void SymbolViewer::drawSymbolShape(const SymbolShape& shape, DC* border, DC* int
   // draw border
   if (border && border_radius > 0) {
     // white/black or, if directB white/green
-    border->SetBrush(Color(borderCol, (directB && borderCol == 0 ? 128 : borderCol), borderCol));
-    border->SetPen(wxPen(*wxWHITE, (int) rotation.trS(border_radius)));
-    border->DrawPolygon((int)points.size(), &points[0]);
+    border->setBrush(Color(borderCol, (directB && borderCol == 0 ? 128 : borderCol), borderCol));
+    border->setPen(Pen(Color(255,255,255), (int) rotation.trS(border_radius)));
+    border->drawPolygon((int)points.size(), &points[0]);
 
     if (clear) {
-      border->SetPen(*wxTRANSPARENT_PEN);
-      border->SetBrush(Color(0, (directB ? 128 : 0), 0));
+      border->setPen(Pen::none());
+      border->setBrush(Color(0, (directB ? 128 : 0), 0));
 
-      wxRasterOperationMode func = border->GetLogicalFunction();
-      border->SetLogicalFunction(wxCOPY);
-      border->DrawPolygon((int)points.size(), &points[0]);
-      border->SetLogicalFunction(func);
+      RasterOp func = border->getRasterOp();
+      border->setRasterOp(RasterOp::COPY);
+      border->drawPolygon((int)points.size(), &points[0]);
+      border->setRasterOp(func);
     }
   }
   // draw interior
   if (interior) {
-    interior->SetBrush(Color(interiorCol,interiorCol,interiorCol));
-    interior->SetPen(*wxTRANSPARENT_PEN);
-    interior->DrawPolygon((int)points.size(), &points[0]);
+    interior->setBrush(Color(interiorCol,interiorCol,interiorCol));
+    interior->setPen(Pen::none());
+    interior->drawPolygon((int)points.size(), &points[0]);
   }
 }
 
 // ----------------------------------------------------------------------------- : Drawing : Highlighting
 
-void SymbolViewer::highlightPart(DC& dc, const SymbolPart& part, HighlightStyle style) {
+void SymbolViewer::highlightPart(Canvas& dc, const SymbolPart& part, HighlightStyle style) {
   if (const SymbolShape* s = part.isSymbolShape()) {
     highlightPart(dc, *s, style);
   } else if (const SymbolSymmetry* s = part.isSymbolSymmetry()) {
@@ -467,7 +457,7 @@ void SymbolViewer::highlightPart(DC& dc, const SymbolPart& part, HighlightStyle 
   }
 }
 
-void SymbolViewer::highlightPart(DC& dc, const SymbolShape& shape, HighlightStyle style) {
+void SymbolViewer::highlightPart(Canvas& dc, const SymbolShape& shape, HighlightStyle style) {
   if (style == HIGHLIGHT_LESS) return;
   // create point list
   vector<wxPoint> points;
@@ -477,28 +467,28 @@ void SymbolViewer::highlightPart(DC& dc, const SymbolShape& shape, HighlightStyl
   }
   // draw
   if (style == HIGHLIGHT_BORDER) {
-    dc.SetBrush(*wxTRANSPARENT_BRUSH);
-    dc.SetPen  (wxPen(Color(255,0,0), 2));
-    dc.DrawPolygon((int)points.size(), &points[0]);
+    dc.setBrush(Brush::none());
+    dc.setPen  (Pen(Color(255,0,0), 2));
+    dc.drawPolygon((int)points.size(), &points[0]);
   } else if (style == HIGHLIGHT_BORDER_DOT) {
-    dc.SetBrush(*wxTRANSPARENT_BRUSH);
-    dc.SetPen  (wxPen(Color(255,0,0), 1, wxPENSTYLE_DOT));
-    dc.DrawPolygon((int)points.size(), &points[0]);
+    dc.setBrush(Brush::none());
+    dc.setPen  (Pen(Color(255,0,0), 1, PenStyle::DOT));
+    dc.drawPolygon((int)points.size(), &points[0]);
   } else {
-    dc.SetLogicalFunction(wxOR);
-    dc.SetBrush(Color(0,0,64));
-    dc.SetPen  (*wxTRANSPARENT_PEN);
-    dc.DrawPolygon((int)points.size(), &points[0]);
+    dc.setRasterOp(RasterOp::OR);
+    dc.setBrush(Color(0,0,64));
+    dc.setPen  (Pen::none());
+    dc.drawPolygon((int)points.size(), &points[0]);
     if (shape.combine == SYMBOL_COMBINE_SUBTRACT || shape.region == SYMBOL_REGION_BORDER) {
-      dc.SetLogicalFunction(wxAND);
-      dc.SetBrush(Color(191,191,255));
-      dc.DrawPolygon((int)points.size(), &points[0]);
+      dc.setRasterOp(RasterOp::AND);
+      dc.setBrush(Color(191,191,255));
+      dc.drawPolygon((int)points.size(), &points[0]);
     }
-    dc.SetLogicalFunction(wxCOPY);
+    dc.setRasterOp(RasterOp::COPY);
   }
 }
 
-void SymbolViewer::highlightPart(DC& dc, const SymbolSymmetry& sym, HighlightStyle style) {
+void SymbolViewer::highlightPart(Canvas& dc, const SymbolSymmetry& sym, HighlightStyle style) {
   // highlight parts?
   FOR_EACH_CONST(part, sym.parts) {
     highlightPart(dc, *part, (HighlightStyle)(style | HIGHLIGHT_LESS));
@@ -511,25 +501,26 @@ void SymbolViewer::highlightPart(DC& dc, const SymbolSymmetry& sym, HighlightSty
   RealPoint center = rotation.tr(sym.center);
   // draw 'spokes'
   Radians angle = atan2(sym.handle.y, sym.handle.x);
-  dc.SetPen(wxPen(color, sym.kind == SYMMETRY_ROTATION ? 1 : 3));
+  dc.setPen(Pen(color, sym.kind == SYMMETRY_ROTATION ? 1 : 3));
   int copies = sym.kind == SYMMETRY_REFLECTION ? sym.copies / 2 * 2 : sym.copies;
   for (int i = 0; i < copies ; ++i) {
     Radians a = angle + (i + 0.5) * 2 * M_PI / copies;
     Vector2D dir(cos(a), sin(a));
     Vector2D dir2 = rotation.tr(sym.center + 2.0 * dir);
-    dc.DrawLine(int(center.x), int(center.y), int(dir2.x), int(dir2.y));
+    dc.drawLine(int(center.x), int(center.y), int(dir2.x), int(dir2.y));
   }
   // draw center
-  dc.SetPen(*wxBLACK_PEN);
-  dc.SetBrush(color);
-  dc.DrawCircle(int(center.x), int(center.y), sym.kind == SYMMETRY_ROTATION ? 7 : 5);
+  dc.setPen(Color(0,0,0));
+  dc.setBrush(color);
+  dc.drawCircle(int(center.x), int(center.y), sym.kind == SYMMETRY_ROTATION ? 7 : 5);
 }
 
-void SymbolViewer::highlightPart(DC& dc, const SymbolGroup& group, HighlightStyle style) {
+void SymbolViewer::highlightPart(Canvas& dc, const SymbolGroup& group, HighlightStyle style) {
   if (style == HIGHLIGHT_BORDER) {
-    dc.SetBrush(*wxTRANSPARENT_BRUSH);
-    dc.SetPen  (wxPen(Color(255,0,0), 2));
-    dc.DrawRectangle(rotation.trRectToBB(RealRect(group.bounds)));
+    dc.setBrush(Brush::none());
+    dc.setPen  (Pen(Color(255,0,0), 2));
+    wxRect r = rotation.trRectToBB(RealRect(group.bounds));
+    dc.drawRectangle(r.x, r.y, r.width, r.height);
   }
   FOR_EACH_CONST(part, group.parts) {
     highlightPart(dc, *part, (HighlightStyle)(style | HIGHLIGHT_LESS));
@@ -537,6 +528,6 @@ void SymbolViewer::highlightPart(DC& dc, const SymbolGroup& group, HighlightStyl
 }
 
 
-void SymbolViewer::drawEditingHints(DC& dc) {
+void SymbolViewer::drawEditingHints(Canvas& dc) {
   // TODO?
 }

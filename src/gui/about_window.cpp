@@ -43,11 +43,11 @@ const char* MSE_AUTHORS[] = {
   "CaiCai (247321453)"
 };
 
-void AboutWindow::draw(DC& dc) {
+void AboutWindow::draw(wxDC& dc) {
   wxSize ws = GetClientSize();
   // draw background
   dc.SetPen  (*wxTRANSPARENT_PEN);
-  dc.SetBrush(settings.darkModeColor());
+  dc.SetBrush(wxColour(settings.darkModeColor()));
   dc.DrawRectangle(0, 0, ws.GetWidth(), ws.GetHeight());
   // draw logo
   dc.DrawBitmap(logo,  (ws.GetWidth() -  logo.GetWidth()) / 2, 5);
@@ -183,10 +183,10 @@ HoverButton::HoverButton(Window* parent, int id, const String& name, const Color
 void HoverButton::loadBitmaps(const String& name) {
   if (bitmaps == name) return;
   bitmaps = name;
-  bg_normal = Bitmap(load_resource_wx_image(name + _("_normal")));
-  bg_hover  = Bitmap(load_resource_wx_image(name + _("_hover")));
-  bg_focus  = Bitmap(load_resource_wx_image(name + _("_focus")));
-  bg_down   = Bitmap(load_resource_wx_image(name + _("_down")));
+  bg_normal = wxBitmap(load_resource_wx_image(name + _("_normal")));
+  bg_hover  = wxBitmap(load_resource_wx_image(name + _("_hover")));
+  bg_focus  = wxBitmap(load_resource_wx_image(name + _("_focus")));
+  bg_down   = wxBitmap(load_resource_wx_image(name + _("_down")));
   Refresh(false);
 }
 
@@ -194,7 +194,7 @@ wxSize HoverButton::DoGetBestSize() const {
   return wxSize(bg_normal.GetWidth(), bg_normal.GetHeight());
 }
 
-const Bitmap* HoverButton::toDraw() const {
+const wxBitmap* HoverButton::toDraw() const {
   return (mouse_down && hover) || key_down ? &bg_down
        : hover                             ? &bg_hover
        : focus                             ? &bg_focus
@@ -204,7 +204,7 @@ void HoverButton::refreshIfNeeded() {
   if (last_drawn != toDraw()) Refresh(false);
 }
 
-void HoverButton::draw(DC& dc) {
+void HoverButton::draw(wxDC& dc) {
   // clear background (for transparent button images)
   wxSize ws = GetClientSize();
   dc.SetPen(*wxTRANSPARENT_PEN);

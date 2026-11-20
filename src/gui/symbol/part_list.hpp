@@ -78,11 +78,11 @@ private:
   void onChar(wxKeyEvent& ev);
   void onPaint(wxPaintEvent&);
   void onSize(wxSizeEvent&);
-  void OnDraw(DC& dc) override;
+  void OnDraw(wxDC& dc) override;
   
   void sendEvent(int type);
   
-  void drawItem(DC& dc, int x, int& i, bool parent_active, const SymbolPartP& part);
+  void drawItem(wxDC& dc, int x, int& i, bool parent_active, const SymbolPartP& part);
   const Image& itemPreview(int i, const SymbolPartP& part);
   const Image& symbolPreview();
   void updatePart(const set<SymbolPartP>& parts, int& i, bool parent_updated, const SymbolPartP& part);
@@ -108,6 +108,6 @@ private:
   
   static int childCount(const SymbolPartP& part);
   
-  void updateCaret(DC& dc, int x, int y, int h, const SymbolPartP& part);
+  void updateCaret(wxDC& dc, int x, int y, int h, const SymbolPartP& part);
 };
 

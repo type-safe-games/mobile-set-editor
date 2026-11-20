@@ -8,8 +8,7 @@
 
 #include <util/prec.hpp>
 #include <data/font.hpp>
-#include <util/file_utils.hpp>
-#include <wx/font.h>
+#include <gfx/font_registry.hpp>
 
 // ----------------------------------------------------------------------------- : Font
 
@@ -31,54 +30,6 @@ FontRef::FontRef()
   , separator_color(Color(0,0,0,128))
   , flags(FONT_NORMAL)
 {}
-
-bool FontRef::PreloadResourceFonts(bool recursive) {
-#if wxUSE_PRIVATE_FONTS
-  String pathSeparator(1, path_separator());
-  String appPath(path_only(executable_path()));
-  vector<String> folders;
-  if (!list_directory(appPath, folders, LIST_DIRS)) return true;
-
-  bool preloadHadErrors = false;
-  for (const String& folder : folders)
-  {
-    if (contains(to_lower(folder), _("fonts"))) {
-      String folderPath = appPath + pathSeparator + folder + pathSeparator;
-      
-      // tally fonts
-      vector<String> fontFilePaths;
-      TallyResourceFonts(folderPath, fontFilePaths, recursive);
-
-      // load fonts
-      for (const String& fontFilePath : fontFilePaths) {
-        if (!wxFont::AddPrivateFont(fontFilePath)) {
-          preloadHadErrors = true;
-        }
-      }
-    }
-  }
-
-  return preloadHadErrors;
-
-#endif // wxUSE_PRIVATE_FONTS
-  return false;
-}
-
-void FontRef::TallyResourceFonts(String fontsDirectoryPath, vector<String>& fontFilePaths, bool recursive) {
-  vector<String> fontFileNames;
-  list_directory(fontsDirectoryPath, fontFileNames);
-  for (const String& fontFileName : fontFileNames) {
-    String fontFilePath = fontsDirectoryPath + fontFileName;
-    if (dir_exists(fontFilePath)) {
-      if (recursive) {
-        TallyResourceFonts(fontFilePath + path_separator(), fontFilePaths, true);
-      }
-    }
-    else if (ends_with(fontFilePath, _(".ttf")) || ends_with(fontFilePath, _(".otf"))) {
-      fontFilePaths.push_back(fontFilePath);
-    }
-  }
-}
 
 bool FontRef::update(Context& ctx) {
   bool changes = false;
@@ -158,56 +109,53 @@ FontRefP FontRef::make(int add_flags, bool add_underline, bool add_strikethrough
 
 static const String BOLD_STRING   = _(" Bold");
 
-// Construct a wxFont without going through the legacy 6-argument wxFont(...)
-// That constructor silently treats a pointSize of exactly 70 as a request for wxDEFAULT
-static wxFont make_font(int point_size, wxFontFamily family, wxFontStyle style, wxFontWeight weight, bool underlined, const String& face) {
-  wxFont font;
-  font.SetFamily(family);
-  font.SetStyle(style);
-  font.SetWeight(weight);
-  font.SetUnderlined(underlined);
-  if (!face.empty()) font.SetFaceName(face);
-  font.SetPointSize(point_size);
-  return font;
-}
-
-wxFont FontRef::toWxFont(double scale) const {
+CanvasFont FontRef::toCanvasFont(double scale) const {
   int size_i = to_int(scale * size);
-  wxFontWeight weight_i = flags & FONT_BOLD   ? wxFONTWEIGHT_BOLD  : wxFONTWEIGHT_NORMAL;
-  wxFontStyle style_i  = flags & FONT_ITALIC ? wxFONTSTYLE_ITALIC : wxFONTSTYLE_NORMAL;
-  // make font
-  wxFont font;
-
-  if (flags & FONT_CODE) {
-    if (size_i < 2) {
-      font = make_font(wxNORMAL_FONT->GetPointSize(), wxFONTFAMILY_TELETYPE, wxFONTSTYLE_NORMAL, weight_i, underline(), _("Courier New"));
-      if (strikethrough()) font.MakeStrikethrough();
-      return font;
+  CanvasFont font;
+  if (name().empty() && !(flags & FONT_CODE)) {
+    // the default GUI font, only resized
+    font.system = true;
+    if (size > 1) {
+      font.point_size = size_i;
     } else {
-      font = make_font(size_i, wxFONTFAMILY_TELETYPE, wxFONTSTYLE_NORMAL, weight_i, underline(), _("Courier New"));
+      font.system_size_scale = scale;
     }
-  } else if (name().empty()) {
-    font = *wxNORMAL_FONT;
-    font.SetPointSize(size > 1 ? size_i : int(scale * font.GetPointSize()));
-    if (strikethrough()) font.MakeStrikethrough();
+    font.strikethrough = strikethrough();
     return font;
+  }
+  font.bold          = flags & FONT_BOLD;
+  font.underline     = underline();
+  font.strikethrough = strikethrough();
+  bool italic_face = flags & FONT_ITALIC; // is an italic face wanted?
+  if (flags & FONT_CODE) {
+    font.family      = CanvasFont::Family::TELETYPE;
+    font.family_name = _("Courier New");
+    italic_face = false;
+    if (size_i < 2) {
+      font.system_size_scale = 1; // the size of the default GUI font
+    } else {
+      font.point_size = size_i;
+    }
   } else if (!(flags & FONT_FROM_TAG) && (flags & FONT_ITALIC) && !italic_name().empty()) {
-    font = make_font(size_i, wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL, weight_i, underline(), italic_name());
+    // a separate family for italic text, it is used as it is
+    font.family_name = italic_name();
+    font.point_size  = size_i;
   } else {
     String familyName = name();
     if(ends_with(familyName, BOLD_STRING)) {
       familyName = familyName.substr(0, familyName.length() - BOLD_STRING.length());
-      weight_i = wxFONTWEIGHT_BOLD;
+      font.bold = true;
     }
-    font = make_font(size_i, wxFONTFAMILY_DEFAULT, style_i, weight_i, underline(), familyName);
+    font.family_name = familyName;
+    font.italic      = flags & FONT_ITALIC;
+    font.point_size  = size_i;
   }
-  // fix size
-#if defined(__WXMSW__) || defined(__WXGTK__)
-  // make it independent of screen dpi, always use 96 dpi
-  // TODO: do something more sensible, and more portable
-  font.SetPixelSize(wxSize(0, -(int)(scale*size*96.0/72.0 + 0.5) ));
-#endif
-  if (strikethrough()) font.MakeStrikethrough();
+  if (!font.system_size_scale) {
+    // make it independent of screen dpi, always use 96 dpi
+    font.request_pixel_height = true;
+    font.pixel_height = scale*size*96.0/72.0;
+  }
+  font.face = font_registry().resolve(font.family_name, font.bold, italic_face);
   return font;
 }
 

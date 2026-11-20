@@ -59,7 +59,7 @@ void ChoiceThumbnailRequest::store(const Image& img) {
   if (img.Ok()) {
     ChoiceThumbnail& thumbnail = style().thumbnails[id];
     ChoiceThumbnailLock lock(thumbnail.mutex);
-    thumbnail.bitmap = to_bitmap(img);
+    thumbnail.image = img;
     thumbnail.status = THUMB_OK;
   }
 }
@@ -126,7 +126,7 @@ DropDownList* DropDownChoiceListBase::submenu(size_t item) const {
   return submenus[item].get();
 }
 
-void DropDownChoiceListBase::drawIcon(DC& dc, int x, int y, size_t item, bool selected) const {
+void DropDownChoiceListBase::drawIcon(wxDC& dc, int x, int y, size_t item, bool selected) const {
   // find the image for the item
   int image_id;
   if (isFieldDefault(item)) {
@@ -138,7 +138,7 @@ void DropDownChoiceListBase::drawIcon(DC& dc, int x, int y, size_t item, bool se
   if ((unsigned) image_id < style().thumbnails.size()) {
     auto const& thumbnail = style().thumbnails[image_id];
     if (thumbnail.status == THUMB_OK)
-    dc.DrawBitmap(thumbnail.bitmap, x, y);
+    dc.DrawBitmap(to_bitmap(thumbnail.image), x, y);
     //il->Draw(image_id, dc, x, y, itemEnabled(item) ? wxIMAGELIST_DRAW_NORMAL : wxIMAGELIST_DRAW_TRANSPARENT);
   }
 }
@@ -294,7 +294,7 @@ void ChoiceValueEditor::onLoseFocus() {
 void ChoiceValueEditor::draw(RotatedDC& dc) {
   ChoiceValueViewer::draw(dc);
   if (nativeLook()) {
-    draw_drop_down_arrow(&editor(), dc.getDC(), dc.getExternalRect().grow(1), drop_down->IsShown());
+    draw_drop_down_arrow(&editor(), wx_dc(dc), dc.getExternalRect().grow(1), drop_down->IsShown());
   }
 }
 void ChoiceValueEditor::determineSize(bool) {

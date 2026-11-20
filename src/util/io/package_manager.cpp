@@ -10,6 +10,7 @@
 #include <util/io/package_manager.hpp>
 #include <util/error.hpp>
 #include <util/file_utils.hpp>
+#include <gfx/font_registry.hpp>
 #include <data/game.hpp>
 #include <data/updater.hpp>
 #include <data/stylesheet.hpp>
@@ -32,6 +33,9 @@ void PackageManager::init() {
                 user_data_dir());
   local.deleteEmptyFolders();
   global.deleteEmptyFolders();
+  // the fonts shipped inside installed Templates
+  if (local.valid())  font_registry().addTemplateDirectory(local.getDirectory());
+  if (global.valid()) font_registry().addTemplateDirectory(global.getDirectory());
 }
 void PackageManager::destroy() {
   loaded_packages.clear();

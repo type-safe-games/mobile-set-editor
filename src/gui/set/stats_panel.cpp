@@ -43,7 +43,7 @@ public:
   
 protected:
   virtual size_t itemCount() const;
-  virtual void drawItem(DC& dc, int x, int y, size_t item);
+  virtual void drawItem(wxDC& dc, int x, int y, size_t item);
   
 private:
   GameP game;
@@ -69,7 +69,7 @@ size_t StatCategoryList::itemCount() const {
   return categories.size();
 }
 
-void StatCategoryList::drawItem(DC& dc, int x, int y, size_t item) {
+void StatCategoryList::drawItem(wxDC& dc, int x, int y, size_t item) {
   StatsCategory& cat = *categories.at(item);
   // draw icon
   if (!cat.icon_filename.empty() && !cat.icon.Ok()) {
@@ -77,11 +77,11 @@ void StatCategoryList::drawItem(DC& dc, int x, int y, size_t item) {
     Image img(*file);
     if (img.HasMask()) img.InitAlpha(); // we can't handle masks
     if (img.Ok()) {
-      cat.icon = Bitmap(resample_preserve_aspect(img, 21, 21));
+      cat.icon = resample_preserve_aspect(img, 21, 21);
     }
   }
   if (cat.icon.Ok()) {
-    dc.DrawBitmap(cat.icon, x+1, y+1);
+    dc.DrawBitmap(to_bitmap(cat.icon), x+1, y+1);
   }
   // draw name
   RealRect rect(RealPoint(x + 24, y), RealSize(item_size.x - 30, item_size.y));
@@ -147,7 +147,7 @@ public:
   
 protected:
   size_t itemCount() const override;
-  void drawItem(DC& dc, int x, int y, size_t item) override;
+  void drawItem(wxDC& dc, int x, int y, size_t item) override;
   
   double subcolumnActivity(size_t col) const override {
     return col-1 >= prefered_dimension_count ? 0.2 : 0.7;
@@ -233,7 +233,7 @@ size_t StatDimensionList::itemCount() const {
   return dimensions.size() + show_empty;
 }
 
-void StatDimensionList::drawItem(DC& dc, int x, int y, size_t item) {
+void StatDimensionList::drawItem(wxDC& dc, int x, int y, size_t item) {
   if (show_empty && item == 0) {
     RealRect rect(RealPoint(x + 24, y), RealSize(item_size.x - 30, item_size.y));
     String str = _("None");
@@ -259,11 +259,11 @@ void StatDimensionList::drawItem(DC& dc, int x, int y, size_t item) {
       if (img.HasMask()) img.InitAlpha(); // we can't handle masks
       Image resampled(21, 21);
       resample_preserve_aspect(img, resampled);
-      if (img.Ok()) dim.icon = to_bitmap(resampled);
+      if (img.Ok()) dim.icon = resampled;
     }
   }
   if (dim.icon.Ok()) {
-    dc.DrawBitmap(dim.icon, x+1, y+1);
+    dc.DrawBitmap(to_bitmap(dim.icon), x+1, y+1);
   }
   // draw name
   RealRect rect(RealPoint(x + 24, y), RealSize(item_size.x - 30, item_size.y));
@@ -284,8 +284,8 @@ void StatDimensionList::drawItem(DC& dc, int x, int y, size_t item) {
       int cx = x + subcolumns[j].offset.x + subcolumns[j].size.x/2;
       int cy = y + subcolumns[j].offset.y + subcolumns[j].size.y/2;
       dc.SetPen(*wxTRANSPARENT_PEN);
-      dc.SetBrush(prefered ? Color(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOWTEXT))
-                           : lerp(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOWTEXT),wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW),0.5));
+      dc.SetBrush(wxColour(prefered ? Color(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOWTEXT))
+                           : lerp(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOWTEXT),wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW),0.5)));
       dc.DrawCircle(cx,cy,6);
     }
   }

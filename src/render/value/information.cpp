@@ -16,11 +16,11 @@
 IMPLEMENT_VALUE_VIEWER(Info);
 
 void InfoValueViewer::draw(RotatedDC& dc) {
-  dc.SetPen(*wxTRANSPARENT_PEN);
+  dc.SetPen(Pen::none());
   if (nativeLook()) {
     dc.SetTextForeground(ui_color(UIColor::WINDOW_TEXT));
     dc.SetBrush(ui_color(UIColor::APP_WORKSPACE));
-    dc.SetFont(wxFont(16, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL, false, _("Arial")));
+    dc.SetFont(CanvasFont::generic(16, CanvasFont::Family::SWISS, false, _("Arial")));
   } else {
     dc.SetTextForeground(style().font.color);
     dc.SetBrush(style().background_color);

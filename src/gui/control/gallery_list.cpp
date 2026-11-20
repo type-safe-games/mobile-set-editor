@@ -285,7 +285,7 @@ void GalleryList::onPaint(wxPaintEvent&) {
     OnDraw(dc);
   } CATCH_ALL_ERRORS(false); // don't show message boxes in onPaint!
 }
-void GalleryList::OnDraw(DC& dc) {
+void GalleryList::OnDraw(wxDC& dc) {
   wxSize cs = GetClientSize();
   size_t start, end; // items to draw
   // number of visble items
@@ -321,8 +321,8 @@ void GalleryList::OnDraw(DC& dc) {
                                          wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOWTEXT), subcolumnActivity(j))
                            )
                          : unselected;
-      dc.SetPen(c);
-      dc.SetBrush(lerp(background, c, 0.3));
+      dc.SetPen(wxColour(c));
+      dc.SetBrush(wxColour(lerp(background, c, 0.3)));
       dc.DrawRectangle(rect.x, rect.y, rect.width, rect.height);
       #endif
     }

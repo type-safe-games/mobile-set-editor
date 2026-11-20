@@ -247,7 +247,7 @@ void PackageUpdateList::initItems() {
   }
 }
 
-void PackageUpdateList::drawItem(DC& dc, size_t index, size_t column, int x, int y, bool selected) const {
+void PackageUpdateList::drawItem(wxDC& dc, size_t index, size_t column, int x, int y, bool selected) const {
   // offset for drawing
   x += 1;  y += 3;
   // the item
@@ -255,7 +255,7 @@ void PackageUpdateList::drawItem(DC& dc, size_t index, size_t column, int x, int
   Color color = wxSystemSettings::GetColour(selected ? wxSYS_COLOUR_HIGHLIGHTTEXT : wxSYS_COLOUR_WINDOWTEXT);
   if (column == 0) {
     // Name
-    const Bitmap& bmp = ti.highlight() ? ti.icon : ti.icon_grey;
+    const wxBitmap& bmp = ti.highlight() ? ti.icon : ti.icon_grey;
     if (bmp.Ok()) dc.DrawBitmap(bmp, x-1,y-2);
     dc.SetTextForeground(color);
     dc.DrawText(capitalize_sentence(ti.label), x+17, y);

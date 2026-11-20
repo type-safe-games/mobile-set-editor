@@ -34,8 +34,6 @@ struct Color {
   inline Color(wxColour color) : r(color.Red()), g(color.Green()), b(color.Blue()), a(color.Alpha()) {}
 
   inline operator wxColour() const { return wxColour(r, g, b, a); }
-  inline operator wxPen() const { return wxPen((wxColour)*this); }
-  inline operator wxBrush() const { return wxBrush((wxColour)*this); }
 
   inline bool operator == (Color const& that) const {
     return packed == that.packed;

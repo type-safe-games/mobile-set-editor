@@ -56,7 +56,7 @@ double CompoundTextElement::scaleStep() const {
 
 void AtomTextElement::draw(RotatedDC& dc, double scale, const RealRect& rect, const double* xs, DrawWhat what, size_t start, size_t end, bool native_look) const {
   if (what & DRAW_ACTIVE) {
-    dc.SetPen(*wxTRANSPARENT_PEN);
+    dc.SetPen(Pen::none());
     dc.SetBrush(background_color);
     dc.DrawRectangle(rect);
   }
@@ -68,7 +68,7 @@ void AtomTextElement::draw(RotatedDC& dc, double scale, const RealRect& rect, co
 void ErrorTextElement::draw(RotatedDC& dc, double scale, const RealRect& rect, const double* xs, DrawWhat what, size_t start, size_t end, bool native_look) const {
   // Draw wavy underline
   if (what & DRAW_ERRORS) {
-    dc.SetPen(*wxRED_PEN);
+    dc.SetPen(Color(255,0,0));
     RealPoint pos = rect.bottomLeft() - dc.trInvS(RealSize(0,2));
     RealSize  dx(dc.trInvS(2), 0), dy(0, dc.trInvS(1));
     while (pos.x + 1 < rect.right()) {

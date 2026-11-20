@@ -233,11 +233,11 @@ private:
   }
   
   /// Draw cutter lines in the page margins, corresponding to the edges of cards
-  void drawCutterLines(DC& dc, PrintJobP& job, int page);
+  void drawCutterLines(wxDC& dc, PrintJobP& job, int page);
   static constexpr double CUTTER_LINE_SIZE_MM = 8.0;
   /// Draw cards according to their CardLayout info
-  void drawCards      (DC& dc, PrintJobP& job, int page);
-  void drawCard       (DC& dc, PrintJob::CardLayout& card_layout);
+  void drawCards      (wxDC& dc, PrintJobP& job, int page);
+  void drawCard       (wxDC& dc, PrintJob::CardLayout& card_layout);
 };
 
 CardsPrintout::CardsPrintout(PrintJobP const& job)
@@ -265,7 +265,7 @@ void CardsPrintout::OnPreparePrinting() {
 
 
 bool CardsPrintout::OnPrintPage(int page) {
-  DC& dc = *GetDC();
+  wxDC& dc = *GetDC();
   // page size in millimeters
   int page_width_mm, page_height_mm;
   GetPageSizeMM(&page_width_mm, &page_height_mm);
@@ -280,13 +280,13 @@ bool CardsPrintout::OnPrintPage(int page) {
   return true;
 }
 
-void CardsPrintout::drawCards(DC& dc, PrintJobP& job, int page) {
+void CardsPrintout::drawCards(wxDC& dc, PrintJobP& job, int page) {
   FOR_EACH(card_layout, job->page_layouts[page - 1]) {
     drawCard(dc, card_layout);
   }
   dc.SetDeviceOrigin(0, 0);
 }
-void CardsPrintout::drawCard(DC& dc, PrintJob::CardLayout& card_layout) {
+void CardsPrintout::drawCard(wxDC& dc, PrintJob::CardLayout& card_layout) {
   // upscale to printer dpi
   RealPoint scale(printer_px_per_mm.width  * card_layout.size_mm.width  / card_layout.size_px.width,
                   printer_px_per_mm.height * card_layout.size_mm.height / card_layout.size_px.height);
@@ -296,8 +296,9 @@ void CardsPrintout::drawCard(DC& dc, PrintJob::CardLayout& card_layout) {
   wxBitmap buffer(width, height, 32);
   wxMemoryDC bufferDC;
   bufferDC.SelectObject(buffer);
-  clearDC(bufferDC,*wxWHITE_BRUSH);
-  RotatedDC rdc(bufferDC, card_layout.rot, RealRect(0, 0, card_layout.size_px.width, card_layout.size_px.height), scale.x, QUALITY_AA, ROTATION_ATTACH_TOP_LEFT);
+  clearDC(bufferDC, Color(255,255,255));
+  WxCanvas canvas(bufferDC);
+  RotatedDC rdc(canvas, card_layout.rot, RealRect(0, 0, card_layout.size_px.width, card_layout.size_px.height), scale.x, QUALITY_AA, ROTATION_ATTACH_TOP_LEFT);
   if (is_rad90(card_layout.rot)) bufferDC.SetDeviceOrigin(bleed, height - width - 1 - bleed); // I don't understand why this is needed
   else bufferDC.SetDeviceOrigin(bleed, bleed);
   viewer.setCard(card_layout.card);
@@ -324,7 +325,7 @@ void CardsPrintout::drawCard(DC& dc, PrintJob::CardLayout& card_layout) {
   dc.DrawBitmap(buffer, 0, 0);
 }
 
-void CardsPrintout::drawCutterLines(DC& dc, PrintJobP& job, int page) {
+void CardsPrintout::drawCutterLines(wxDC& dc, PrintJobP& job, int page) {
   const vector<PrintJob::CardLayout>& page_layouts = job->page_layouts[page - 1];
   const RealSize& page_margin = job->page_margins[page - 1];
   int page_width, page_height;

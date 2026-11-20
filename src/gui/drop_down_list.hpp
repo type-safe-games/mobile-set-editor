@@ -68,7 +68,7 @@ protected:
   /// Text of an item
   virtual String itemText(size_t item) const = 0;
   /// Draw an icon at the specified location
-  virtual void drawIcon(DC& dc, int x, int y, size_t item, bool selected) const {}
+  virtual void drawIcon(wxDC& dc, int x, int y, size_t item, bool selected) const {}
   /// Is there a line below an item?
   virtual bool lineBelow(size_t item)        const { return false; }
   /// Should the item be highlighted?
@@ -133,8 +133,8 @@ private:
   void ensureSelectedItemVisible();
   void scrollTo(int pos);
   
-  void draw(DC& dc);
-  void drawItem(DC& dc, int y, size_t item);
+  void draw(wxDC& dc);
+  void drawItem(wxDC& dc, int y, size_t item);
   
 protected:
   virtual void redrawArrowOnParent(); // allow override

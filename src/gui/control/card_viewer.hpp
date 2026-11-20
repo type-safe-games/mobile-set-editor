@@ -67,7 +67,7 @@ private:
 
   void onTimer(wxTimerEvent&);
 
-  Bitmap  buffer;         ///< Off-screen buffer we draw to
+  wxBitmap  buffer;         ///< Off-screen buffer we draw to
   bool    up_to_date;     ///< Is the buffer up to date?
   bool    full_repaint;   ///< True only while onPaint() is (re)building the whole buffer from scratch. While true, shouldDraw() ignores GetUpdateRegion() and draws everything
   wxTimer redraw_timer;   ///< Timer that will trigger a redraw

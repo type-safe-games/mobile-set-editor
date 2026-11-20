@@ -29,7 +29,7 @@ SymbolSymmetryEditor::SymbolSymmetryEditor(SymbolControl* control, const SymbolS
 
 // ----------------------------------------------------------------------------- : Drawing
 
-void SymbolSymmetryEditor::draw(DC& dc) {
+void SymbolSymmetryEditor::draw(wxDC& dc) {
   if (symmetry) {
     control.highlightPart(dc, *symmetry, HIGHLIGHT_BORDER);
     Color color(255,100,0);
@@ -41,12 +41,12 @@ void SymbolSymmetryEditor::draw(DC& dc) {
       dc.DrawLine(int(center.x), int(center.y), int(handle.x), int(handle.y));
       // draw handle
       dc.SetPen(*wxBLACK_PEN);
-      dc.SetBrush(color);
+      dc.SetBrush(wxColour(color));
       dc.DrawCircle(int(handle.x), int(handle.y), hovered == SELECTION_HANDLE ? 7 : 4);
     }
     // draw center
     dc.SetPen(*wxBLACK_PEN);
-    dc.SetBrush(color);
+    dc.SetBrush(wxColour(color));
     dc.DrawCircle(int(center.x), int(center.y), hovered == SELECTION_CENTER ? 8 : 5);
   }
 }

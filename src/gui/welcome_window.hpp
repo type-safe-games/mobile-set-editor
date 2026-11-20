@@ -31,14 +31,14 @@ private:
   DECLARE_EVENT_TABLE();
   
   // MSE logos
-  Bitmap logo;
+  wxBitmap logo;
   #if USE_BETA_LOGO
-  Bitmap logo2;
+  wxBitmap logo2;
   #endif
   wxComboBox* select_language;
     
   void onPaint(wxPaintEvent&);
-  void draw(DC& dc);
+  void draw(wxDC& dc);
     
   void onOpenSet     (wxCommandEvent&);
   void onNewSet      (wxCommandEvent&);
@@ -58,11 +58,11 @@ public:
   HoverButtonExt(Window* parent, int id, const wxImage& icon_name, const String& label, const String& sub_label);
   
 private:
-  Bitmap icon;
+  wxBitmap icon;
   String label, sub_label;
   wxFont font_large, font_small;
   
 protected:
-  void draw(DC& dc) override;
+  void draw(wxDC& dc) override;
 };
 

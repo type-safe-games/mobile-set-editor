@@ -10,6 +10,7 @@
 #include <gui/value/package_choice.hpp>
 #include <gui/drop_down_list.hpp>
 #include <gui/util.hpp>
+#include <gfx/wx_image_adapter.hpp>
 #include <data/action/value.hpp>
 
 // ----------------------------------------------------------------------------- : DropDownPackageChoiceList
@@ -23,7 +24,7 @@ protected:
   size_t itemCount() const override;
   String itemText(size_t item) const override;
   bool   lineBelow(size_t item) const override;
-  void   drawIcon(DC& dc, int x, int y, size_t item, bool selected) const override;
+  void   drawIcon(wxDC& dc, int x, int y, size_t item, bool selected) const override;
   void   select(size_t selection) override;
   size_t selection() const override;
   
@@ -54,11 +55,11 @@ bool DropDownPackageChoiceList::lineBelow(size_t item) const {
   return item == 0 && !editor.field().required;
 }
 
-void DropDownPackageChoiceList::drawIcon(DC& dc, int x, int y, size_t item, bool selected) const {
+void DropDownPackageChoiceList::drawIcon(wxDC& dc, int x, int y, size_t item, bool selected) const {
   if (item == 0 && !editor.field().required) return;
   size_t i = item - !editor.field().required;
-  const Bitmap& bmp = editor.items[i].image;
-  if (bmp.Ok()) dc.DrawBitmap(bmp, x, y);
+  const Image& bmp = editor.items[i].image;
+  if (bmp.Ok()) dc.DrawBitmap(to_bitmap(bmp), x, y);
 }
 
 
@@ -101,7 +102,7 @@ void PackageChoiceValueEditor::onLoseFocus() {
 void PackageChoiceValueEditor::draw(RotatedDC& dc) {
   PackageChoiceValueViewer::draw(dc);
   if (nativeLook()) {
-    draw_drop_down_arrow(&editor(), dc.getDC(), dc.getExternalRect().grow(1), drop_down && drop_down->IsShown());
+    draw_drop_down_arrow(&editor(), wx_dc(dc), dc.getExternalRect().grow(1), drop_down && drop_down->IsShown());
   }
 }
 void PackageChoiceValueEditor::determineSize(bool) {

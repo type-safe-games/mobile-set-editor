@@ -7,13 +7,9 @@
 // ----------------------------------------------------------------------------- : Includes
 
 #include <util/prec.hpp>
-#include <gfx/wx_image_adapter.hpp>
 #include <data/format/image_encoding.hpp>
 #include <gfx/gfx.hpp>
 #include <util/error.hpp>
-#if defined(__WXMSW__) && wxUSE_WXDIB
-#include <wx/msw/dib.h>
-#endif
 
 // ----------------------------------------------------------------------------- : Saturation
 
@@ -344,17 +340,8 @@ void thicken_image_alpha(Image& img, int radius) {
 
 // ----------------------------------------------------------------------------- : Resampled text
 
-void downsample_to_alpha(Bitmap& bmp_in, Image& img_out) {
+void downsample_to_alpha(Image& img_in, Image& img_out) {
   Byte* temp = nullptr;
-#if defined(__WXMSW__) && wxUSE_WXDIB
-  wxDIB img_in(bmp_in);
-  if (!img_in.IsOk()) return;
-  // if text_scaling = 4, then the line always is dword aligned, so we need no adjusting
-  // we created a bitmap with depth 24, so that is what we should have here
-  if (img_in.GetDepth() != 24) throw InternalError(_("DIB has wrong bit depth"));
-#else
-  Image img_in = from_bitmap(bmp_in);
-#endif
   Byte* in  = img_in.GetData();
   Byte* out = img_in.GetData();
   // scale in the x direction, this overwrites parts of the input image
@@ -407,14 +394,8 @@ void downsample_to_alpha(Bitmap& bmp_in, Image& img_out) {
   // now scale in the y direction, and write to the output alpha
   img_out.InitAlpha();
   int line_size_in = img_out.GetWidth();
-#if defined(__WXMSW__) && wxUSE_WXDIB
-  // DIBs are upside down
-  out = img_out.GetAlpha() + (img_out.GetHeight() - 1) * line_size_in;
-  int line_size_out = -line_size_in;
-#else
   out = img_out.GetAlpha();
   int line_size_out = line_size_in;
-#endif
   int h = img_out.GetHeight();
   if (img_in.GetHeight() == h * text_scaling) {
     // no stretching

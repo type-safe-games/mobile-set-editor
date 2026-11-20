@@ -307,7 +307,7 @@ void DropDownList::redrawArrowOnParent() {
       shared_ptr<RotatedDC> dcP = editor.overdrawDC();
       RotatedDC& dc = *dcP;
       Rotater r(dc, viewer->getRotation());
-      draw_drop_down_arrow(&editor, dc.getDC(), dc.getExternalRect().grow(1), IsShown());
+      draw_drop_down_arrow(&editor, wx_dc(dc), dc.getExternalRect().grow(1), IsShown());
     }
   }
 }
@@ -319,7 +319,7 @@ void DropDownList::onPaint(wxPaintEvent&) {
   draw(dc);
 }
 
-void DropDownList::draw(DC& dc) {
+void DropDownList::draw(wxDC& dc) {
   // Size
   wxSize cs = dc.GetSize();
   size_t count = itemCount();
@@ -370,7 +370,7 @@ void DropDownList::draw(DC& dc) {
   }
 }
 
-void DropDownList::drawItem(DC& dc, int y, size_t item) {
+void DropDownList::drawItem(wxDC& dc, int y, size_t item) {
   if (y + item_size.height <= 0 || y >= dc.GetSize().y) return; // not visible
   // draw background
   dc.SetPen(*wxTRANSPARENT_PEN);
@@ -388,8 +388,8 @@ void DropDownList::drawItem(DC& dc, int y, size_t item) {
     dc.SetTextForeground(wxSystemSettings::GetColour(wxSYS_COLOUR_GRAYTEXT));
   } else if (highlightItem(item)) {
     // mix a color between selection and window
-    dc.SetBrush         (lerp(wxSystemSettings::GetColour(wxSYS_COLOUR_HIGHLIGHT),
-                              wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW), 0.75));
+    dc.SetBrush         (wxColour(lerp(wxSystemSettings::GetColour(wxSYS_COLOUR_HIGHLIGHT),
+                              wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW), 0.75)));
     dc.SetTextForeground(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOWTEXT));
     dc.DrawRectangle(marginW, y, (int)item_size.width, (int)item_size.height);
   } else {

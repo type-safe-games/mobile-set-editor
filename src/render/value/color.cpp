@@ -32,7 +32,7 @@ void ColorValueViewer::draw(RotatedDC& dc) {
       }
     }
     // draw background
-    dc.SetPen(*wxTRANSPARENT_PEN);
+    dc.SetPen(Pen::none());
     dc.SetBrush(ui_color(UIColor::WINDOW));
     dc.DrawRectangle(RealRect(40, 0, dc.getWidth()-40, dc.getHeight()));
     // draw color
@@ -42,7 +42,7 @@ void ColorValueViewer::draw(RotatedDC& dc) {
     // draw name
     dc.DrawText(color_name, RealPoint(45, 3));
   } else {
-    dc.SetPen(*wxTRANSPARENT_PEN);
+    dc.SetPen(Pen::none());
     dc.SetBrush(value().value());
     // is there a mask?
     const AlphaMask& alpha_mask = getMask(dc);
@@ -54,17 +54,17 @@ void ColorValueViewer::draw(RotatedDC& dc) {
             style().top_width  < style().height && style().bottom_width < style().height;
       if (clip) {
         // clip away the inside of the rectangle
-        wxRegion r = dc.trRectToRegion(dc.getInternalRect());
-        r.Subtract(dc.trRectToRegion(RealRect(
+        CanvasRegion r = dc.trRectToRegion(dc.getInternalRect());
+        r.subtract(dc.trRectToRegion(RealRect(
           style().left_width,
           style().top_width,
           style().width  - style().left_width - style().right_width,
           style().height - style().top_width  - style().bottom_width
         )));
-        dc.getDC().SetClippingRegion(r);
+        dc.getCanvas().setClipRegion(r);
       }
       dc.DrawRoundedRectangle(dc.getInternalRect(), style().radius);
-      if (clip) dc.getDC().DestroyClippingRegion();
+      if (clip) dc.getCanvas().destroyClipRegion();
     }
     drawFieldBorder(dc);
   }

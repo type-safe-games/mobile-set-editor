@@ -78,7 +78,7 @@ public:
   const size_t start, end; ///< Start and ending indices
   RealRect  rect;          ///< Rectangle around word list text
   WordListP word_list;     ///< Word list to use
-  Bitmap    behind;        ///< Bitmap behind the button
+  Image       behind;        ///< Image behind the button
 };
 
 enum WordListItemFlags
@@ -123,7 +123,7 @@ protected:
   size_t        itemCount() const override             { return items.size(); }
   bool          lineBelow(size_t item) const override  { return items[item].flags & FLAG_LINE_BELOW; }
   String        itemText(size_t item) const override   { return items[item].name; }
-  void          drawIcon(DC& dc, int x, int y, size_t item, bool selected) const override;
+  void          drawIcon(wxDC& dc, int x, int y, size_t item, bool selected) const override;
   DropDownList* submenu(size_t item) const override;
   size_t        selection() const override;
   void          select(size_t item) override;
@@ -215,7 +215,7 @@ void DropDownWordList::addWordsFromScript(const WordListWordP& w) {
   }
 }
 
-void DropDownWordList::drawIcon(DC& dc, int x, int y, size_t item, bool selected) const {
+void DropDownWordList::drawIcon(wxDC& dc, int x, int y, size_t item, bool selected) const {
   if (has_checkboxes) {
     bool radio = !words->words[item]->is_prefix;
     // draw checkbox
@@ -891,7 +891,7 @@ void TextValueEditor::doFormat(int type) {
       data.EnableEffects(false);
       TextStyle* style = dynamic_cast<TextStyle*>(getStyle().get());
       if (style) {
-        data.SetInitialFont(style->font.toWxFont(1.0));
+        data.SetInitialFont(to_wx_font(style->font.toCanvasFont(1.0)));
       }
       wxFontDialog dial(nullptr, data);
       if (dial.ShowModal() == wxID_OK) {
@@ -990,7 +990,7 @@ void TextValueEditor::showCaret() {
       if (cursor.height == 0) {
         wxClientDC dc(&editor());
         // TODO : high quality?
-        dc.SetFont(style().font.toWxFont(1.0));
+        dc.SetFont(to_wx_font(style().font.toCanvasFont(1.0)));
         int hi;
         dc.GetTextExtent(_(" "), nullptr, &hi);
         #ifdef __WXGTK__
@@ -1385,9 +1385,9 @@ void TextValueEditor::determineSize(bool force_fit) {
   } else {
     // Height depends on font
     wxMemoryDC dc;
-    Bitmap bmp(1,1);
+    wxBitmap bmp(1,1);
     dc.SelectObject(bmp);
-    dc.SetFont(style().font.toWxFont(1.0));
+    dc.SetFont(to_wx_font(style().font.toCanvasFont(1.0)));
     bounding_box.height = dc.GetCharHeight() + 2 + style().padding_top + style().padding_bottom;
   }
 }
@@ -1507,7 +1507,7 @@ void TextValueEditor::clearWordListIndicators(RotatedDC& dc) {
     }
     // restore background
     if (wl->behind.Ok()) {
-      dc.DrawPreRotatedBitmap(wl->behind, RealRect(wl->rect.right(), wl->rect.y - 1, 10, wl->rect.height+3));
+      dc.DrawPreRotatedPlainImage(wl->behind, RealRect(wl->rect.right(), wl->rect.y - 1, 10, wl->rect.height+3));
     }
   }
 }
@@ -1548,7 +1548,7 @@ void TextValueEditor::drawWordListIndicators(RotatedDC& dc, bool redrawing) {
     }
     if (what & (DRAW_ACTIVE | DRAW_BOXES)) {
       // draw rectangle around value
-      dc.SetBrush(*wxTRANSPARENT_BRUSH);
+      dc.SetBrush(Brush::none());
       dc.DrawRectangle(r.move(-1,-1,2,2));
     }
   }
@@ -1580,9 +1580,9 @@ void TextValueEditor::drawWordListIndicators(RotatedDC& dc, bool redrawing) {
       dc.SetPen  (*wxTRANSPARENT_PEN);
       dc.SetBrush(*wxBLACK_BRUSH);
       wxPoint poly[] = {dc.tr(RealPoint(0,0)), dc.tr(RealPoint(5,0)), dc.tr(RealPoint(3,2))};
-      dc.getDC().DrawPolygon(3, poly, r.right() + 2, r.bottom() - 5);
+      wx_dc(dc).DrawPolygon(3, poly, r.right() + 2, r.bottom() - 5);
       */
-      dc.SetPen  (*wxBLACK_PEN);
+      dc.SetPen  (Color(0,0,0));
       double x = r.right(), y = r.bottom() - 1;
       dc.DrawLine(RealPoint(x + 4, y - 3), RealPoint(x + 5, y - 3));
       dc.DrawLine(RealPoint(x + 3, y - 4), RealPoint(x + 6, y - 4));

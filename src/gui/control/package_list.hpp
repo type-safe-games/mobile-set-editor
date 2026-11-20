@@ -20,9 +20,9 @@ DECLARE_POINTER_TYPE(PackageData);
 class PackageData : public IntrusivePtrVirtualBase, public IntrusiveFromThis<PackageData> {
 public:
     PackageData() {};
-    PackageData(const PackagedP& package, const Bitmap& image) : package(package), image(image) {};
+    PackageData(const PackagedP& package, const wxBitmap& image) : package(package), image(image) {};
     PackagedP package;
-    Bitmap    image;
+    wxBitmap    image;
 
     bool contains(QuickFilterPart const& query) const;
 
@@ -72,7 +72,7 @@ public:
   
 protected:
   /// Draw an item
-  void drawItem(DC& dc, int x, int y, size_t item) override;
+  void drawItem(wxDC& dc, int x, int y, size_t item) override;
   /// Return how many items there are in the list
   size_t itemCount() const override;
   

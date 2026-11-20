@@ -14,6 +14,7 @@
 
 #include <util/prec.hpp>
 #include <gfx/dc_util.hpp>
+#include <gfx/wx_canvas.hpp>
 #include <gfx/image_load.hpp>
 
 class RotatedDC;
@@ -73,25 +74,28 @@ wxImage load_resource_tool_image(const String& name);
 
 /// Draws a box for a control *around* a rect
 /** Based on wxRendererXP::DrawComboBoxDropButton */
-void draw_control_box(Window* win, DC& dc, const wxRect& rect, bool focused, bool enabled = true);
+void draw_control_box(Window* win, wxDC& dc, const wxRect& rect, bool focused, bool enabled = true);
+
+/// Fill a DC with a single color
+void clearDC(wxDC& dc, const Color& color);
 
 /// Draw a (possibly themed) button
-void draw_button(Window* win, DC& dc, const wxRect& rect, bool focused, bool down, bool enabled);
+void draw_button(Window* win, wxDC& dc, const wxRect& rect, bool focused, bool down, bool enabled);
 
 /// Draws an arrow for a menu item indicating it has a sub menu
-void draw_menu_arrow(Window* win, DC& dc, const wxRect& rect, bool active);
+void draw_menu_arrow(Window* win, wxDC& dc, const wxRect& rect, bool active);
 
 /// Draws a drop down arrow corresponding to that used by a combo box
-void draw_drop_down_arrow(Window* win, DC& dc, const wxRect& rect, bool active);
+void draw_drop_down_arrow(Window* win, wxDC& dc, const wxRect& rect, bool active);
 
 /// Draws a check box
-void draw_checkbox(const Window* win, DC& dc, const wxRect& rect, bool checked, bool enabled = true);
+void draw_checkbox(const Window* win, wxDC& dc, const wxRect& rect, bool checked, bool enabled = true);
 
 /// Draws a radio button
-void draw_radiobox(const Window* win, DC& dc, const wxRect& rect, bool checked, bool enabled = true);
+void draw_radiobox(const Window* win, wxDC& dc, const wxRect& rect, bool checked, bool enabled = true);
 
 /// Draws a (fancy) selection rectangle
-void draw_selection_rectangle(Window* win, DC& dc, const wxRect& rect, bool selected = true, bool focused = true, bool hot = false);
+void draw_selection_rectangle(Window* win, wxDC& dc, const wxRect& rect, bool selected = true, bool focused = true, bool hot = false);
 
 /// Enable fancy themed selection rectangle on windows
 void enable_themed_selection_rectangle(Window* win);

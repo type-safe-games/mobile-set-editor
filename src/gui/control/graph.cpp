@@ -10,6 +10,7 @@
 #include <gui/control/graph.hpp>
 #include <util/alignment.hpp>
 #include <gfx/gfx.hpp>
+#include <gfx/wx_canvas.hpp>
 #include <wx/dcbuffer.h>
 #include <wx/tooltip.h>
 
@@ -338,7 +339,7 @@ void BarGraph::draw(RotatedDC& dc, int current, DrawLayer layer) const {
     if (current >= 0) {
       const GraphGroup& group = axis.groups[current];
       RealRect bar = bar_graph_bar(screen_rect, current, count, 0, group.size, axis.max);
-      dc.SetPen(*wxTRANSPARENT_PEN);
+      dc.SetPen(Pen::none());
       dc.SetBrush(lerp(bg, group.color, 0.25));
       dc.DrawRectangle(bar.move(-5,-5,10,5));
       dc.SetBrush(lerp(bg, group.color, 0.5));
@@ -555,7 +556,7 @@ void ScatterGraph::draw(RotatedDC& dc, const vector<int>& current, DrawLayer lay
   double step = min(size.width / max_value_x, size.height / max_value_y) * 0.99;
   // Draw
   if (layer == LAYER_SELECTION) {
-    dc.SetPen(*wxTRANSPARENT_PEN);
+    dc.SetPen(Pen::none());
     Color bg = wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW);
     if (cur1 >= 0 && cur2 >= 0) {
       UInt value = values[cur1 * axis2.groups.size() + cur2];
@@ -729,7 +730,7 @@ void GraphStats::setData(const GraphDataP& d) {
 
 RealSize GraphStats::determineSize(RotatedDC& dc) const {
   if (values.empty()) return RealSize(-1,-1);
-  dc.SetFont(*wxNORMAL_FONT);
+  dc.SetFont(CanvasFont::systemFont());
   item_size = RealSize(0,0);
   label_width = 0;
   FOR_EACH_CONST(v, values) {
@@ -758,7 +759,7 @@ void GraphStats::draw(RotatedDC& dc, int current, DrawLayer layer) const {
     dc.SetPen(fg);
     dc.DrawRectangle(RealRect(pos,size));
     // draw items
-    dc.SetFont(*wxNORMAL_FONT);
+    dc.SetFont(CanvasFont::systemFont());
     double y = pos.y + 1;
     FOR_EACH_CONST(v, values) {
       dc.DrawText(v.first,  RealPoint(pos.x + 3,               y + 2));
@@ -773,7 +774,7 @@ void GraphStats::draw(RotatedDC& dc, int current, DrawLayer layer) const {
 RealSize GraphLegend::determineSize(RotatedDC& dc) const {
   if (!data) return RealSize(-1,-1);
   GraphAxis& axis = axis_data();
-  dc.SetFont(*wxNORMAL_FONT);
+  dc.SetFont(CanvasFont::systemFont());
   item_size = RealSize(0,0);
   FOR_EACH(g, axis.groups) {
     RealSize this_item_size = dc.GetTextExtent(g.name);
@@ -797,14 +798,14 @@ void GraphLegend::draw(RotatedDC& dc, int current, DrawLayer layer) const {
     dc.SetPen(fg);
     dc.DrawRectangle(RealRect(pos,size));
     // draw items
-    dc.SetFont(*wxNORMAL_FONT);
+    dc.SetFont(CanvasFont::systemFont());
     double y = pos.y + 1;
     for (int j = 0 ; j < (int)axis.groups.size() ; ++j) {
       int i = reverse ? (int)axis.groups.size() - j - 1 : j;
       const GraphGroup& g = axis.groups[i];
       if (i == current) {
         dc.SetBrush(lerp(bg,g.color,0.5));
-        dc.SetPen(*wxTRANSPARENT_PEN);
+        dc.SetPen(Pen::none());
         dc.DrawRectangle(RealRect(pos.x+1, y, item_size.width, item_size.height + 1));
         dc.SetPen(fg);
       }
@@ -834,7 +835,7 @@ void GraphLabelAxis::draw(RotatedDC& dc, int current, DrawLayer layer) const {
   GraphAxis& axis = axis_data();
   int count = int(axis.groups.size());
   // Draw
-  dc.SetFont(*wxNORMAL_FONT);
+  dc.SetFont(CanvasFont::systemFont());
   Color bg = wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW);
   Color fg = wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOWTEXT);
   if (layer == LAYER_SELECTION && current >= 0) {
@@ -843,13 +844,13 @@ void GraphLabelAxis::draw(RotatedDC& dc, int current, DrawLayer layer) const {
     if (direction == HORIZONTAL) {
       double width = screen_rect.width / count; // width of an item
       dc.SetBrush(lerp(bg,group.color,0.5));
-      dc.SetPen(*wxTRANSPARENT_PEN);
+      dc.SetPen(Pen::none());
       RealSize text_size = dc.GetTextExtent(group.name);
       dc.DrawRectangle(RealRect(screen_rect.x + current * width, screen_rect.bottom(), width, text_size.height + 5));
     } else {
       double height = screen_rect.height / count;
       dc.SetBrush(lerp(bg,group.color,0.5));
-      dc.SetPen(*wxTRANSPARENT_PEN);
+      dc.SetPen(Pen::none());
       dc.DrawRectangle(RealRect(screen_rect.x, screen_rect.bottom() - (current+1)*height, -78, height));
     }
   } else if (layer == LAYER_AXES) {
@@ -932,7 +933,7 @@ void GraphValueAxis::draw(RotatedDC& dc, int current, DrawLayer layer) const {
   RealRect screen_rect = dc.getInternalRect();
   GraphAxis& axis = axis_data();
   double step_height = screen_rect.height / axis.max; // height of a single value
-  dc.SetFont(*wxNORMAL_FONT);
+  dc.SetFont(CanvasFont::systemFont());
   int label_step = (int) ceil(max(1.0, (dc.GetCharHeight()) / step_height)); // values per labeled line
   // Colors
   Color bg = wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW);
@@ -944,8 +945,8 @@ void GraphValueAxis::draw(RotatedDC& dc, int current, DrawLayer layer) const {
     if (i % label_step == 0 || i == highlight) {
       // highlight?
       if (i == highlight) {
-        wxFont font(*wxNORMAL_FONT);
-        font.SetWeight(wxFONTWEIGHT_BOLD);
+        CanvasFont font = CanvasFont::systemFont();
+        font.bold = true;
         dc.SetFont(font);
         dc.SetPen(fg);
       }
@@ -962,7 +963,7 @@ void GraphValueAxis::draw(RotatedDC& dc, int current, DrawLayer layer) const {
       }
       // restore font/pen
       if (i == highlight) {
-        dc.SetFont(*wxNORMAL_FONT);
+        dc.SetFont(CanvasFont::systemFont());
         dc.SetPen(lerp(bg, fg, 0.2));
       }
     }
@@ -1099,9 +1100,10 @@ void GraphControl::onPaint(wxPaintEvent&) {
   wxBufferedPaintDC dc(this);
   try {
     wxSize cs = GetClientSize();
-    RotatedDC rdc(dc, 0, RealRect(RealPoint(0,0),cs), 1, QUALITY_LOW);
-    rdc.SetPen(*wxTRANSPARENT_PEN);
-    rdc.SetBrush(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW));
+    WxCanvas canvas(dc);
+    RotatedDC rdc(canvas, 0, RealRect(RealPoint(0,0),cs), 1, QUALITY_LOW);
+    rdc.SetPen(Pen::none());
+    rdc.SetBrush(Color(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW)));
     rdc.DrawRectangle(rdc.getInternalRect());
     if (graph) {
       for (int layer = LAYER_BOTTOM ; layer < LAYER_COUNT ; ++layer) {

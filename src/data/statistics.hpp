@@ -33,7 +33,7 @@ public:
   int               position_hint;      ///< Hint for the ordering
   String            icon_filename;      ///< Icon for lists
   String            dark_icon_filename; ///< Icon for lists, if a variant for dark mode is needed
-  Bitmap            icon;               ///< The loaded icon (optional of course)
+  Image             icon;               ///< The loaded icon (optional of course)
   OptionalScript    script;             ///< Script that determines the value(s), ran on each card
   OptionalScript    global_script;      ///< Script that determines the value(s), ran only once at the start
   bool              numeric;            ///< Are the values numeric? If so, they require special sorting
@@ -61,7 +61,7 @@ public:
   int                     position_hint;      ///< Hint for the ordering
   String                  icon_filename;      ///< Icon for lists
   String                  dark_icon_filename; ///< Icon for lists when a variant for dark mode is needed
-  Bitmap                  icon;               ///< The loaded icon (optional of course)
+  Image                   icon;               ///< The loaded icon (optional of course)
   vector<String>          dimension_names;    ///< Names of the dimensions to use
   vector<StatsDimensionP> dimensions;         ///< Actual dimensions
   GraphType               type;               ///< Type of graph to use

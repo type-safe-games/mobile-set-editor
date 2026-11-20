@@ -99,13 +99,13 @@ public:
   /** *combine should be set to the combine value of the style.
    *  It will be overwritten if the image specifies a non-default combine.
    *  After this call, either:
-   *     -    combine <= COMBINE_NORMAL && bitmap->Ok()
+   *     -    combine <= COMBINE_NORMAL && bitmap->Ok() (an image to draw as it is)
    *     - or combine >  COMBINE_NORMAL && image->Ok()
    *  Optionally, an alpha mask is applied to the image.
    */
   void generateCached(const GeneratedImage::Options& img_options,
                       CachedScriptableMask* mask,
-                      ImageCombine* combine, wxBitmap* bitmap, Image* image, RealSize* size);
+                      ImageCombine* combine, Image* bitmap, Image* image, RealSize* size);
   
   /// Update the script, returns true if the value has changed
   bool update(Context& ctx);
@@ -115,7 +115,7 @@ public:
   
 private:
   Image          cached_i; ///< The cached image
-  Bitmap         cached_b; ///< *or* the cached bitmap
+  Image          cached_b; ///< *or* the cached image to draw as it is
   RealSize       cached_size; ///< The size of the image before rotating, may be different than the options size
   /// The options as they were last specified
   RealSize       cached_options_size = RealSize(-1.0,-1.0);

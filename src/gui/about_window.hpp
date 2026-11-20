@@ -26,13 +26,13 @@ private:
   DECLARE_EVENT_TABLE();
   
   // MSE logos
-  Bitmap logo;
+  wxBitmap logo;
   #if USE_BETA_LOGO
-    Bitmap logo2;
+    wxBitmap logo2;
   #endif
   
   void onPaint(wxPaintEvent&);
-  void draw(DC& dc);
+  void draw(wxDC& dc);
 };
 
 // ----------------------------------------------------------------------------- : Button with hover effect
@@ -66,7 +66,7 @@ protected:
   bool hover, focus, mouse_down, key_down;
   String help_text;
   
-  virtual void draw(DC& dc) = 0;
+  virtual void draw(wxDC& dc) = 0;
   virtual void refreshIfNeeded();
   virtual void onClick();
 };
@@ -87,17 +87,17 @@ public:
   
 private:
   String bitmaps; ///< Name of the loaded bitmaps
-  Bitmap bg_normal, bg_hover, bg_focus, bg_down; ///< Bitmaps for the states of the button
+  wxBitmap bg_normal, bg_hover, bg_focus, bg_down; ///< Bitmaps for the states of the button
   Color background;
   
   wxSize DoGetBestSize() const override;
   
-  const Bitmap* last_drawn;
-  const Bitmap* toDraw() const;
+  const wxBitmap* last_drawn;
+  const wxBitmap* toDraw() const;
 protected:
   int drawDelta() const;
   void refreshIfNeeded() override;
-  void draw(DC& dc) override;
+  void draw(wxDC& dc) override;
 };
 
 

@@ -147,7 +147,7 @@ public:
 
   // --------------------------------------------------- : Data
 private:
-  Bitmap bitmap;
+  wxBitmap bitmap;
   ImageSlice& slice;
   const AlphaMask& mask;
   
@@ -167,7 +167,7 @@ private:
   void onLoseCapture(wxMouseCaptureLostEvent&);
   
   void onPaint(wxPaintEvent&);
-  void draw(DC& dc);
+  void draw(wxDC& dc);
 };
 
 // ----------------------------------------------------------------------------- : ImageSliceSelector
@@ -183,7 +183,7 @@ public:
   // --------------------------------------------------- : Data
 private:
   ImageSlice& slice;
-  Bitmap bitmap, bitmap_no_sel;  ///< Bitmaps showing selection
+  wxBitmap bitmap, bitmap_no_sel;  ///< Bitmaps showing selection
   
   bool mouse_down;
   int mouseX, mouseY;      ///< starting mouse position
@@ -210,9 +210,9 @@ private:
   // Return the position of a handle, dx,dy in {-1,0,1}
   wxPoint handlePos(int dx, int dy) const;
   
-  void draw(DC& dc);
+  void draw(wxDC& dc);
   // Draw a handle, dx and dy indicate the side, can be {-1,0,1}
-  void drawHandle(DC& dc, int dx, int dy);
+  void drawHandle(wxDC& dc, int dx, int dy);
   void createBitmap();
   
   

@@ -30,7 +30,7 @@ public:
   // --------------------------------------------------- : Drawing
   
   /// Draw the current (card/data) to the given dc
-  virtual void draw(DC& dc);
+  virtual void draw(Canvas& dc);
   /// Draw the current (card/data) to the given dc
   virtual void draw(RotatedDC& dc, const Color& background);
   /// Draw a single viewer

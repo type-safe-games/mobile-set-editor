@@ -13,6 +13,7 @@
 #include <data/stylesheet.hpp>
 #include <data/settings.hpp>
 #include <render/value/viewer.hpp>
+#include <gfx/wx_canvas.hpp>
 #include <wx/dcbuffer.h>
 #include <gui/window_id.hpp>
 
@@ -102,7 +103,7 @@ void CardViewer::onPaint(wxPaintEvent&) {
     return; // empty bitmaps are not allowed because some idiots think that 0 is not a number
   }
   if (!buffer.Ok() || buffer.GetWidth() != cs.GetWidth() || buffer.GetHeight() != cs.GetHeight()) {
-    buffer = Bitmap(cs.GetWidth(), cs.GetHeight());
+    buffer = wxBitmap(cs.GetWidth(), cs.GetHeight());
     up_to_date = false;
   }
   wxBufferedPaintDC dc(this, buffer);
@@ -121,7 +122,8 @@ void CardViewer::onPaint(wxPaintEvent&) {
     up_to_date = true;
     full_repaint = true;
     try {
-      draw(dc);
+      WxCanvas canvas(dc);
+      draw(canvas);
     } CATCH_ALL_ERRORS(false); // don't show message boxes in onPaint!
     full_repaint = false;
   }
@@ -172,9 +174,11 @@ void CardViewer::onTimer(wxTimerEvent& ev) {
 class CardViewer::OverdrawDC_aux : private wxClientDC {
 protected:
   wxBufferedDC bufferedDC;
+  WxCanvas     overdraw_canvas;
   
   OverdrawDC_aux(CardViewer* window)
     : wxClientDC(window)
+    , overdraw_canvas(bufferedDC)
   {
     bufferedDC.Init((wxClientDC*)this, window->buffer);
   }
@@ -183,7 +187,7 @@ class CardViewer::OverdrawDC : private OverdrawDC_aux, public RotatedDC {
 public:
   OverdrawDC(CardViewer* window)
     : OverdrawDC_aux(window)
-    , RotatedDC(bufferedDC, window->getRotation(), QUALITY_LOW)
+    , RotatedDC(overdraw_canvas, window->getRotation(), QUALITY_LOW)
   {}
 };
 

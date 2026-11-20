@@ -12,6 +12,7 @@
 #include <data/symbol.hpp>
 #include <gui/symbol/selection.hpp>
 #include <render/symbol/viewer.hpp>
+#include <gfx/wx_canvas.hpp>
 
 class SymbolWindow;
 DECLARE_POINTER_TYPE(SymbolEditorBase);
@@ -73,12 +74,20 @@ public:
     ZOOM_DENSE_GRID = 120,  ///< from this zoom level on, the grid is twice as dense
   };
 
+  /// Highlight a part on a wx DC (the editors draw on one)
+  template <typename Part>
+  void highlightPart(wxDC& dc, const Part& part, HighlightStyle style) {
+    WxCanvas canvas(dc);
+    SymbolViewer::highlightPart(canvas, part, style);
+  }
+  using SymbolViewer::highlightPart;
+
 private:
   /// Switch the a different editor object
   void switchEditor(const SymbolEditorBaseP& e);
     
   /// Draw the editor
-  void draw(DC& dc);
+  void draw(wxDC& dc);
   
   /// Apply zoom_percent and view_center to the viewer
   void updateView();

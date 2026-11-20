@@ -25,7 +25,7 @@ void TextValueViewer::draw(RotatedDC& dc) {
   // draw background
   if (nativeLook()) {
     dc.SetBrush(ui_color(UIColor::WINDOW));
-    dc.SetPen(*wxTRANSPARENT_PEN);
+    dc.SetPen(Pen::none());
     dc.DrawRectangle(RealRect(0, 0, dc.getWidth(), dc.getHeight()));
   }
   if (!v.prepared()) {

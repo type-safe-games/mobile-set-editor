@@ -24,7 +24,7 @@ public:
   struct Item{
     String package_name;
     String name;
-    Bitmap image;
+    Image image;
   };
 protected:
   vector<Item> items;

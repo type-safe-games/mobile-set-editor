@@ -7,7 +7,6 @@
 // ----------------------------------------------------------------------------- : Includes
 
 #include <util/prec.hpp>
-#include <gfx/wx_image_adapter.hpp>
 #include <script/image.hpp>
 #include <script/context.hpp>
 #include <script/to_value.hpp>
@@ -94,7 +93,7 @@ template <> void GetDefaultMember::handle(const ScriptableImage& s) {
 
 void CachedScriptableImage::generateCached(const GeneratedImage::Options& options,
                                          CachedScriptableMask* mask,
-                                         ImageCombine* combine, wxBitmap* bitmap, Image* image, RealSize* size) {
+                                         ImageCombine* combine, Image* bitmap, Image* image, RealSize* size) {
   assert(image && bitmap);
   // ready?
   if (!isReady()) {
@@ -165,7 +164,7 @@ void CachedScriptableImage::generateCached(const GeneratedImage::Options& option
     cached_i = rotate_image(cached_i, options.angle);
   }
   if (*combine <= COMBINE_NORMAL) {
-    *bitmap = cached_b = to_bitmap(cached_i);
+    *bitmap = cached_b = cached_i;
     cached_i = Image();
   } else {
     *image = cached_i;
@@ -183,7 +182,7 @@ bool CachedScriptableImage::update(Context& ctx) {
 
 void CachedScriptableImage::clearCache() {
   cached_i = Image();
-  cached_b = Bitmap();
+  cached_b = Image();
 }
 
 

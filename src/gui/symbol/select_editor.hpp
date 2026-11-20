@@ -25,16 +25,16 @@ public:
   
   // --------------------------------------------------- : Drawing
   
-  void draw(DC& dc) override;
+  void draw(wxDC& dc) override;
   
 private:
   /// Draw handles on all sides
-  void drawHandles(DC& dc);
+  void drawHandles(wxDC& dc);
   /// Draw a handle, dx and dy indicate the side, can be {-1,0,1}
-  void drawHandle(DC& dc, int dx, int dy);
+  void drawHandle(wxDC& dc, int dx, int dy);
   
   /// Draw the rotation center
-  void drawRotationCenter(DC& dc, const Vector2D& pos);
+  void drawRotationCenter(wxDC& dc, const Vector2D& pos);
   
 public:
   // --------------------------------------------------- : UI
@@ -96,9 +96,9 @@ private:
   wxCursor cursorRotate;
   wxCursor cursorShearX;
   wxCursor cursorShearY;
-  Bitmap handleRotateTL, handleRotateTR, handleRotateBL, handleRotateBR;
-  Bitmap handleShearX, handleShearY;
-  Bitmap handleCenter;
+  wxBitmap handleRotateTL, handleRotateTR, handleRotateBL, handleRotateBR;
+  wxBitmap handleShearX, handleShearY;
+  wxBitmap handleCenter;
 
   /// Is the mouse on a scale/rotate handle?
   bool onHandle(const Vector2D& mpos, int dx, int dy);

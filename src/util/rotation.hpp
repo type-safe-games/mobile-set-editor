@@ -11,6 +11,7 @@
 #include <util/prec.hpp>
 #include <util/real_point.hpp>
 #include <gfx/gfx.hpp>
+#include <gfx/canvas.hpp>
 
 class FontRef;
 
@@ -83,7 +84,7 @@ public:
   /// Translate a rectangle, returns the bounding box, the size will be non-negative
   RealRect trRectToBB(const RealRect& r) const;
   /// Translate a rectangle into a region (supports rotation)
-  wxRegion trRectToRegion(const RealRect& rect) const;
+  CanvasRegion trRectToRegion(const RealRect& rect) const;
   
   /// Translate a size or length back to internal 'coordinates'
   inline double   trInvS(double s)           const { return s / zoomY; }
@@ -141,18 +142,13 @@ enum RenderQuality {
   QUALITY_AA,      ///< Our own anti aliassing
 };
 
-#if wxVERSION_NUMBER < 2900
-  // argument type to SetLogicalFunction
-  typedef int wxRasterOperationMode;
-#endif
-
-/// A DC with rotation applied
+/// A Canvas with rotation applied
 /** All draw** functions take internal coordinates.
  */
 class RotatedDC : public Rotation {
 public:
-  RotatedDC(DC& dc, Radians angle, const RealRect& rect, double zoom, RenderQuality quality, RotationFlags flags = ROTATION_NORMAL);
-  RotatedDC(DC& dc, const Rotation& rotation, RenderQuality quality);
+  RotatedDC(Canvas& canvas, Radians angle, const RealRect& rect, double zoom, RenderQuality quality, RotationFlags flags = ROTATION_NORMAL);
+  RotatedDC(Canvas& canvas, const Rotation& rotation, RenderQuality quality);
   
   // --------------------------------------------------- : Drawing
   
@@ -161,13 +157,13 @@ public:
   void DrawText  (const String& text, const RealPoint& pos, Color color, int blur_radius = 0, Color stroke_color = Color(0,0,0), int stroke_radius = 0, double stretch = 1.0);
   /// Draw text with a shadow or stroke, and color settings of the given font
   void DrawTextWithShadowOrStroke(const String& text, const FontRef& font, const RealPoint& pos, double scale = 1.0, double stretch = 1.0);
-  /// Draw abitmap, it must already be zoomed!
-  void DrawBitmap(const Bitmap& bitmap, const RealPoint& pos);
+  /// Draw an image as it is (no combine mode, but with its mask), it must already be zoomed!
+  void DrawPlainImage(const Image& image, const RealPoint& pos);
   /// Draw an image using the given combining mode, the image must already be zoomed!
   void DrawImage (const Image& image,   const RealPoint& pos, ImageCombine combine = COMBINE_DEFAULT);
-  /// Draw a bitmap that is already zoomed and rotated.
+  /// Draw an image that is already zoomed and rotated, as it is (no combine mode, but with its mask).
   /** The rectangle the position in internal coordinates, and the size before rotating and zooming */
-  void DrawPreRotatedBitmap(const Bitmap& bitmap, const RealRect& rect);
+  void DrawPreRotatedPlainImage(const Image& image, const RealRect& rect);
   /// Draw an image that is already zoomed and rotated
   void DrawPreRotatedImage(const Image& image, const RealRect& rect, ImageCombine combine = COMBINE_DEFAULT);
   void DrawLine  (const RealPoint& p1,  const RealPoint& p2);
@@ -187,12 +183,13 @@ public:
   // --------------------------------------------------- : Properties
   
   /// Sets the pen for the dc, does not scale the line width
-  void SetPen(const wxPen&);
-  void SetBrush(const wxBrush&);
+  void SetPen(const Pen&);
+  void SetBrush(const Brush&);
   void SetTextForeground(const Color&);
-  void SetLogicalFunction(wxRasterOperationMode function);
+  void SetRasterOp(RasterOp op);
   
-  void SetFont(const wxFont& font);
+  /// Set a font, scales its point size for zoom and high quality
+  void SetFont(CanvasFont font);
   /// Set the font, scales for zoom and high_quality
   /** The font size will be multiplied by 'scale' */
   void SetFont(const FontRef& font, double scale);
@@ -208,12 +205,12 @@ public:
   // --------------------------------------------------- : Other
   
   /// Get the current contents of the given ractangle, for later restoring
-  Bitmap GetBackground(const RealRect& r);
+  Image GetBackground(const RealRect& r);
   
-  inline wxDC& getDC() { return dc; }
+  inline Canvas& getCanvas() { return canvas; }
   
 private:
-  wxDC& dc;        ///< The actual dc
+  Canvas& canvas;  ///< The actual canvas
   RenderQuality quality;  ///< Quality of the text
 };
 

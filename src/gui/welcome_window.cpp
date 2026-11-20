@@ -84,11 +84,11 @@ void WelcomeWindow::onPaint(wxPaintEvent&) {
   draw(dc);
 }
 
-void WelcomeWindow::draw(DC& dc) {
+void WelcomeWindow::draw(wxDC& dc) {
   wxSize ws = GetClientSize();
   // draw background
   dc.SetPen  (*wxTRANSPARENT_PEN);
-  dc.SetBrush(settings.darkModeColor());
+  dc.SetBrush(wxColour(settings.darkModeColor()));
   dc.DrawRectangle(0, 0, ws.GetWidth(), ws.GetHeight());
   // draw logo
   dc.DrawBitmap(logo,  (ws.GetWidth() -  logo.GetWidth()) / 2, 5);
@@ -175,7 +175,7 @@ HoverButtonExt::HoverButtonExt(Window* parent, int id, const wxImage& icon, cons
   , font_small(8,  wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL, false, _("Arial"))
 {}
 
-void HoverButtonExt::draw(DC& dc) {
+void HoverButtonExt::draw(wxDC& dc) {
   // draw button
   HoverButton::draw(dc);
   int d = drawDelta();

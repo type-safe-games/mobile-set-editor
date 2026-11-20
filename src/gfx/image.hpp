@@ -24,7 +24,7 @@
  *     (<mse-card-data>/<mse-crop-data>) that is written as the PNG description.
  *
  *  Decoding and encoding go through the ImageCodec (gfx/image_codec.hpp).
- *  Conversion to and from wx (for drawing on a DC) is in gfx/wx_image_adapter.hpp.
+ *  Conversion to and from wx (for the wx canvas and the GUI) is in gfx/wx_image_adapter.hpp.
  */
 
 // ----------------------------------------------------------------------------- : Includes

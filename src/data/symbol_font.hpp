@@ -74,8 +74,8 @@ public:
   
   /// The description of this font's 'insert symbol' menu, or nullptr if it has none
   const InsertSymbolMenu* insertSymbolMenu() const { return insert_symbol_menu.get(); }
-  /// Preview image of the symbol an 'insert symbol' menu item inserts, or an invalid bitmap if there is none
-  Bitmap insertSymbolPreview(const InsertSymbolMenu& item, wxSize size);
+  /// Preview image of the symbol an 'insert symbol' menu item inserts, or an invalid image if there is none
+  Image insertSymbolPreview(const InsertSymbolMenu& item, wxSize size);
   /// The host's built 'insert symbol' menu, owned and cached by this font (the desktop gui keeps a wxMenu here)
   shared_ptr<void> insert_symbol_menu_ui;
     

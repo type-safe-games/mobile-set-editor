@@ -74,8 +74,8 @@ private:
   DECLARE_EVENT_TABLE();
   GameP game;
   void onPaint(wxPaintEvent&);
-  void draw(DC& dc);
-  void drawItem(DC& dc, int& y, const String& name, double value);
+  void draw(wxDC& dc);
+  void drawItem(wxDC& dc, int& y, const String& name, double value);
   PackGenerator& generator;
   bool show_all;
 };
@@ -84,7 +84,7 @@ void PackTotalsPanel::onPaint(wxPaintEvent&) {
   wxBufferedPaintDC dc(this);
   draw(dc);
 }
-void PackTotalsPanel::draw(DC& dc) {
+void PackTotalsPanel::draw(wxDC& dc) {
   // clear background
   dc.SetPen(*wxTRANSPARENT_PEN);
   dc.SetBrush(wxSystemSettings::GetColour(wxSYS_COLOUR_3DFACE));
@@ -113,7 +113,7 @@ void PackTotalsPanel::draw(DC& dc) {
   y += 7;
   drawItem(dc, y, _LABEL_("total cards"), total);
 }
-void PackTotalsPanel::drawItem(DC& dc, int& y,  const String& name, double value) {
+void PackTotalsPanel::drawItem(wxDC& dc, int& y,  const String& name, double value) {
   wxSize size = dc.GetSize();
   int w,h;
   String amount = wxString::Format(_("%.f"),value).ToStdWstring();
@@ -161,7 +161,7 @@ public:
     , interactive(interactive)
     , buddy(nullptr)
   {}
-  void draw(DC& dc) override {
+  void draw(wxDC& dc) override {
     Color bg = wxSystemSettings::GetColour(wxSYS_COLOUR_3DFACE);
     Color fg = wxSystemSettings::GetColour(wxSYS_COLOUR_BTNTEXT);
     // clear background
@@ -169,7 +169,7 @@ public:
     //dc.SetBrush(mouse_down ? wxSystemSettings::GetColour(wxSYS_COLOUR_HIGHLIGHT)
     //                       : hover ? lerp(bg,fg,0.1) : bg);
     //dc.SetTextForeground(mouse_down ? wxSystemSettings::GetColour(wxSYS_COLOUR_HIGHLIGHTTEXT) : fg);
-    dc.SetBrush(interactive && hover ? lerp(bg,fg,0.1) : bg);
+    dc.SetBrush(wxColour(interactive && hover ? lerp(bg,fg,0.1) : bg));
     dc.SetTextForeground(fg);
     wxSize size = dc.GetSize();
     dc.DrawRectangle(0,0,size.x,size.y);

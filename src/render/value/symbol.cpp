@@ -7,7 +7,6 @@
 // ----------------------------------------------------------------------------- : Includes
 
 #include <util/prec.hpp>
-#include <gfx/wx_image_adapter.hpp>
 #include <util/io/package.hpp>
 #include <render/value/symbol.hpp>
 #include <render/symbol/filter.hpp>
@@ -37,7 +36,7 @@ void SymbolValueViewer::draw(RotatedDC& dc) {
         Image img = render_symbol(symbol, *variation->filter, variation->border_radius, int(200 * ar), 200);
         Image resampled(int(wh * ar), int(wh), false);
         resample(img, resampled);
-        symbols.push_back(to_bitmap(resampled));
+        symbols.push_back(resampled);
       }
     } catch (const Error& e) {
       handle_error(e);
@@ -47,7 +46,7 @@ void SymbolValueViewer::draw(RotatedDC& dc) {
   int x = 0;
   for (size_t i = 0 ; i < symbols.size() ; ++i) {
     // todo : labels?
-    dc.DrawBitmap(symbols[i], RealPoint(x, 0));
+    dc.DrawPlainImage(symbols[i], RealPoint(x, 0));
     x += symbols[i].GetWidth() + 2;
   }
 }

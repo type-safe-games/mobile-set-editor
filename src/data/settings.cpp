@@ -346,8 +346,8 @@ String Settings::darkModePrefix() {
 }
 
 Color Settings::darkModeColor() {
-  if (darkMode()) return wxColor(15,8,0);
-  return wxColor(240,247,255);
+  if (darkMode()) return Color(15,8,0);
+  return Color(240,247,255);
 }
 
 IMPLEMENT_REFLECTION_NO_SCRIPT(Settings) {

@@ -33,7 +33,7 @@ size_t PackageList::itemCount() const {
   return filtered_packages.size();
 }
 
-void PackageList::drawItem(DC& dc, int x, int y, size_t item) {
+void PackageList::drawItem(wxDC& dc, int x, int y, size_t item) {
   dc.SetClippingRegion(x+1, y+2, item_size.x-2, item_size.y-2);
   PackageDataP& d = filtered_packages.at(item);
   RealRect rect(RealPoint(x,y),item_size);
@@ -91,7 +91,7 @@ void PackageList::showData(const String& pattern) {
     PROFILER(_("load package image"));
     auto stream = p->openIconFile();
     Image img;
-    Bitmap bmp;
+    wxBitmap bmp;
     if (stream && image_load_file(img, *stream)) {
       bmp = to_bitmap(img);
       if (bmp.GetWidth() > 150 || bmp.GetHeight() > 150) {

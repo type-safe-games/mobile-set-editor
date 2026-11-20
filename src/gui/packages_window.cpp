@@ -49,7 +49,7 @@ private:
   DECLARE_EVENT_TABLE();
   
   void onPaint(wxPaintEvent&);
-  void draw(DC&);
+  void draw(wxDC&);
 };
 
 PackageInfoPanel::PackageInfoPanel(Window* parent)
@@ -67,7 +67,7 @@ void PackageInfoPanel::onPaint(wxPaintEvent&) {
     draw(dc);
   } CATCH_ALL_ERRORS(false); // don't show message boxes in onPaint!
 }
-void PackageInfoPanel::draw(DC& dc) {
+void PackageInfoPanel::draw(wxDC& dc) {
   wxSize cs = GetClientSize();
   dc.SetPen(*wxTRANSPARENT_PEN);
   dc.SetBrush(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW));

@@ -19,7 +19,7 @@ IMPLEMENT_DYNAMIC_ARG(StyleSheet*, stylesheet_for_reading, nullptr);
 
 StyleSheet::StyleSheet()
   : card_width(100), card_height(100)
-  , card_dpi(96), card_background(*wxWHITE)
+  , card_dpi(96), card_background(Color(255,255,255))
   , dependencies_initialized(false)
 {}
 

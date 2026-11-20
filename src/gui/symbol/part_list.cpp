@@ -408,7 +408,7 @@ bool SymbolPartList::updateLayers(const SymbolGroup& group, int& layer, bool& dr
   return any_shape;
 }
 
-void SymbolPartList::OnDraw(DC& dc) {
+void SymbolPartList::OnDraw(wxDC& dc) {
   // init
   dc.SetFont(*wxNORMAL_FONT);
   // clear background
@@ -434,7 +434,7 @@ void SymbolPartList::OnDraw(DC& dc) {
   }
 }
 
-void SymbolPartList::drawItem(DC& dc, int x, int& i, bool parent_active, const SymbolPartP& part) {
+void SymbolPartList::drawItem(wxDC& dc, int x, int& i, bool parent_active, const SymbolPartP& part) {
   wxSize size = GetClientSize();
   int w = size.x - x;
   int y = i * (ITEM_HEIGHT + 1);
@@ -448,12 +448,12 @@ void SymbolPartList::drawItem(DC& dc, int x, int& i, bool parent_active, const S
   Color tint = lerp(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW),
                     wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOWTEXT), 0.06);
   if (tinted) {
-    dc.SetBrush(tint);
+    dc.SetBrush(wxColour(tint));
     dc.DrawRectangle(x,y,w,ITEM_HEIGHT);
   }
   if (active) {
     background = wxSystemSettings::GetColour(wxSYS_COLOUR_HIGHLIGHT);
-    dc.SetBrush(background);
+    dc.SetBrush(wxColour(background));
     dc.DrawRectangle(x,y,w,ITEM_HEIGHT);
     dc.SetTextForeground(wxSystemSettings::GetColour(wxSYS_COLOUR_HIGHLIGHTTEXT));
   } else if (parent_active) {
@@ -463,14 +463,14 @@ void SymbolPartList::drawItem(DC& dc, int x, int& i, bool parent_active, const S
     background = tinted ? tint : Color(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW));
     dc.SetTextForeground(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOWTEXT));
   }
-  wxPen line_pen = lerp(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW),
-            wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOWTEXT),0.5);
+  wxPen line_pen = wxColour(lerp(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW),
+            wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOWTEXT),0.5));
   if (part != symbol) {
     // draw item : name
     int h = dc.GetCharHeight();
     dc.DrawText(part->name, ITEM_HEIGHT + x + 3, y + (ITEM_HEIGHT - h) / 2);
     // draw item : icon
-    dc.SetBrush(lerp(background,wxColour(0,128,0),0.7));
+    dc.SetBrush(wxColour(lerp(background,wxColour(0,128,0),0.7)));
     dc.DrawRectangle(x,y,ITEM_HEIGHT,ITEM_HEIGHT);
     dc.DrawBitmap(to_bitmap(symbolPreview()),     x, y);
     dc.DrawBitmap(to_bitmap(itemPreview(i,part)), x, y);
@@ -497,7 +497,7 @@ void SymbolPartList::drawItem(DC& dc, int x, int& i, bool parent_active, const S
   int new_y = i * (ITEM_HEIGHT + 1); // after children
   if (old_y != new_y && part != symbol) {
     dc.SetPen(line_pen);
-    dc.SetBrush(background);
+    dc.SetBrush(wxColour(background));
     dc.DrawRectangle(x-1,old_y-1,5+1,new_y-old_y+1);
   }
   // Drop indicator?
@@ -567,7 +567,7 @@ const Image& SymbolPartList::symbolPreview() {
   return symbol_preview.image;
 }
 
-void SymbolPartList::updateCaret(DC& dc, int x, int y, int h, const SymbolPartP& part) {
+void SymbolPartList::updateCaret(wxDC& dc, int x, int y, int h, const SymbolPartP& part) {
   int top; GetViewStart(0, &top);
   // make caret
   wxCaret* caret = GetCaret();

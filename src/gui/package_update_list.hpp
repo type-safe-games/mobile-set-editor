@@ -49,7 +49,7 @@ public:
 protected:
   // overridden methods from TreeList
   void initItems() override;
-  void drawItem(DC& dc, size_t index, size_t column, int x, int y, bool selected) const override;
+  void drawItem(wxDC& dc, size_t index, size_t column, int x, int y, bool selected) const override;
 
   size_t columnCount() const override { return 3; }
   String columnText(size_t column) const override;
@@ -104,7 +104,7 @@ private:
     String label;
     vector<TreeItemP> children;
     InstallablePackageP package;
-    Bitmap icon, icon_grey;
+    wxBitmap icon, icon_grey;
     // positioning
     enum PackageType {
       TYPE_PROG,

@@ -45,26 +45,16 @@ Rotation ValueViewer::getRotation() const {
   return Rotation(deg_to_rad(getStyle()->angle), bounding_box, 1.0, getStretch());
 }
 
-#if defined(__WXMSW__)
-  // on windows, wxDOT is not actually dotted, so use a custom style to achieve that
-  static wxDash dashes_dotted[] = { 0,2 };
-  wxPen dotted_pen(wxColour const& color) {
-    wxPen pen(color, 1, wxPENSTYLE_USER_DASH);
-    pen.SetDashes(2, dashes_dotted);
-    return pen;
-  }
-#else
-  wxPen dotted_pen(wxColour const& color) {
-    return wxPen(color, 1, wxPENSTYLE_DOT);
-  }
-#endif
+Pen dotted_pen(Color color) {
+  return Pen(color, 1, PenStyle::DOT);
+}
 
 bool ValueViewer::setFieldBorderPen(RotatedDC& dc) {
   if (!getField()->editable) return false;
   DrawWhat what = drawWhat();
   if (!(what & DRAW_BORDERS)) return false;
   if (what & DRAW_ACTIVE) {
-    dc.SetPen(wxPen(Color(0, 128, 255), 1, wxPENSTYLE_SOLID));
+    dc.SetPen(Pen(Color(0, 128, 255), 1, PenStyle::SOLID));
   } else if (what & DRAW_HOVER) {
     dc.SetPen(dotted_pen(Color(0, 128, 255)));
   } else {
@@ -75,7 +65,7 @@ bool ValueViewer::setFieldBorderPen(RotatedDC& dc) {
 
 void ValueViewer::drawFieldBorder(RotatedDC& dc) {
   if (setFieldBorderPen(dc)) {
-    dc.SetBrush(*wxTRANSPARENT_BRUSH);
+    dc.SetBrush(Brush::none());
     const AlphaMask& alpha_mask = getMask(dc);
     if (alpha_mask.isLoaded()) {
       // from mask
@@ -83,7 +73,7 @@ void ValueViewer::drawFieldBorder(RotatedDC& dc) {
       alpha_mask.convexHull(points);
       if (points.size() < 3) return;
       FOR_EACH(p, points) p = dc.trPixelNoZoom(RealPoint(p.x,p.y));
-      dc.getDC().DrawPolygon((int)points.size(), &points[0]);
+      dc.getCanvas().drawPolygon((int)points.size(), &points[0]);
     } else {
       // simple rectangle
       dc.DrawRectangle(dc.getInternalRect().grow(dc.trInvS(1)));

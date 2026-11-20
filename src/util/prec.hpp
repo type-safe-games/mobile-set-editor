@@ -49,9 +49,6 @@ using namespace std;
 
 typedef wxWindow Window;
 
-typedef wxBitmap Bitmap;
-typedef wxDC     DC;
-
 // ----------------------------------------------------------------------------- : Compatability fixes
 
 #include "wx_compat.hpp"

@@ -26,12 +26,12 @@ public:
   void onStyleChange(int) override;
       
 private:
-  Bitmap bitmap; ///< Cached bitmap
+  Image bitmap; ///< Cached image, as it is drawn
   RealSize size; ///< Size of cached bitmap
   Radians angle;  ///< Angle of cached bitmap
   bool    is_default; ///< Is the default placeholder image used?
   
   /// Generate a placeholder image
-  static Bitmap imagePlaceholder(const Rotation& rot, UInt w, UInt h, const Image& default_image, bool editing);
+  static Image imagePlaceholder(const Rotation& rot, UInt w, UInt h, const Image& default_image, bool editing);
 };
 

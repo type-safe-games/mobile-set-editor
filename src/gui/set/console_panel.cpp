@@ -29,7 +29,7 @@ public:
   MessageType type;
   String text; // string message
   wxDateTime timestamp;
-  Bitmap bitmap; // image message instead of string
+  wxBitmap bitmap; // image message instead of string
   ScriptValueP value; // other valued message (images? cards?)
   // location of error messages
   String source_file;
@@ -285,7 +285,7 @@ private:
     
     // draw background
     dc.SetPen(*wxTRANSPARENT_PEN);
-    dc.SetBrush(lerp(bg,color, 0.05));
+    dc.SetBrush(wxColour(lerp(bg,color, 0.05)));
     dc.DrawRectangle(left,top,width,msg.height);
 
     // draw foreground
@@ -301,7 +301,7 @@ private:
     left += TIMESTAMP_PADDING * 2;
 
     // draw line right of timestamp
-    dc.SetPen(lerp(bg, fg, 0.3));
+    dc.SetPen(wxColour(lerp(bg, fg, 0.3)));
     dc.DrawLine(left, top, left, top + msg.height);
 
     // draw icon
@@ -337,7 +337,7 @@ private:
     }
 
     // draw line below item
-    dc.SetPen(lerp(bg,fg, 0.3));
+    dc.SetPen(wxColour(lerp(bg,fg, 0.3)));
     dc.DrawLine(0, top + msg.height, 0 + width, top + msg.height);
   }
   

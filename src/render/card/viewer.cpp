@@ -16,7 +16,6 @@
 #include <data/settings.hpp>
 #include <data/action/value.hpp>
 #include <data/action/set.hpp>
-#include <gfx/dc_util.hpp>
 
 // ----------------------------------------------------------------------------- : DataViewer
 
@@ -27,7 +26,7 @@ DataViewer::~DataViewer() {}
 
 IMPLEMENT_DYNAMIC_ARG(bool, drawing_card, false);
 
-void DataViewer::draw(DC& dc) {
+void DataViewer::draw(Canvas& dc) {
   StyleSheetSettings& ss = settings.stylesheetSettingsFor(*stylesheet);
   RotatedDC rdc(dc, getRotation(),
                 nativeLook() ? QUALITY_LOW : (ss.card_anti_alias() ? QUALITY_AA : QUALITY_SUB_PIXEL));
@@ -37,7 +36,7 @@ void DataViewer::draw(RotatedDC& dc, const Color& background) {
   if (!set) return; // no set specified, don't draw anything
   WITH_DYNAMIC_ARG(drawing_card, true);
   // fill with background color
-  clearDC(dc.getDC(), background);
+  dc.getCanvas().clear(background);
   // update style scripts
   updateStyles(false);
   // prepare viewers

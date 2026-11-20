@@ -53,7 +53,7 @@ protected:
   bool          lineBelow(size_t item) const override;
   bool          itemEnabled(size_t item) const override;
   String        itemText(size_t item) const override;
-  void          drawIcon(DC& dc, int x, int y, size_t item, bool selected) const override;
+  void          drawIcon(wxDC& dc, int x, int y, size_t item, bool selected) const override;
   DropDownList* submenu(size_t item) const override;
   
 protected:

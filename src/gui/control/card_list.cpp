@@ -506,13 +506,13 @@ bool CardListBase::parseData(bool ignore_cards_from_own_card_list) {
           return false;
         }
         if (size > 50000000) { // 50Mb
-          queue_message(MESSAGE_ERROR, _("Bitmap data too large or corrupted"));
+          queue_message(MESSAGE_ERROR, _("wxBitmap data too large or corrupted"));
           return false;
         }
         try {
           wxBitmap bitmap = bitmap_data->GetBitmap();
           if (!bitmap.IsOk() || bitmap.GetWidth() > 20000 || bitmap.GetHeight() > 20000) {
-            queue_message(MESSAGE_ERROR, _("Bitmap too large or corrupted"));
+            queue_message(MESSAGE_ERROR, _("wxBitmap too large or corrupted"));
             return false;
           }
           Image image = from_bitmap(bitmap);

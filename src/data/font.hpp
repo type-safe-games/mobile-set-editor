@@ -12,6 +12,7 @@
 #include <util/real_point.hpp>
 #include <script/scriptable.hpp>
 #include <gfx/color.hpp>
+#include <gfx/canvas.hpp>
 
 DECLARE_POINTER_TYPE(FontRef);
 
@@ -54,12 +55,6 @@ public:
   int                flags;                ///< FontFlags for this font
 
   FontRef();
- 
-  /// Load fonts (.ttf or .otf) from all directories in the app directory that contain "fonts" in their names,
-  /// and optionaly their subdirectories, returns true if there were errors
-  static bool PreloadResourceFonts(bool recursive);
-  /// Adds font file paths from the given directory into fontFilePaths
-  static void TallyResourceFonts(String fontsDirectoryPath, vector<String>& fontFilePaths, bool recursive);
 
   /// Update the scritables, returns true if there is a change
   bool update(Context& ctx);
@@ -78,8 +73,8 @@ public:
   /// Add style, and optionally change the font family, color and size
   FontRefP make(int add_flags, bool add_underline, bool add_strikethrough, String const* other_family, Color const* other_color, double const* other_size) const;
   
-  /// Convert this font reference to a wxFont
-  wxFont toWxFont(double scale) const;
+  /// The font to draw with on a canvas, at the given scale; its face is resolved by the font registry
+  CanvasFont toCanvasFont(double scale) const;
 
 private:
   DECLARE_REFLECTION();

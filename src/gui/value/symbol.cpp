@@ -17,22 +17,22 @@
 IMPLEMENT_VALUE_EDITOR(Symbol)
   , button_down(-2)
 {
-  button_images[0] = Bitmap(load_resource_wx_image(_("edit_symbol")));
+  button_images[0] = wxBitmap(load_resource_wx_image(_("edit_symbol")));
 }
 
 void SymbolValueEditor::draw(RotatedDC& dc) {
   SymbolValueViewer::draw(dc);
   // draw helper text if there are no symbols
   if (symbols.empty()) {
-    dc.SetFont(wxFont(10,wxFONTFAMILY_SWISS,wxFONTSTYLE_NORMAL,wxFONTWEIGHT_NORMAL));
-    dc.SetTextForeground(*wxBLACK);
+    dc.SetFont(CanvasFont::generic(10, CanvasFont::Family::SWISS));
+    dc.SetTextForeground(Color(0,0,0));
     String label = _LABEL_("edit symbol");
     RealSize text_size = dc.GetTextExtent(label);
     dc.DrawText(label, align_in_rect(ALIGN_MIDDLE_CENTER, text_size, dc.getInternalRect()));
   }
   if (nativeLook()) {
     // draw editor buttons
-    dc.SetFont(*wxNORMAL_FONT);
+    dc.SetFont(CanvasFont::systemFont());
     drawButton(dc, 0, _BUTTON_("edit symbol"));
     //drawButton(dc, 1, _BUTTON_("symbol gallery"));
   }
@@ -44,15 +44,15 @@ void SymbolValueEditor::drawButton(RotatedDC& dc, int button, const String& text
   double x = bounding_box.width - width - (width + 1) * button;
   double y = 0;
   // draw button
-  draw_button(&editor(), dc.getDC(), dc.trRectToBB(RealRect(x,y,width,height)), false, down, true);
+  draw_button(&editor(), wx_dc(dc), dc.trRectToBB(RealRect(x,y,width,height)), false, down, true);
   // draw text
   dc.SetTextForeground(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOWTEXT));
   RealSize text_size = dc.GetTextExtent(text);
   dc.DrawText(text, align_in_rect((Alignment)(ALIGN_BOTTOM | ALIGN_CENTER), text_size, RealRect(x, y, width,height*0.9)));
   // draw image
-  const Bitmap& bmp = button_images[button];
+  const wxBitmap& bmp = button_images[button];
   RealSize image_size(bmp.GetWidth(), bmp.GetHeight());
-  dc.DrawBitmap(bmp, align_in_rect(ALIGN_MIDDLE_CENTER, image_size, RealRect(x,y,width,height * 0.8)));
+  draw_bitmap(dc, bmp, align_in_rect(ALIGN_MIDDLE_CENTER, image_size, RealRect(x,y,width,height * 0.8)));
 }
 
 int SymbolValueEditor::findButton(const RealPoint& pos) {

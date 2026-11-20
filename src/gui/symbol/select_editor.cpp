@@ -44,7 +44,7 @@ SymbolSelectEditor::SymbolSelectEditor(SymbolControl* control, bool rotate)
 
 // ----------------------------------------------------------------------------- : Drawing
 
-void SymbolSelectEditor::draw(DC& dc) {
+void SymbolSelectEditor::draw(wxDC& dc) {
   // highlight selected parts
   FOR_EACH(p, control.selected_parts.get()) {
     control.highlightPart(dc, *p, HIGHLIGHT_INTERIOR);
@@ -66,7 +66,7 @@ void SymbolSelectEditor::draw(DC& dc) {
   }
 }
 
-void SymbolSelectEditor::drawHandles(DC& dc) {
+void SymbolSelectEditor::drawHandles(wxDC& dc) {
   if (control.selected_parts.empty()) return;
   if (rotateAction) return; // not when rotating
   updateBoundingBox();
@@ -85,7 +85,7 @@ void SymbolSelectEditor::drawHandles(DC& dc) {
   }
 }
 
-void SymbolSelectEditor::drawHandle(DC& dc, int dx, int dy) {
+void SymbolSelectEditor::drawHandle(wxDC& dc, int dx, int dy) {
   wxPoint p = control.rotation.tr(bounds.corner(dx, dy));
   p.x += 4 * dx;
   p.y += 4 * dy;
@@ -108,7 +108,7 @@ void SymbolSelectEditor::drawHandle(DC& dc, int dx, int dy) {
   }
 }
 
-void SymbolSelectEditor::drawRotationCenter(DC& dc, const Vector2D& pos) {
+void SymbolSelectEditor::drawRotationCenter(wxDC& dc, const Vector2D& pos) {
   wxPoint p = control.rotation.tr(pos);
   dc.DrawBitmap(handleCenter, p.x - 9, p.y - 9);
 }

@@ -25,7 +25,7 @@ protected:
   size_t selection() const override;
   bool stayOpen(size_t selection) const override { return true; }
   DropDownList* createSubMenu(ChoiceField::ChoiceP group) const override;
-  void drawIcon(DC& dc, int x, int y, size_t item, bool selected) const override;
+  void drawIcon(wxDC& dc, int x, int y, size_t item, bool selected) const override;
 };
 
 DropDownMultipleChoiceList::DropDownMultipleChoiceList
@@ -47,7 +47,7 @@ void DropDownMultipleChoiceList::select(size_t item) {
   DropDownChoiceListBase::onShow(); // update 'enabled'
 }
 
-void DropDownMultipleChoiceList::drawIcon(DC& dc, int x, int y, size_t item, bool selected) const {
+void DropDownMultipleChoiceList::drawIcon(wxDC& dc, int x, int y, size_t item, bool selected) const {
   // is this item active/checked?
   bool active = false;
   bool radio  = false;
@@ -104,7 +104,7 @@ void MultipleChoiceValueEditor::determineSize(bool force_fit) {
   double h = 18;
   if (style().render_style & RENDER_TEXT) {
     wxClientDC dc(&editor());
-    dc.SetFont(style().font.toWxFont(1.0));
+    dc.SetFont(to_wx_font(style().font.toCanvasFont(1.0)));
     int end = field().choices->lastId();
     for (int i = 0; i < end; ++i) {
       String choice = field().choices->choiceName(i);

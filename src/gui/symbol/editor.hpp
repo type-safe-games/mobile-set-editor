@@ -42,7 +42,7 @@ public:
   // --------------------------------------------------- : Drawing
   
   /// Drawing for this control,
-  virtual void draw(DC& dc) = 0;
+  virtual void draw(wxDC& dc) = 0;
   
   // --------------------------------------------------- : UI
   

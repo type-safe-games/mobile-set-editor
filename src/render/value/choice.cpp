@@ -26,7 +26,7 @@ void ChoiceValueViewer::draw(RotatedDC& dc) {
   // render background
   if (nativeLook()) {
     dc.SetBrush(ui_color(UIColor::WINDOW));
-    dc.SetPen(*wxTRANSPARENT_PEN);
+    dc.SetPen(Pen::none());
     dc.DrawRectangle(RealRect(0, 0, dc.getWidth(), dc.getHeight()));
   }
   draw_choice_viewer(dc, *this, style(), value().value());
@@ -52,7 +52,7 @@ bool prepare_choice_viewer(RotatedDC& dc, ValueViewer& viewer, ChoiceStyle& styl
       // Generate image/bitmap (whichever is available)
       // don't worry, we cache the image
       ImageCombine combine = style.combine;
-      Bitmap bitmap; Image image;
+      Image bitmap, image;
       RealSize size;
       img.generateCached(img_options, &style.mask, &combine, &bitmap, &image, &size);
       // store content properties
@@ -84,14 +84,14 @@ void draw_choice_viewer(RotatedDC& dc, ValueViewer& viewer, ChoiceStyle& style, 
       get_options(dc, viewer, style, img_options);
       // Generate image/bitmap
       ImageCombine combine = style.combine;
-      Bitmap bitmap; Image image;
+      Image bitmap, image;
       RealSize size;
       img.generateCached(img_options, &style.mask, &combine, &bitmap, &image, &size);
       size = dc.trInvS(size);
       RealRect rect(align_in_rect(style.alignment, size, dc.getInternalRect()), size);
       if (bitmap.Ok()) {
         // just draw it
-        dc.DrawPreRotatedBitmap(bitmap,rect);
+        dc.DrawPreRotatedPlainImage(bitmap,rect);
       } else {
         // use combine mode
         assert(image.Ok());

@@ -18,6 +18,8 @@
 #include <util/angle.hpp>
 #include <gfx/color.hpp>
 
+class Canvas;
+
 // ----------------------------------------------------------------------------- : Resampling
 
 /// Resample (resize) an image, uses bilenear filtering
@@ -53,14 +55,14 @@ void sharp_resample_and_clip(const Image& img_in, Image& img_out, wxRect rect, i
  *  rect    = rectangle to draw in (a rectangle somewhere around pos)
  *  stretch = amount to stretch in the direction of the text after drawing
  */
-void draw_resampled_text(DC& dc, const String& text, const RealPoint& pos, const RealRect& rect, Radians angle, Color color, int blur_radius = 0, Color stroke_color = Color(0,0,0), int stroke_radius = 0, double stretch = 1.0);
+void draw_resampled_text(Canvas& dc, const String& text, const RealPoint& pos, const RealRect& rect, Radians angle, Color color, int blur_radius = 0, Color stroke_color = Color(0,0,0), int stroke_radius = 0, double stretch = 1.0);
 
 // scaling factor to use when drawing resampled text
 extern const int text_scaling;
 
 // Downsamples the red channel of the input image to the alpha channel of the output image
 // img_in must be text_scaling times as large as img_out
-void downsample_to_alpha(Bitmap& bmp_in, Image& img_out);
+void downsample_to_alpha(Image& img_in, Image& img_out);
 
 /// Resize an image, but keep a border of unchanged pixels along
 /// each edge (9-slice scaling): the corners are copied verbatim, the top/bottom
@@ -275,8 +277,8 @@ String combine_to_string(const ImageCombine&);
 /// drawn onto the area where A originated.
 void combine_image(Image& a, const Image& b, ImageCombine combine);
 
-/// Draw an image to a DC using a combining function
-void draw_combine_image(DC& dc, UInt x, UInt y, const Image& img, ImageCombine combine);
+/// Draw an image to a canvas using a combining function
+void draw_combine_image(Canvas& dc, UInt x, UInt y, const Image& img, ImageCombine combine);
 
 // ----------------------------------------------------------------------------- : Masks
 
@@ -304,7 +306,6 @@ public:
   /// Apply the alpha mask to an image
   void setAlpha(Image& i) const;
   /// Apply the alpha mask to a bitmap
-  void setAlpha(Bitmap& b) const;
   
   /// Is the given location opaque (not fully transparent)? when the mask were stretched to size
   bool isOpaque(const RealPoint& p, const RealSize& size) const;

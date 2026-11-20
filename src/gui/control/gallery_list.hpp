@@ -66,7 +66,7 @@ protected:
   /// Return how many items there are in the list
   virtual size_t itemCount() const = 0;
   /// Draw an item
-  virtual void drawItem(DC& dc, int x, int y, size_t item) = 0;
+  virtual void drawItem(wxDC& dc, int x, int y, size_t item) = 0;
   /// How 'salient' should the selection in the given subcolumn be?
   virtual double subcolumnActivity(size_t col) const { return 0.7; }
   
@@ -96,7 +96,7 @@ private:
   void onPaint(wxPaintEvent&);
   void onSize(wxSizeEvent&);
   void onScroll(wxScrollWinEvent&);
-  void OnDraw(DC& dc);
+  void OnDraw(wxDC& dc);
   
   /// Find the item corresponding to the given location
   size_t findItem(const wxMouseEvent&) const;

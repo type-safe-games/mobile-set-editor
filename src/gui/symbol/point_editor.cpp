@@ -37,7 +37,7 @@ SymbolPointEditor::SymbolPointEditor(SymbolControl* control, const SymbolShapeP&
 
 // ----------------------------------------------------------------------------- : Drawing
 
-void SymbolPointEditor::draw(DC& dc) {
+void SymbolPointEditor::draw(wxDC& dc) {
   // highlight the part
   control.highlightPart(dc, *part, HIGHLIGHT_BORDER);
   // handles etc.
@@ -50,7 +50,7 @@ void SymbolPointEditor::draw(DC& dc) {
   }
 }
 
-void SymbolPointEditor::drawHoveredLine(DC& dc) {
+void SymbolPointEditor::drawHoveredLine(wxDC& dc) {
   BezierCurve c(*hover_line_1, *hover_line_2);
   wxPoint prevPoint = control.rotation.tr(hover_line_1->pos);
   for(int i = 1 ; i <= 100 ; ++i) {
@@ -72,9 +72,9 @@ void SymbolPointEditor::drawHoveredLine(DC& dc) {
   }
 }
 
-void SymbolPointEditor::drawHandles(DC& dc) {
-  dc.SetPen(Color(0,0,128));
-  dc.SetBrush(Color(128,128,255));
+void SymbolPointEditor::drawHandles(wxDC& dc) {
+  dc.SetPen(wxColour(Color(0,0,128)));
+  dc.SetBrush(wxColour(Color(128,128,255)));
   for (int i = 0 ; (size_t)i < part->points.size() ; ++i) {
     // determine which handles to draw
     bool selected  = pointSelected(*part->getPoint(i));
@@ -85,14 +85,14 @@ void SymbolPointEditor::drawHandles(DC& dc) {
   }
 }
 
-void SymbolPointEditor::drawNewPoint(DC& dc) {
+void SymbolPointEditor::drawNewPoint(wxDC& dc) {
   dc.SetPen(*wxGREEN_PEN);
   dc.SetBrush(*wxTRANSPARENT_BRUSH);
   wxPoint p = control.rotation.tr(new_point);
   drawHandleBox(dc, p.x, p.y, true);
 }
 
-void SymbolPointEditor::drawControlPoint(DC& dc, const ControlPoint& p, bool drawHandleBefore, bool drawHandleAfter) {
+void SymbolPointEditor::drawControlPoint(wxDC& dc, const ControlPoint& p, bool drawHandleBefore, bool drawHandleAfter) {
   // Position
   wxPoint p0 = control.rotation.tr(p.pos);
   // Sub handles
@@ -125,14 +125,14 @@ void SymbolPointEditor::drawControlPoint(DC& dc, const ControlPoint& p, bool dra
   drawHandleBox(dc, p0.x, p0.y, selected);
 }
 
-void SymbolPointEditor::drawHandleBox(DC& dc, UInt px, UInt py, bool active) {
+void SymbolPointEditor::drawHandleBox(wxDC& dc, UInt px, UInt py, bool active) {
   dc.DrawRectangle(px - 3, py - 3, 7, 7);
   if (!active) {
     dc.SetPen(*wxWHITE_PEN);
     dc.DrawRectangle(px - 2, py - 2, 5, 5);
   }
 }
-void SymbolPointEditor::drawHandleCircle(DC& dc, UInt px, UInt py) {
+void SymbolPointEditor::drawHandleCircle(wxDC& dc, UInt px, UInt py) {
   dc.DrawCircle(px, py, 4);
 }
 

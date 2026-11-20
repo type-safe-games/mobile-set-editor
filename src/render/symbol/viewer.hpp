@@ -57,20 +57,20 @@ public:
   // --------------------------------------------------- : Drawing
   
   /// Draw the symbol to a dc
-  void draw(DC& dc);
+  void draw(Canvas& dc);
   
-  void highlightPart(DC& dc, const SymbolPart& part,    HighlightStyle style);
-  void highlightPart(DC& dc, const SymbolShape& shape,  HighlightStyle style);
-  void highlightPart(DC& dc, const SymbolSymmetry& sym, HighlightStyle style);
-  void highlightPart(DC& dc, const SymbolGroup& group,  HighlightStyle style);
+  void highlightPart(Canvas& dc, const SymbolPart& part,    HighlightStyle style);
+  void highlightPart(Canvas& dc, const SymbolShape& shape,  HighlightStyle style);
+  void highlightPart(Canvas& dc, const SymbolSymmetry& sym, HighlightStyle style);
+  void highlightPart(Canvas& dc, const SymbolGroup& group,  HighlightStyle style);
   
-  void drawEditingHints(DC& dc);
+  void drawEditingHints(Canvas& dc);
   
   void onAction(const Action&, bool) override {}
   
   
 private:
-  typedef shared_ptr<wxMemoryDC> MemoryDCP;
+  typedef OffscreenCanvasP MemoryDCP;
   
   /// The temporary masks that are used while drawing. They are white where something is, and black elsewhere.
   struct Buffers {
@@ -86,30 +86,30 @@ private:
   int in_symmetry;
   
   /// Combine a symbol part with the dc
-  void combineSymbolPart(DC& dc, const SymbolPart& part, bool& paintedSomething, bool& buffersFilled, bool allow_overlap, Buffers& buffers);
+  void combineSymbolPart(Canvas& dc, const SymbolPart& part, bool& paintedSomething, bool& buffersFilled, bool allow_overlap, Buffers& buffers);
   
   /// Write the buffers to the dc
-  void combineBuffers(DC& dc, Buffers& buffers);
+  void combineBuffers(Canvas& dc, Buffers& buffers);
   
   /// Combines a shape that acts on the border with the borders in the buffers
   /** The combine mode works on the border as a whole: the border of the fill, of the accent and the extra border.
    *  border and accent_border can be null if they do not exist (yet).
    *  Subtract, intersection and difference need to read or clear border, so that can not be the dc itself.
    */
-  void combineBorderShape(const SymbolShape& shape, DC* border, DC* accent_border, DC& extra_border);
+  void combineBorderShape(const SymbolShape& shape, Canvas* border, Canvas* accent_border, Canvas& extra_border);
   
   /// Combines a symbol part with what is currently drawn, the border and interior are drawn separatly
   /** directB/directI are true if the border/interior is the screen dc, false if it
    *  is a temporary 1 bit one
    */
-  void combineSymbolShape(const SymbolShape& part, DC& border, DC& interior, bool directB, bool directI);
+  void combineSymbolShape(const SymbolShape& part, Canvas& border, Canvas& interior, bool directB, bool directI);
   
   /// Draw a symbol part, draws the border and the interior to separate DCs
   /** The DCs may be null. directB should be true when drawing the border directly to the screen.
    *  The **Col parameters give the color to use for the (interior of) the border and the interior
    *  default should be white (255) border and black (0) interior.
    */
-  void drawSymbolShape(const SymbolShape& shape, DC* border, DC* interior, unsigned char borderCol, unsigned char interiorCol, bool directB, bool oppB);
+  void drawSymbolShape(const SymbolShape& shape, Canvas* border, Canvas* interior, unsigned char borderCol, unsigned char interiorCol, bool directB, bool oppB);
 /*  
   // ------------------- Bezier curve calculation
   

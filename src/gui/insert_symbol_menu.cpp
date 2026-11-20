@@ -9,6 +9,7 @@
 #include <util/prec.hpp>
 #include <gui/insert_symbol_menu.hpp>
 #include <data/symbol_font.hpp>
+#include <gfx/wx_image_adapter.hpp>
 #include <gui/window_id.hpp>
 
 // ----------------------------------------------------------------------------- : Building the menu
@@ -47,7 +48,8 @@ static wxMenuItem* make_menu_item(const InsertSymbolMenu& item, wxMenu* parent, 
   } else {
     wxMenuItem* menu_item = new wxMenuItem(parent, first_id, label);
     // Generate bitmap for use on this item
-    menu_item->SetBitmap(font.insertSymbolPreview(item, wxSize(16,16)));
+    Image preview = font.insertSymbolPreview(item, wxSize(16,16));
+    menu_item->SetBitmap(preview.Ok() ? to_bitmap(preview) : wxNullBitmap);
     return menu_item;
   }
 }

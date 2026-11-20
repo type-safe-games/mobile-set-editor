@@ -12,7 +12,6 @@
 #include <wx/imaggif.h>
 #include <wx/imagtiff.h>
 #include <wx/imagbmp.h>
-#include <wx/rawbmp.h>
 #include <cstring>
 
 // ----------------------------------------------------------------------------- : Conversion
@@ -112,30 +111,10 @@ Image from_wx_image(const wxImage& image) {
   return out;
 }
 
-Bitmap to_bitmap(const Image& image) {
-  return Bitmap(to_wx_image(image));
+wxBitmap to_bitmap(const Image& image) {
+  return wxBitmap(to_wx_image(image));
 }
 
-Image from_bitmap(const Bitmap& bitmap) {
+Image from_bitmap(const wxBitmap& bitmap) {
   return from_wx_image(bitmap.ConvertToImage());
-}
-
-// ----------------------------------------------------------------------------- : Bitmap pixels
-
-void invert_bitmap(Bitmap& bmp) {
-  wxNativePixelData data(bmp);
-  if (!data) return; // Raw access not available on this platform/bitmap
-  wxNativePixelData::Iterator p(data);
-  for (int j = 0; j < bmp.GetHeight(); ++j) {
-    wxNativePixelData::Iterator rowStart = p;
-    for (int i = 0; i < bmp.GetWidth(); ++i) {
-      // Invert each channel
-      p.Red()   = 255 - p.Red();
-      p.Green() = 255 - p.Green();
-      p.Blue()  = 255 - p.Blue();
-      ++p; // Move to next pixel in the row
-    }
-    p = rowStart;
-    p.OffsetY(data, 1); // Move to the next row
-  }
 }

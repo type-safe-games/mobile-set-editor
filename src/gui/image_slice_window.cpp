@@ -506,7 +506,7 @@ void ImageSlicePreview::onPaint(wxPaintEvent&) {
   wxBufferedPaintDC dc(this);
   draw(dc);
 }
-void ImageSlicePreview::draw(DC& dc) {
+void ImageSlicePreview::draw(wxDC& dc) {
   if (slice.adaptive_target_size) {
     // the image may not cover all of the dc, so clear it before redraw
     dc.SetBackground(wxBrush(GetBackgroundColour()));
@@ -520,11 +520,12 @@ void ImageSlicePreview::draw(DC& dc) {
     if (image.HasAlpha()) {
       // create bitmap
       int width = image.GetWidth(), height = image.GetHeight();
-      bitmap = Bitmap(width, height);
+      bitmap = wxBitmap(width, height);
       wxMemoryDC mdc; mdc.SelectObject(bitmap);
       // draw checker pattern behind image
       RealRect rect = RealRect(0, 0, width, height);
-      RotatedDC rdc(mdc, 0, rect, 1, QUALITY_LOW);
+      WxCanvas canvas(mdc);
+      RotatedDC rdc(canvas, 0, rect, 1, QUALITY_LOW);
       draw_checker(rdc, rect);
       rdc.DrawImage(image, RealPoint(0,0));
       mdc.SelectObject(wxNullBitmap);
@@ -631,7 +632,7 @@ void ImageSliceSelector::onPaint(wxPaintEvent&) {
   wxBufferedPaintDC dc(this);
   draw(dc);
 }
-void ImageSliceSelector::draw(DC& dc) {
+void ImageSliceSelector::draw(wxDC& dc) {
   if (!bitmap.Ok()) createBitmap();
   if (!bitmap.Ok()) return;
   // Selected region
@@ -642,7 +643,8 @@ void ImageSliceSelector::draw(DC& dc) {
   int height = int(slice.selection.height * scaleY);
   // background
   {
-    RotatedDC rdc(dc, 0, RealRect(0,0,s.x,s.y), 1, QUALITY_LOW);
+    WxCanvas canvas(dc);
+    RotatedDC rdc(canvas, 0, RealRect(0,0,s.x,s.y), 1, QUALITY_LOW);
     draw_checker(rdc, RealRect(0,0,s.x,s.y));
   }
   // edge
@@ -651,7 +653,7 @@ void ImageSliceSelector::draw(DC& dc) {
     r.Subtract(wxRect(border,border, s.x-2*border, s.y-2*border));
     dc.SetDeviceClippingRegion(r);
     dc.SetPen(*wxTRANSPARENT_PEN);
-    dc.SetBrush(Color(191,191,191));
+    dc.SetBrush(wxColour(Color(191,191,191)));
     dc.SetLogicalFunction(wxAND);
     dc.DrawRectangle(0, 0, s.x, s.y);
     dc.SetLogicalFunction(wxCOPY);
@@ -670,10 +672,10 @@ void ImageSliceSelector::draw(DC& dc) {
   dc.SetBrush(*wxTRANSPARENT_BRUSH);
   dc.SetPen(*wxBLACK_PEN);
   dc.DrawRectangle(left - 1, top - 1, width + 2, height + 2);
-  dc.SetPen(Color(64,64,64));
+  dc.SetPen(wxColour(Color(64,64,64)));
   dc.DrawRectangle(left - 2, top - 2, width + 4, height + 4);
   // Draw handles on all sides
-  dc.SetBrush(Color(0,0,128));
+  dc.SetBrush(wxColour(Color(0,0,128)));
   dc.SetPen(*wxWHITE_PEN);
   drawHandle(dc, -1, -1);
   drawHandle(dc, -1, +1);
@@ -686,7 +688,7 @@ void ImageSliceSelector::draw(DC& dc) {
     drawHandle(dc, +1,  0);
   }
 }
-void ImageSliceSelector::drawHandle(DC& dc, int dx, int dy) {
+void ImageSliceSelector::drawHandle(wxDC& dc, int dx, int dy) {
   wxPoint p = handlePos(dx, dy);
   dc.DrawRectangle(p.x - 3 + 4 * dx, p.y - 3 + 4 * dy, 6, 6);
 }
