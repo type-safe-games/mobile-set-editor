@@ -1,0 +1,44 @@
+mse version: 2.6.0
+short name: Fixture
+full name: Test fixture game
+version: 2026-11-19
+
+set field:
+	type: text
+	name: title
+	identifying: true
+
+card link:
+	selected: Front Face
+	linked: Back Face
+
+card field:
+	type: text
+	name: name
+	identifying: true
+	show statistics: false
+	card list visible: true
+	card list column: 1
+card field:
+	type: choice
+	name: frame
+	choice: red
+	choice: blue
+	choice: grey
+	initial: grey
+card field:
+	type: slider
+	name: level
+	minimum: 0
+	maximum: 5
+	increment: 1
+	initial: 1
+card field:
+	type: image
+	name: picture
+	show statistics: false
+card field:
+	type: text
+	name: rules
+	multi line: true
+	show statistics: false

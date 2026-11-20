@@ -1,0 +1,1 @@
+for each c in set.cards do write_image_file(c, file: "fixture-render/" + c.uid + ".png")

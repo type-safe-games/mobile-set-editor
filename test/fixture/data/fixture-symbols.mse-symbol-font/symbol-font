@@ -1,0 +1,10 @@
+mse version: 2.6.0
+short name: Fixture symbols
+version: 2026-11-19
+image font size: 80
+symbol:
+	code: R
+	image: red.png
+symbol:
+	code: U
+	image: blue.png

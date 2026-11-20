@@ -1,0 +1,30 @@
+mse version: 2.6.0
+game: fixture
+stylesheet: standard
+set info:
+	title: Fixture cards
+card:
+	uid: fixture-wrap
+	name: Long Wrapping Text
+	frame: red
+	level: 3
+	picture: image1.png
+	rules:
+		Pay <sym>R</sym><sym>U</sym> to draw a card. This sentence is deliberately long so that it has to wrap over several lines of the rules box.
+		<i>A second paragraph, in italics, also wraps across the box to check line breaks and paragraph spacing.</i>
+card:
+	uid: fixture-front
+	name: Front Face
+	frame: blue
+	level: 0
+	rules: Transform: pay <sym>U</sym>.
+	linked_card_1: fixture-back
+	linked_relation_1: Back Face
+card:
+	uid: fixture-back
+	name: Back Face
+	frame: grey
+	level: 5
+	rules: The other side of <sym>U</sym> Front Face.
+	linked_card_1: fixture-front
+	linked_relation_1: Front Face

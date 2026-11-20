@@ -1,0 +1,68 @@
+mse version: 2.6.0
+game: fixture
+short name: Standard
+full name: Test fixture style
+version: 2026-11-19
+depends on:
+	package: fixture.mse-game
+	version: 2026-11-19
+depends on:
+	package: fixture-symbols.mse-symbol-font
+	version: 2026-11-19
+card width: 300
+card height: 420
+card dpi: 150
+card background: white
+
+card style:
+	frame:
+		left: 0
+		top: 0
+		width: 300
+		height: 420
+		z index: -1
+		render style: image
+		choice images:
+			red: frame-red.png
+			blue: frame-blue.png
+			grey: frame-grey.png
+	name:
+		left: 20
+		top: 18
+		width: 200
+		height: 26
+		font:
+			name: DejaVu Sans
+			size: 13
+			weight: bold
+			color: black
+	level:
+		left: 230
+		top: 18
+		width: 50
+		height: 26
+		alignment: middle right
+		render style: text
+		font:
+			name: DejaVu Sans
+			size: 13
+			weight: bold
+			color: black
+	picture:
+		left: 21
+		top: 51
+		width: 258
+		height: 148
+	rules:
+		left: 26
+		top: 246
+		width: 248
+		height: 138
+		font:
+			name: DejaVu Sans
+			size: 10
+			color: black
+		symbol font:
+			name: fixture-symbols
+			size: 10
+		alignment: top left
