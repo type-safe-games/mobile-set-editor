@@ -17,7 +17,7 @@
 #include <gui/util.hpp>
 #include <data/action/symbol.hpp>
 #include <data/settings.hpp>
-#include <util/window_id.hpp>
+#include <gui/window_id.hpp>
 #include <wx/dcbuffer.h>
 
 // ----------------------------------------------------------------------------- : SymbolControl

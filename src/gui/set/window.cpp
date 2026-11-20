@@ -30,7 +30,7 @@
 #include <gui/auto_replace_window.hpp>
 #include <gui/util.hpp>
 #include <util/io/package_manager.hpp>
-#include <util/window_id.hpp>
+#include <gui/window_id.hpp>
 #include <data/game.hpp>
 #include <data/set.hpp>
 #include <data/card.hpp>
@@ -189,7 +189,6 @@ wxMenu* SetWindow::makeExportMenu() {
   add_menu_item_tr(menuExport, ID_FILE_EXPORT_HTML, "export_html", "export_html");
   add_menu_item_tr(menuExport, ID_FILE_EXPORT_IMAGE, "export_image", "export_image");
   add_menu_item_tr(menuExport, ID_FILE_EXPORT_IMAGES, "export_images", "export_images");
-  add_menu_item_tr(menuExport, ID_FILE_EXPORT_APPR, "export_apprentice", "export_apprentice");
   add_menu_item_tr(menuExport, ID_FILE_EXPORT_MWS, "export_mws", "export_mws");
   return menuExport;
 }
@@ -506,7 +505,6 @@ void SetWindow::onUpdateUI(wxUpdateUIEvent& ev) {
     // file menu
     case ID_FILE_SAVE:         ev.Enable(!set->actions.atSavePoint() || set->needSaveAs());  break;
     case ID_FILE_EXPORT_IMAGE: ev.Enable(!!current_panel->selectedCard());          break;
-    case ID_FILE_EXPORT_APPR:  ev.Enable(set->game->isMagic());                break;
     case ID_FILE_EXPORT_MWS:   ev.Enable(set->game->isMagic());                break;
     // undo/redo
     case ID_EDIT_UNDO: {
@@ -599,7 +597,6 @@ void SetWindow::onFileSave(wxCommandEvent& ev) {
   } else {
     wxBusyCursor busy;
     settings.addRecentFile(set->absoluteFilename());
-    SetWindow::updateRecentSetsInAllWindows();
     set->save();
     set->actions.setSavePoint();
   }
@@ -621,7 +618,6 @@ void SetWindow::onFileSaveAsDirectory(wxCommandEvent&) {
     settings.default_set_dir = dlg.GetDirectory();
     set->saveAs(filename, true, true);
     settings.addRecentFile(filename);
-    SetWindow::updateRecentSetsInAllWindows();
     set->actions.setSavePoint();
     updateTitle(); // title may depend on filename
   }
@@ -692,12 +688,18 @@ void SetWindow::onFileExportHTML(wxCommandEvent&) {
   wnd.ShowModal();
 }
 
-void SetWindow::onFileExportApprentice(wxCommandEvent&) {
-  export_apprentice(this, set);
-}
-
 void SetWindow::onFileExportMWS(wxCommandEvent&) {
-  export_mws(this, set);
+  if (!set->game->isMagic()) {
+    throw Error(_("Can only export magic sets to Magic Workstation"));
+  }
+  // Select filename
+  String name = wxFileSelector(_("Export to file"),settings.default_export_dir,_(""),_(""),
+                             _("Text files (*.txt)|*.txt|All Files|*"),
+                             wxFD_SAVE | wxFD_OVERWRITE_PROMPT, this);
+  if (name.empty()) return;
+  settings.default_export_dir = wxPathOnly(name);
+  wxBusyCursor busy;
+  export_mws(set, name);
 }
 
 void SetWindow::onFileCheckUpdates(wxCommandEvent&) {
@@ -893,7 +895,6 @@ BEGIN_EVENT_TABLE(SetWindow, wxFrame)
   EVT_MENU      (ID_FILE_EXPORT_IMAGE,  SetWindow::onFileExportImage)
   EVT_MENU      (ID_FILE_EXPORT_IMAGES,  SetWindow::onFileExportImages)
   EVT_MENU      (ID_FILE_EXPORT_HTML,  SetWindow::onFileExportHTML)
-  EVT_MENU      (ID_FILE_EXPORT_APPR,  SetWindow::onFileExportApprentice)
   EVT_MENU      (ID_FILE_EXPORT_MWS,  SetWindow::onFileExportMWS)
   EVT_MENU      (ID_FILE_CHECK_UPDATES,  SetWindow::onFileCheckUpdates)
 #if USE_SCRIPT_PROFILING

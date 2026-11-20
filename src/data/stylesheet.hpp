@@ -66,6 +66,10 @@ public:
   
   /// Load a StyleSheet, given a Game and the name of the StyleSheet
   static StyleSheetP byGameAndName(const Game& game, const String& name);
+  /// Picks a replacement when a stylesheet (or one of its dependencies) can't be loaded.
+  /** Installed by the host program (the desktop gui asks the user); without one, loading fails.
+   *  Returns nullptr to give up. */
+  static function<StyleSheetP(const Game& game, const String& failed_name, const String& failed_dep)> select_alternative;
   /// name of the package without the game name
   String stylesheetName() const;
   

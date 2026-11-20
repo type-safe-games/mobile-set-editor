@@ -16,7 +16,7 @@
 #include <data/game.hpp>
 #include <data/pack.hpp>
 #include <data/settings.hpp>
-#include <util/window_id.hpp>
+#include <gui/window_id.hpp>
 #include <wx/spinctrl.h>
 #include <wx/dcbuffer.h>
 #include <wx/scrolwin.h>

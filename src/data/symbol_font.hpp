@@ -73,15 +73,12 @@ public:
   String typeName() const override;
   Version fileVersion() const override;
   
-  /// Generate a 'insert symbol' menu.
-  /** This class owns the menu!
-   *  All ids used will be in the range ID_INSERT_SYMBOL_MENU_MIN...ID_INSERT_SYMBOL_MENU_MAX.
-   *  If there is no insert symbol menu, returns nullptr.
-   */
-  wxMenu* insertSymbolMenu(Context& ctx);
-  /// Process a choice from the insert symbol menu
-  /** Return the code representing the symbol */
-  String insertSymbolCode(int menu_id) const;
+  /// The description of this font's 'insert symbol' menu, or nullptr if it has none
+  const InsertSymbolMenu* insertSymbolMenu() const { return insert_symbol_menu.get(); }
+  /// Preview image of the symbol an 'insert symbol' menu item inserts, or an invalid bitmap if there is none
+  Bitmap insertSymbolPreview(const InsertSymbolMenu& item, wxSize size);
+  /// The host's built 'insert symbol' menu, owned and cached by this font (the desktop gui keeps a wxMenu here)
+  shared_ptr<void> insert_symbol_menu_ui;
     
 private:
   double img_size;  ///< Font size that the images use
@@ -89,7 +86,6 @@ private:
   // writing text
   bool scale_text;  ///< Should text be scaled down to fit in a symbol?
   InsertSymbolMenuP insert_symbol_menu;
-  wxMenu* processed_insert_symbol_menu;
   
   friend class SymbolInFont;
   friend class InsertSymbolMenu;
@@ -132,14 +128,9 @@ public:
   
   /// Number of ids used (recursive)
   int size() const;
-  /// Get the code for an item, id relative to the start of this menu
-  String getCode(int id, const SymbolFont& font) const;
-  /// Make an actual menu
-  wxMenu* makeMenu(int first_id, SymbolFont& font) const;
+  /// The CODE or CUSTOM item with the given id (relative to the start of this menu), or nullptr
+  const InsertSymbolMenu* itemAt(int id) const;
 private:
-  /// Make an actual menu item
-  wxMenuItem* makeMenuItem(wxMenu* parent, int first_id, SymbolFont& font) const;
-  
   DECLARE_REFLECTION();
 };
 

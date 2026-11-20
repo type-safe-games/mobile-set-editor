@@ -7,7 +7,7 @@
 // ----------------------------------------------------------------------------- : Includes
 
 #include <util/prec.hpp>
-#include <data/format/clipboard.hpp>
+#include <gui/clipboard.hpp>
 #include <data/format/formats.hpp>
 #include <data/card.hpp>
 #include <data/set.hpp>

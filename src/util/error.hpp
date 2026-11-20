@@ -135,10 +135,6 @@ public:
 
 // ----------------------------------------------------------------------------- : Error/message handling
 
-/// Should a popup be shown for internal errors?
-extern bool show_message_box_for_fatal_errors;
-extern bool write_errors_to_cli;
-
 /// Types/levels of (error)messages
 enum MessageType
 {  MESSAGE_NONE
@@ -152,8 +148,16 @@ enum MessageType
 ,  MESSAGE_TYPE_MAX
 };
 
+/// Receives (error) messages on the main thread as they are queued.
+/** Returns true if it dealt with the message, false to queue it for get_queued_message.
+ *  Installed by the host program: the desktop program writes to the console in cli mode,
+ *  and shows a popup for fatal errors otherwise.
+ */
+typedef function<bool(MessageType type, String const& msg)> ErrorSink;
+extern ErrorSink error_sink;
+
 /// Queue an (error) message, it can later be retrieved with get_queued_message
-/** If the message is a MESSAGE_FATAL_ERROR, and show_message_box_for_fatal_errors==true, then a popup is shown
+/** On the main thread the message goes to the error_sink first.
  */
 void queue_message(MessageType type, String const& msg);
 void qm(String const& msg);

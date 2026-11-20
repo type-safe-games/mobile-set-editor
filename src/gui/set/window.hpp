@@ -130,7 +130,6 @@ private:
   void onFileExportImage     (wxCommandEvent&);
   void onFileExportImages    (wxCommandEvent&);
   void onFileExportHTML      (wxCommandEvent&);
-  void onFileExportApprentice(wxCommandEvent&);
   void onFileExportMWS       (wxCommandEvent&);
   void onFileCheckUpdates    (wxCommandEvent&);
   void onFileProfiler        (wxCommandEvent&);

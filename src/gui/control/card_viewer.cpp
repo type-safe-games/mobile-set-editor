@@ -14,7 +14,7 @@
 #include <data/settings.hpp>
 #include <render/value/viewer.hpp>
 #include <wx/dcbuffer.h>
-#include <util/window_id.hpp>
+#include <gui/window_id.hpp>
 
 // ----------------------------------------------------------------------------- : Events
 

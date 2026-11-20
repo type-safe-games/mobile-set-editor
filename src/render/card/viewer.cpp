@@ -16,7 +16,7 @@
 #include <data/settings.hpp>
 #include <data/action/value.hpp>
 #include <data/action/set.hpp>
-#include <gui/util.hpp> // clearDC
+#include <gfx/dc_util.hpp>
 
 // ----------------------------------------------------------------------------- : DataViewer
 

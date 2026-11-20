@@ -50,6 +50,17 @@ struct Color {
   inline constexpr unsigned char Alpha() const { return a; }
 };
 
+// ----------------------------------------------------------------------------- : User interface colors
+
+/// Colors of the host's user interface, for values drawn in an editor rather than on a card
+enum class UIColor { WINDOW, WINDOW_TEXT, GRAY_TEXT, APP_WORKSPACE };
+
+/// Looks up a user interface color. Installed by the host; without one, light defaults are used.
+extern function<Color(UIColor)> ui_color_hook;
+
+/// The current user interface color
+Color ui_color(UIColor which);
+
 // -----------------------------------------------------------------------------
 // RGB Color, packed into 3 bytes
 // These are used for arrays in wxImage

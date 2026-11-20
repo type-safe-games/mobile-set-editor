@@ -7,10 +7,11 @@
 // ----------------------------------------------------------------------------- : Includes
 
 #include <util/prec.hpp>
+#include <gfx/color.hpp>
 #include <render/value/multiple_choice.hpp>
 #include <render/value/choice.hpp>
 #include <render/card/viewer.hpp>
-#include <gui/util.hpp>
+#include <gfx/dc_util.hpp>
 
 // ----------------------------------------------------------------------------- : MultipleChoiceValueViewer
 
@@ -27,7 +28,7 @@ void MultipleChoiceValueViewer::draw(RotatedDC& dc) {
   RealPoint pos = align_in_rect(style().alignment, RealSize(0,0), dc.getInternalRect());
   // render background
   if (nativeLook()) {
-    dc.SetBrush(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW));
+    dc.SetBrush(ui_color(UIColor::WINDOW));
     dc.SetPen(*wxTRANSPARENT_PEN);
     dc.DrawRectangle(RealRect(0, 0, dc.getWidth(), dc.getHeight()));
   }
@@ -58,7 +59,7 @@ void MultipleChoiceValueViewer::drawChoice(RotatedDC& dc, RealPoint& pos, const 
   RealSize size; size.height = item_height;
   if (style().render_style & RENDER_CHECKLIST) {
     wxRect rect = dc.trRectToBB(RealRect(pos + RealSize(1,1), RealSize(item_height-2, item_height-2)));
-    draw_checkbox(nullptr, dc.getDC(), rect, active); // TODO
+    draw_checkbox_portable(dc.getDC(), rect, active);
     size = add_horizontal(size, RealSize(item_height, item_height));
   }
   if (style().render_style & RENDER_IMAGE) {
@@ -81,7 +82,7 @@ void MultipleChoiceValueViewer::drawChoice(RotatedDC& dc, RealPoint& pos, const 
     Color font_color = font.color;
     RealSize margin(0, 0);
     if (nativeLook()) {
-      font.color = wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOWTEXT);
+      font.color = ui_color(UIColor::WINDOW_TEXT);
       margin = RealSize(1., 0);
     }
     String text = tr(getStylePackage(), choice, capitalize_sentence);

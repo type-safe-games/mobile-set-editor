@@ -9,7 +9,7 @@
 #include <util/prec.hpp>
 #include <gui/card_select_window.hpp>
 #include <gui/control/select_card_list.hpp>
-#include <util/window_id.hpp>
+#include <gui/window_id.hpp>
 #include <wx/statline.h>
 
 // ----------------------------------------------------------------------------- : ExportCardSelectionChoice

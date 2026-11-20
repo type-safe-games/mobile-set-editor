@@ -8,7 +8,7 @@
 
 #include <util/prec.hpp>
 #include <gui/web_request_window.hpp>
-#include <util/window_id.hpp>
+#include <gui/window_id.hpp>
 #include <wx/mstream.h>
 
 // ----------------------------------------------------------------------------- : WebRequestWindow

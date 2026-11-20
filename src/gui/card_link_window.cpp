@@ -12,7 +12,7 @@
 #include <data/action/value.hpp>
 #include <gui/card_link_window.hpp>
 #include <gui/control/select_card_list.hpp>
-#include <util/window_id.hpp>
+#include <gui/window_id.hpp>
 #include <data/action/set.hpp>
 #include <wx/statline.h>
 #include <unordered_set>
@@ -164,7 +164,7 @@ void CardLinkWindow::onOk(wxCommandEvent&) {
     }
   }
   // Add action to set
-  set->actions.addAction(make_unique<BulkAction>(actions, set, card_list_window, false), false);
+  set->actions.addAction(make_unique<BulkAction>(actions, set, false), false);
   set->actions.tellListeners(GlobalDisplayChangeAction(),true);
   // Done
   EndModal(wxID_OK);

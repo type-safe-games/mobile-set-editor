@@ -15,9 +15,9 @@
 #include <data/keyword.hpp>
 #include <data/action/value.hpp>
 #include <data/action/keyword.hpp>
-#include <data/format/clipboard.hpp>
+#include <gui/clipboard.hpp>
 #include <util/tagged_string.hpp>
-#include <util/window_id.hpp>
+#include <gui/window_id.hpp>
 #include <gfx/color.hpp>
 #include <wx/clipbrd.h>
 

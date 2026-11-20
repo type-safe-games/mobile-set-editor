@@ -14,7 +14,7 @@
 #include <data/game.hpp>
 #include <data/word_list.hpp>
 #include <gfx/gfx.hpp>
-#include <util/window_id.hpp>
+#include <gui/window_id.hpp>
 #include <util/error.hpp>
 
 // ----------------------------------------------------------------------------- : AutoReplaceList

@@ -10,7 +10,6 @@
 #include <data/format/formats.hpp>
 #include <data/set.hpp>
 #include <data/settings.hpp>
-#include <gui/set/window.hpp>
 
 // ----------------------------------------------------------------------------- : MSE2FileFormat
 
@@ -33,7 +32,6 @@ public:
     SetP set = make_intrusive<Set>();
     set->open(set_name);
     settings.addRecentFile(set_name);
-    SetWindow::updateRecentSetsInAllWindows();
     return set;
   }
   void exportSet(Set& set, const String& filename, bool is_copy) override {
@@ -42,8 +40,7 @@ public:
     } else {
       set.saveAs(filename);
       settings.addRecentFile(filename);
-      SetWindow::updateRecentSetsInAllWindows();
-      set.actions.setSavePoint();
+        set.actions.setSavePoint();
     }
   }
 };

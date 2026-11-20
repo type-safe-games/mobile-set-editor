@@ -15,7 +15,7 @@
 #include <data/game.hpp>
 #include <data/statistics.hpp>
 #include <data/action/value.hpp>
-#include <util/window_id.hpp>
+#include <gui/window_id.hpp>
 #include <util/alignment.hpp>
 #include <util/tagged_string.hpp>
 #include <gfx/gfx.hpp>

@@ -21,7 +21,7 @@
 #include <script/functions/construction_helper.hpp>
 #include <gui/bulk_modification_window.hpp>
 #include <gui/control/card_list.hpp>
-#include <util/window_id.hpp>
+#include <gui/window_id.hpp>
 #include <wx/statline.h>
 
 // ----------------------------------------------------------------------------- : AddCSV
@@ -378,7 +378,7 @@ void BulkModificationWindow::onOk(wxCommandEvent&) {
     return;
   }
   else {
-    set->actions.addAction(make_unique<BulkAction>(actions, set, card_list_window, actions.size() > 1), false);
+    set->actions.addAction(make_unique<BulkAction>(actions, set, actions.size() > 1), false);
     set->actions.tellListeners(GlobalDisplayChangeAction(),true);
     wxMessageDialog dial = wxMessageDialog(this, _ERROR_1_("bulk modify success", String() << actions.size()));
     dial.ShowModal();

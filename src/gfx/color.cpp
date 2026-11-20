@@ -77,6 +77,19 @@ optional<Color> parse_color(const String& v) {
   }
 }
 
+function<Color(UIColor)> ui_color_hook;
+
+Color ui_color(UIColor which) {
+  if (ui_color_hook) return ui_color_hook(which);
+  switch (which) {
+    case UIColor::WINDOW:        return Color(255,255,255);
+    case UIColor::WINDOW_TEXT:   return Color(0,0,0);
+    case UIColor::GRAY_TEXT:     return Color(128,128,128);
+    case UIColor::APP_WORKSPACE: return Color(171,171,171);
+  }
+  return Color(0,0,0);
+}
+
 String format_color(Color col) {
   if (col.Alpha() == 255) {
     return String::Format(_("rgb(%u,%u,%u)"), col.Red(), col.Green(), col.Blue());

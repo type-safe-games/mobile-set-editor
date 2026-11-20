@@ -18,7 +18,6 @@
 #include <data/field/information.hpp>
 #include <data/field/boolean.hpp>
 #include <data/field/multiple_choice.hpp>
-#include <data/format/clipboard.hpp>
 #include <data/update_cards_script.hpp>
 #include <data/add_cards_script.hpp>
 #include <render/symbol/filter.hpp>

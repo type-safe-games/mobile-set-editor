@@ -243,6 +243,7 @@ void Settings::addRecentFile(const String& filename) {
   recent_sets.insert(recent_sets.begin(), filenameAbs);
   // enforce size limit
   if (recent_sets.size() > max_recent_sets) recent_sets.resize(max_recent_sets);
+  if (on_recent_sets_changed) on_recent_sets_changed();
 }
 
 GameSettings& Settings::gameSettingsFor(const Game& game) {
@@ -339,7 +340,7 @@ String Settings::settingsFile() {
 }
 
 bool Settings::darkMode() {
-  return wxSystemSettings::GetAppearance().IsDark();
+  return dark_mode_hook && dark_mode_hook();
 }
 
 String Settings::darkModePrefix() {

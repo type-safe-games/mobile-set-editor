@@ -574,6 +574,17 @@ public:
 
 // ----------------------------------------------------------------------------- : DownloadedImage
 
+/// Result of downloading a file for DownloadedImage
+struct ImageDownload {
+  String content_type;
+  Image  image;
+};
+
+/// Downloads a url for DownloadedImage, returns false if the download failed or was cancelled.
+/** Installed by the host program; without one, downloads always fail.
+ *  The desktop gui shows a progress window. */
+extern function<bool(const String& url, ImageDownload& out)> download_image_hook;
+
 /// Load an image from the internet
 class DownloadedImage : public ExternalImage {
 public:

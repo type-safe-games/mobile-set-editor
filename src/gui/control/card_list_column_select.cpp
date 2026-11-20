@@ -10,7 +10,7 @@
 #include <gui/control/card_list_column_select.hpp>
 #include <data/game.hpp>
 #include <data/field.hpp>
-#include <util/window_id.hpp>
+#include <gui/window_id.hpp>
 
 // ----------------------------------------------------------------------------- : CardListColumnSelectDialog
 

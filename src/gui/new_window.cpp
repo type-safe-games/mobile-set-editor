@@ -17,7 +17,7 @@
 #include <data/set.hpp>
 #include <data/card.hpp>
 #include <data/settings.hpp>
-#include <util/window_id.hpp>
+#include <gui/window_id.hpp>
 
 // ----------------------------------------------------------------------------- : NewSetWindow
 

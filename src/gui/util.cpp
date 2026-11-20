@@ -12,6 +12,7 @@
 #include <util/rotation.hpp>
 #include <util/file_utils.hpp>
 #include <wx/renderer.h>
+#include <wx/progdlg.h>
 #include <wx/stdpaths.h>
 #include <wx/mstream.h>
 #include <gfx/gfx.hpp>
@@ -95,143 +96,22 @@ void set_help_text(Window* wnd, const String& s) {
 }
 
 
-// ----------------------------------------------------------------------------- : DC related
+// ----------------------------------------------------------------------------- : Progress
 
-/// Fill a DC with a single color
-void clearDC(DC& dc, const wxBrush& brush) {
-  wxSize size = dc.GetSize();
-  wxPoint pos = dc.GetDeviceOrigin(); // don't you love undocumented methods?
-  dc.SetPen(*wxTRANSPARENT_PEN);
-  dc.SetBrush(brush);
-  dc.DrawRectangle(-pos.x, -pos.y, size.GetWidth(), size.GetHeight());
-}
-
-void clearDC_black(DC& dc) {
-  #if !BITMAPS_DEFAULT_BLACK
-    // On windows 9x it seems that bitmaps are not black by default
-    clearDC(dc, *wxBLACK_BRUSH);
-  #endif
-}
-
-void draw_checker(RotatedDC& dc, const RealRect& rect) {
-  dc.SetPen(*wxTRANSPARENT_PEN);
-  dc.SetBrush(*wxWHITE_BRUSH);
-  dc.DrawRectangle(rect);
-  dc.SetBrush(Color(235,235,235));
-  const double checker_size = 10;
-  int odd = 0;
-  for (double y = 0 ; y < rect.height ; y += checker_size) {
-    for (double x = odd * checker_size ; x < rect.width ; x += checker_size * 2) {
-      dc.DrawRectangle(RealRect(
-                rect.x + x,
-                rect.y + y,
-                min(checker_size, rect.width  - x),
-                min(checker_size, rect.height - y)
-              ));
+function<bool(int done, int total)> import_cards_progress() {
+  auto dialog = make_shared<unique_ptr<wxProgressDialog>>();
+  return [dialog](int done, int total) {
+    if (!*dialog) {
+      *dialog = make_unique<wxProgressDialog>(
+        _TITLE_("importing cards"),
+        wxString::Format(_LABEL_2_("importing cards", String()<<1, String()<<total)),
+        total,
+        nullptr,
+        wxPD_APP_MODAL | wxPD_AUTO_HIDE | wxPD_CAN_ABORT
+      );
     }
-    odd = 1 - odd;
-  }
-}
-
-
-// ----------------------------------------------------------------------------- : Seekable stream
-
-/// A wxInputStream in which we can seek, even if the underlying stream can't
-/** Seeking is used by the wxImage format detection code, to peek at the header.
- *  So we only need to be able to seek back to the beginning.
- *  The solution is to keep a small buffer of the file header.
- */
-class SeekableInputStream : public wxInputStream {
-public:
-  SeekableInputStream(wxInputStream& stream)
-    : stream(stream) {
-  }
-  bool IsOk() const override {
-    return stream.IsOk();
-  }
-  bool IsSeekable() const override {
-    return pos < (wxFileOffset)BUFFER_SIZE;
-  }
-  size_t LastRead() const override {
-    return last_read;
-  }
-  char Peek() override {
-    if (pos < stream_pos) {
-      return buffer[pos];
-    } else {
-      return stream.Peek();
-    }
-  }
-  wxInputStream& Read(void* out_buffer, size_t size) override {
-    last_read = 0;
-    if (pos < stream_pos) {
-      // take from buffer
-      size_t n = min(size, min((size_t)stream_pos, BUFFER_SIZE) - (size_t)pos);
-      memcpy(out_buffer, buffer + pos, n);
-      size -= n;
-      out_buffer = (char*)out_buffer + n;
-      last_read += n;
-      pos += n;
-    }
-    if (size > 0) {
-      assert(pos == stream_pos);
-      // take from stream
-      stream.Read(out_buffer, size);
-      size_t read = stream.LastRead();
-      last_read += read;
-      if (pos < (wxFileOffset)BUFFER_SIZE) {
-        // update buffer
-        memcpy(buffer + pos, out_buffer, min(BUFFER_SIZE - (size_t)pos, read));
-      }
-      stream_pos += read;
-      pos += read;
-    }
-    return *this;
-  }
-  wxFileOffset SeekI(wxFileOffset target, wxSeekMode mode = wxFromStart) override {
-    assert(mode == wxFromStart);
-    assert(target < (wxFileOffset)BUFFER_SIZE);
-    if (target < (wxFileOffset)BUFFER_SIZE) {
-      pos = target;
-      return target;
-    } else {
-      return wxInvalidOffset;
-    }
-  }
-  wxFileOffset TellI() const override {
-    return pos;
-  }
-protected:
-  size_t OnSysRead(void* out_buffer, size_t size) override {
-    Read(out_buffer, size);
-    return last_read;
-  }
-private:
-  wxInputStream& stream;
-  static constexpr size_t BUFFER_SIZE = 16;
-  Byte buffer[BUFFER_SIZE];
-  // positions:
-  // Invariant: pos < stream_pos ==> pos < BUFFER_SIZE && buffer[i] is valid for i<=pos
-  wxFileOffset stream_pos = 0; // position in underlying stream
-  wxFileOffset pos = 0; // position taking into account any seeking done.
-  size_t last_read = 0;
-};
-
-// ----------------------------------------------------------------------------- : Image related
-
-bool image_load_file(Image& image, wxInputStream &stream) {
-  wxLogNull noLog; // prevent wx from showing popups about sRGB profiles and other notices
-  if (!stream.IsSeekable()) {
-    SeekableInputStream seek_stream(stream);
-    return image.LoadFile(seek_stream);
-  } else {
-    return image.LoadFile(stream);
-  }
-}
-
-bool image_load_file(Image& image, const wxString &name) {
-  wxLogNull noLog;
-  return retry_io([&]{ return image.LoadFile(name); });
+    return (*dialog)->Update(done, wxString::Format(_LABEL_2_("importing cards", String()<<(done+1), String()<<total)));
+  };
 }
 
 // ----------------------------------------------------------------------------- : Tool/menu bar
@@ -297,47 +177,6 @@ wxToolBarToolBase* add_tool_tr(wxToolBar* toolbar, int id, const char* resource,
 }
 
 // ----------------------------------------------------------------------------- : Resource related
-
-Image load_resource_image(const String& name) {
-  #if defined(__WXMSW__) && !defined(__GNUC__)
-    // Load resource
-    // based on wxLoadUserResource
-    // The image can be in an IMAGE resource, in any file format
-    HRSRC hResource = ::FindResource(wxGetInstance(), name.wc_str(), _("IMAGE"));
-    if ( hResource == 0 ) throw InternalError(String::Format(_("Resource not found: %s"), name));
-    
-    HGLOBAL hData = ::LoadResource(wxGetInstance(), hResource);
-    if ( hData == 0 ) throw InternalError(String::Format(_("Resource not an image: %s"), name));
-    
-    char* data = (char *)::LockResource(hData);
-    if ( !data ) throw InternalError(String::Format(_("Resource cannot be locked: %s"), name));
-    
-    int len = ::SizeofResource(wxGetInstance(), hResource);
-    wxMemoryInputStream stream(data, len);
-
-    wxLogNull noLog;
-    return wxImage(stream);
-  #elif defined(__GNUC__)
-    static String path = wxStandardPaths::Get().GetDataDir() + _("/resource/");
-    String file = path + name;
-    wxImage resource;
-    if (wxFileExists(file + _(".png"))) image_load_file(resource, file + _(".png"));
-    else if (wxFileExists(file + _(".bmp"))) image_load_file(resource, file + _(".bmp"));
-    else if (wxFileExists(file + _(".ico"))) image_load_file(resource, file + _(".ico"));
-    else if (wxFileExists(file + _(".cur"))) image_load_file(resource, file + _(".cur"));
-    if (resource.Ok()) return resource;
-        static String local_path = wxStandardPaths::Get().GetUserDataDir() + _("/resource/");
-        file = local_path + name;
-        if (wxFileExists(file + _(".png"))) image_load_file(resource, file + _(".png"));
-        else if (wxFileExists(file + _(".bmp"))) image_load_file(resource, file + _(".bmp"));
-        else if (wxFileExists(file + _(".ico"))) image_load_file(resource, file + _(".ico"));
-        else if (wxFileExists(file + _(".cur"))) image_load_file(resource, file + _(".cur"));
-        if (!resource.Ok()) handle_error(InternalError(String(_("Cannot find resource file at ")) + path + name + _(" or ") + file));
-    return resource;
-  #else
-    #error Handling of resource loading needs to be declared.
-  #endif
-}
 
 wxCursor load_resource_cursor(const String& name) {
   #if defined(__WXMSW__) && !defined(__GNUC__)
@@ -492,13 +331,7 @@ void draw_checkbox(const Window* win, DC& dc, const wxRect& rect, bool checked, 
     rn.DrawCheckBox(const_cast<wxWindow*>(win), dc, rect, (checked ? wxCONTROL_CHECKED : 0) | (enabled ? 0 : wxCONTROL_DISABLED));
     return;
   } else {
-    // portable version
-    if (checked) {
-      dc.DrawCheckMark(wxRect(rect.x+1,rect.y+1,rect.width-2,rect.height-2));
-    }
-    dc.SetPen(wxSystemSettings::GetColour(enabled ? wxSYS_COLOUR_WINDOWTEXT: wxSYS_COLOUR_GRAYTEXT));
-    dc.SetBrush(*wxTRANSPARENT_BRUSH);
-    dc.DrawRectangle(rect.x, rect.y, rect.width, rect.height);
+    draw_checkbox_portable(dc, rect, checked, enabled);
   }
 }
 

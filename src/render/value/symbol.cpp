@@ -11,7 +11,7 @@
 #include <render/value/symbol.hpp>
 #include <render/symbol/filter.hpp>
 #include <data/symbol.hpp>
-#include <gui/util.hpp> // draw_checker
+#include <gfx/dc_util.hpp>
 #include <util/error.hpp>
 
 // ----------------------------------------------------------------------------- : SymbolValueViewer

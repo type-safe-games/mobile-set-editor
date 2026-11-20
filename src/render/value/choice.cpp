@@ -7,6 +7,7 @@
 // ----------------------------------------------------------------------------- : Includes
 
 #include <util/prec.hpp>
+#include <gfx/color.hpp>
 #include <render/value/choice.hpp>
 #include <render/card/viewer.hpp>
 
@@ -24,7 +25,7 @@ void ChoiceValueViewer::draw(RotatedDC& dc) {
   if (style().render_style & RENDER_HIDDEN) return;
   // render background
   if (nativeLook()) {
-    dc.SetBrush(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW));
+    dc.SetBrush(ui_color(UIColor::WINDOW));
     dc.SetPen(*wxTRANSPARENT_PEN);
     dc.DrawRectangle(RealRect(0, 0, dc.getWidth(), dc.getHeight()));
   }
@@ -111,7 +112,7 @@ void draw_choice_viewer(RotatedDC& dc, ValueViewer& viewer, ChoiceStyle& style, 
     FontRef& font = style.font;
     Color font_color = font.color;
     if (viewer.nativeLook()) {
-      font.color = wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOWTEXT);
+      font.color = ui_color(UIColor::WINDOW_TEXT);
       margin += 1.;
     }
     dc.SetFont(font, 1.0);

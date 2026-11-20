@@ -9,7 +9,7 @@
 #include <util/prec.hpp>
 #include <gui/preferences_window.hpp>
 #include <data/settings.hpp>
-#include <util/window_id.hpp>
+#include <gui/window_id.hpp>
 #include <util/io/package_manager.hpp>
 #include <gui/packages_window.hpp>
 #include <gui/downloadable_installers.hpp>

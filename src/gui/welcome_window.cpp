@@ -11,7 +11,7 @@
 #include <gui/util.hpp>
 #include <gui/new_window.hpp>
 #include <gui/set/window.hpp>
-#include <util/window_id.hpp>
+#include <gui/window_id.hpp>
 #include <data/settings.hpp>
 #include <data/format/formats.hpp>
 #include <wx/dcbuffer.h>

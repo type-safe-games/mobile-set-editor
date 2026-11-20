@@ -15,7 +15,6 @@
 #include <util/io/package_manager.hpp>
 #include <util/rotation.hpp>
 #include <util/error.hpp>
-#include <util/window_id.hpp>
 #include <render/text/element.hpp> // fot CharInfo
 #include <script/image.hpp>
 
@@ -29,12 +28,9 @@ SymbolFont::SymbolFont()
   : img_size(12)
   , spacing(1,1)
   , scale_text(false)
-  , processed_insert_symbol_menu(nullptr)
 {}
 
-SymbolFont::~SymbolFont() {
-  delete processed_insert_symbol_menu;
-}
+SymbolFont::~SymbolFont() {}
 
 String SymbolFont::typeNameStatic() { return _("symbol-font"); }
 String SymbolFont::typeName() const { return _("symbol-font"); }
@@ -488,21 +484,22 @@ RealSize SymbolFont::spacingSize(double font_size) {
 
 // ----------------------------------------------------------------------------- : InsertSymbolMenu
 
-wxMenu* SymbolFont::insertSymbolMenu(Context& ctx) {
-  if (!processed_insert_symbol_menu && insert_symbol_menu) {
-    update(ctx);
-    // Make menu
-    processed_insert_symbol_menu = insert_symbol_menu->makeMenu(ID_INSERT_SYMBOL_MENU_MIN, *this);
+Bitmap SymbolFont::insertSymbolPreview(const InsertSymbolMenu& item, wxSize size) {
+  SymbolInFont* symbol = nullptr;
+  if (item.type == InsertSymbolMenu::Type::CUSTOM) {
+    symbol = defaultSymbol();
+  } else if (item.type == InsertSymbolMenu::Type::CODE) {
+    FOR_EACH(sym, symbols) {
+      if (!sym->code.empty() && sym->enabled && item.name == sym->code) {
+        symbol = sym.get();
+        break;
+      }
+    }
   }
-  return processed_insert_symbol_menu;
-}
-
-String SymbolFont::insertSymbolCode(int menu_id) const {
-  // find item
-  if (insert_symbol_menu) {
-    return insert_symbol_menu->getCode(menu_id - ID_INSERT_SYMBOL_MENU_MIN, *this);
+  if (symbol && symbol->preview_enabled()) {
+    return symbol->getBitmap(*this, size);
   } else {
-    return _("");
+    return wxNullBitmap;
   }
 }
 
@@ -524,88 +521,19 @@ int InsertSymbolMenu::size() const {
     return 0;
   }
 }
-String InsertSymbolMenu::getCode(int id, const SymbolFont& font) const {
+const InsertSymbolMenu* InsertSymbolMenu::itemAt(int id) const {
   if (type == Type::SUBMENU) {
     FOR_EACH_CONST(i, items) {
       int id2 = id - i->size();
       if (id2 < 0) {
-        return i->getCode(id, font);
+        return i->itemAt(id);
       }
       id = id2;
     }
-  } else if (id == 0 && type == Type::CODE) {
-    return name;
-  } else if (id == 0 && type == Type::CUSTOM) {
-    String title = this->label.get();
-    title.Replace(_("&"), _("")); // remove underlines
-    return wxGetTextFromUser(prompt.get(), title);
-  }
-  return String();
-}
-
-wxMenu* InsertSymbolMenu::makeMenu(int id, SymbolFont& font) const {
-  if (type == Type::SUBMENU) {
-    wxMenu* menu = new wxMenu();
-    FOR_EACH_CONST(i, items) {
-      menu->Append(i->makeMenuItem(menu, id, font));
-      id += i->size();
-    }
-    return menu;
+  } else if (id == 0 && (type == Type::CODE || type == Type::CUSTOM)) {
+    return this;
   }
   return nullptr;
-}
-
-wxMenuItem* InsertSymbolMenu::makeMenuItem(wxMenu* parent, int first_id, SymbolFont& font) const {
-  String label = this->label.get();
-  // ensure that we are not defining an accelerator...
-  // everything after a tab is considered to be an accelerator by wxMenuItem
-  int accel_pos = label.find_last_of('\t');
-  if (accel_pos != label.npos && accel_pos > 0) {
-    String accel = label.substr(accel_pos+1);
-#ifdef __WXMSW__
-    // if there is a + or - in the accelerator, replace the tab with spaces (simply adding a space does not work)
-    if (accel.Contains("+") || accel.Contains("-")) {
-      label = label.substr(0, accel_pos) + _("      ") + accel;
-    }
-    // otherwise simply add a space after the tab if there isn't one
-    else {
-      label.Replace(_("\t "), _("\t"));
-      label.Replace(_("\t"), _("\t "));
-    }
-#else
-    label = label.substr(0, accel_pos) + _("      ") + accel; // replace the tab with spaces
-#endif
-  }
-  if (type == Type::SUBMENU) {
-    wxMenuItem* item = new wxMenuItem(parent, wxID_ANY, label,
-                                      _(""), wxITEM_NORMAL,
-                                      makeMenu(first_id, font));
-    item->SetBitmap(wxNullBitmap);
-    return item;
-  } else if (type == Type::LINE) {
-    wxMenuItem* item = new wxMenuItem(parent, wxID_SEPARATOR);
-    return item;
-  } else {
-    wxMenuItem* item = new wxMenuItem(parent, first_id, label);
-    // Generate bitmap for use on this item
-    SymbolInFont* symbol = nullptr;
-    if (type == Type::CUSTOM) {
-      symbol = font.defaultSymbol();
-    } else {
-      FOR_EACH(sym, font.symbols) {
-        if (!sym->code.empty() && sym->enabled && name == sym->code) { 
-          symbol = sym.get();
-          break;
-        }
-      }
-    }
-    if (symbol && symbol->preview_enabled()) {
-      item->SetBitmap(symbol->getBitmap(font, wxSize(16,16)));
-    } else {
-      item->SetBitmap(wxNullBitmap);
-    }
-    return item;
-  }
 }
 
 

@@ -12,7 +12,7 @@
 #include <sstream>
 #include <regex>
 #include <util/prec.hpp>
-#include <util/window_id.hpp>
+#include <gui/window_id.hpp>
 #include <data/game.hpp>
 #include <data/set.hpp>
 #include <data/card.hpp>
@@ -21,6 +21,7 @@
 #include <data/format/formats.hpp>
 #include <gui/add_json_window.hpp>
 #include <script/functions/json.hpp>
+#include <gui/util.hpp>
 #include <script/functions/construction_helper.hpp>
 #include <wx/statline.h>
 #include <boost/json.hpp>
@@ -198,7 +199,7 @@ void AddJSONWindow::onOk(wxCommandEvent&) {
   }
   // Produce cards from the table
   vector<CardP> cards;
-  if (!cards_from_table(set, headers, table, true, _("JSON"), cards)) {
+  if (!cards_from_table(set, headers, table, true, _("JSON"), cards, import_cards_progress())) {
     EndModal(wxID_ABORT);
     return;
   }

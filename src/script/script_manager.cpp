@@ -291,7 +291,6 @@ void SetScriptManager::updateAll() {
   #ifdef LOG_UPDATES
     wxLogDebug(_("Update all"));
   #endif
-  wxBusyCursor busy;
   // update set data
   Context& ctx = getContext(set.stylesheet);
   FOR_EACH(v, set.data) {

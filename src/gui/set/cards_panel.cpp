@@ -20,9 +20,9 @@
 #include <data/add_cards_script.hpp>
 #include <data/action/set.hpp>
 #include <data/settings.hpp>
-#include <util/find_replace.hpp>
+#include <gui/find_replace.hpp>
 #include <util/tagged_string.hpp>
-#include <util/window_id.hpp>
+#include <gui/window_id.hpp>
 #include <wx/splitter.h>
 #include <wx/gbsizer.h>
 #include <wx/scrolwin.h>

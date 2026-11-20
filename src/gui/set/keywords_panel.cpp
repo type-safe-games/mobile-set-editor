@@ -16,7 +16,7 @@
 #include <data/action/value.hpp>
 #include <data/action/keyword.hpp>
 #include <data/field/text.hpp>
-#include <util/window_id.hpp>
+#include <gui/window_id.hpp>
 #include <wx/listctrl.h>
 #include <wx/splitter.h>
 #include <wx/statline.h>

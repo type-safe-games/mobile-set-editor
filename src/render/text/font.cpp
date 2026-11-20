@@ -7,6 +7,7 @@
 // ----------------------------------------------------------------------------- : Includes
 
 #include <util/prec.hpp>
+#include <gfx/color.hpp>
 #include <render/text/element.hpp>
 #include <data/font.hpp>
 
@@ -23,7 +24,7 @@ void FontTextElement::draw(RotatedDC& dc, double scale, const RealRect& rect, co
   Color font_color = font->color;
   RealSize margin(0, 0);
   if (native_look) {
-    font->color = wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOWTEXT);
+    font->color = ui_color(UIColor::WINDOW_TEXT);
     margin = RealSize(1., 0);
   }
   dc.SetFont(*font, scale);

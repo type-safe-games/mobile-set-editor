@@ -20,7 +20,6 @@
 #include <data/set.hpp>
 #include <data/stylesheet.hpp>
 #include <data/card.hpp>
-#include <wx/progdlg.h>
 
 // ----------------------------------------------------------------------------- : Helper functions
 
@@ -239,7 +238,10 @@ inline static bool check_table_headers(GameP& game, std::vector<String>& headers
   return true;
 }
 
-inline static bool cards_from_table(SetP& set, vector<String>& headers, std::vector<std::vector<ScriptValueP>>& table, bool ignore_field_not_found, const String& file_extension, vector<CardP>& cards_out) {
+/// Reports progress while producing cards (done, total); return false to cancel.
+typedef function<bool(int done, int total)> CardsProgress;
+
+inline static bool cards_from_table(SetP& set, vector<String>& headers, std::vector<std::vector<ScriptValueP>>& table, bool ignore_field_not_found, const String& file_extension, vector<CardP>& cards_out, const CardsProgress& progress = nullptr) {
   // ensure table is square
   int count = headers.size();
   for (int y = 0; y < table.size(); ++y) {
@@ -255,21 +257,10 @@ inline static bool cards_from_table(SetP& set, vector<String>& headers, std::vec
   ScriptValueP ctx_ignore = ctx.getVariableOpt("ignore_field_not_found");
   ctx.setVariable("ignore_field_not_found", to_script(ignore_field_not_found));
   int total = (int)table.size();
-  // progress dialog, lets the user cancel
-  std::unique_ptr<wxProgressDialog> progress;
-  if (total > 0) {
-    progress = std::make_unique<wxProgressDialog>(
-      _TITLE_("importing cards"),
-      wxString::Format(_LABEL_2_("importing cards", String()<<1, String()<<total)),
-      total,
-      nullptr,
-      wxPD_APP_MODAL | wxPD_AUTO_HIDE | wxPD_CAN_ABORT
-    );
-  }
   bool cancelled = false;
   // produce cards from table
   for (int y = 0; y < total; ++y) {
-    if (progress && !progress->Update(y, wxString::Format(_LABEL_2_("importing cards", String()<<(y+1), String()<<total)))) {
+    if (progress && !progress(y, total)) {
       cancelled = true;
       break;
     }

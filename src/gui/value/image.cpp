@@ -9,7 +9,7 @@
 #include <util/prec.hpp>
 #include <gui/value/image.hpp>
 #include <gui/image_slice_window.hpp>
-#include <data/format/clipboard.hpp>
+#include <gui/clipboard.hpp>
 #include <data/action/value.hpp>
 #include <data/card.hpp>
 #include <data/stylesheet.hpp>

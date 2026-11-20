@@ -10,13 +10,14 @@
 #include <sstream>
 #include <regex>
 #include <util/prec.hpp>
-#include <util/window_id.hpp>
+#include <gui/window_id.hpp>
 #include <data/game.hpp>
 #include <data/set.hpp>
 #include <data/card.hpp>
 #include <data/stylesheet.hpp>
 #include <data/action/set.hpp>
 #include <gui/add_csv_window.hpp>
+#include <gui/util.hpp>
 #include <script/functions/construction_helper.hpp>
 #include <wx/statline.h>
 
@@ -193,7 +194,7 @@ void AddCSVWindow::onOk(wxCommandEvent&) {
   }
   // Produce cards from the table
   vector<CardP> cards;
-  if (!cards_from_table(set, headers, table, true, _("CSV / TSV"), cards)) {
+  if (!cards_from_table(set, headers, table, true, _("CSV / TSV"), cards, import_cards_progress())) {
     EndModal(wxID_ABORT);
     return;
   }

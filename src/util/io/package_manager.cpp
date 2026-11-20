@@ -486,8 +486,8 @@ bool PackageDirectory::actual_install(const InstallablePackage& package, const S
     if (!out_stream->IsOk() || (!in_stream->Eof() && in_stream->GetLastError() != wxSTREAM_NO_ERROR)) {
       out_stream.reset();
       remove_file(local_file);
-      int act = wxMessageBox(_ERROR_1_("cannot create file", file), _TITLE_("cannot create file"), wxICON_ERROR | wxYES_NO, wxGetActiveWindow());
-      if (act == wxNO) return false;
+      queue_message(MESSAGE_ERROR, _ERROR_1_("cannot create file", file));
+      return false;
     }
     // report progress
     ++files_done;

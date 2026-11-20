@@ -7,9 +7,10 @@
 // ----------------------------------------------------------------------------- : Includes
 
 #include <util/prec.hpp>
+#include <gfx/color.hpp>
 #include <render/value/package_choice.hpp>
 #include <util/io/package_manager.hpp>
-#include <gui/util.hpp>
+#include <gfx/image_load.hpp>
 
 // ----------------------------------------------------------------------------- : PackageChoiceValueViewer
 
@@ -46,7 +47,7 @@ void PackageChoiceValueViewer::draw(RotatedDC& dc) {
   drawFieldBorder(dc);
   // draw background
   if (nativeLook()) {
-    dc.SetBrush(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW));
+    dc.SetBrush(ui_color(UIColor::WINDOW));
     dc.SetPen(*wxTRANSPARENT_PEN);
     dc.DrawRectangle(RealRect(0, 0, dc.getWidth(), dc.getHeight()));
   }
@@ -72,7 +73,7 @@ void PackageChoiceValueViewer::draw(RotatedDC& dc) {
   Color font_color = font.color;
   RealSize margin(0, 0);
   if (nativeLook()) {
-    font.color = wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOWTEXT);
+    font.color = ui_color(UIColor::WINDOW_TEXT);
     margin = RealSize(1., 0);
   }
   dc.SetFont(font, 1.0);

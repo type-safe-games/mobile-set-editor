@@ -13,7 +13,7 @@
 #include <gfx/bezier.hpp>
 #include <data/action/symbol_part.hpp>
 #include <data/settings.hpp>
-#include <util/window_id.hpp>
+#include <gui/window_id.hpp>
 #include <util/error.hpp>
 
 // ----------------------------------------------------------------------------- : SymbolPointEditor

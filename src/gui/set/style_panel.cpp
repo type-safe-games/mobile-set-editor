@@ -13,7 +13,7 @@
 #include <gui/control/card_viewer.hpp>
 #include <gui/control/native_look_editor.hpp>
 #include <gui/util.hpp>
-#include <util/window_id.hpp>
+#include <gui/window_id.hpp>
 #include <data/set.hpp>
 #include <data/game.hpp>
 #include <data/card.hpp>

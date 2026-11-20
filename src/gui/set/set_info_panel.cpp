@@ -10,7 +10,7 @@
 #include <gui/set/set_info_panel.hpp>
 #include <gui/control/native_look_editor.hpp>
 #include <gui/util.hpp>
-#include <util/window_id.hpp>
+#include <gui/window_id.hpp>
 
 // ----------------------------------------------------------------------------- : SetInfoPanel
 

@@ -13,7 +13,7 @@
 #include <gui/util.hpp>
 #include <gui/set/window.hpp>
 #include <util/io/package_manager.hpp>
-#include <util/window_id.hpp>
+#include <gui/window_id.hpp>
 #include <data/installer.hpp>
 #include <data/updater.hpp>
 #include <data/settings.hpp>

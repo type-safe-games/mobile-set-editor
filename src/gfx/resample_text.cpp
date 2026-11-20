@@ -9,7 +9,7 @@
 #include <util/prec.hpp>
 #include <gfx/gfx.hpp>
 #include <util/error.hpp>
-#include <gui/util.hpp> // clearDC_black
+#include <gfx/dc_util.hpp>
 
 void blur_image(const Image& img_in, Image& img_out);
 

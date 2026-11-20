@@ -9,7 +9,7 @@
 #include <util/prec.hpp>
 #include <gui/symbol/symmetry_editor.hpp>
 #include <gui/util.hpp>
-#include <util/window_id.hpp>
+#include <gui/window_id.hpp>
 #include <data/settings.hpp>
 #include <data/action/symbol.hpp>
 #include <data/action/symbol_part.hpp>

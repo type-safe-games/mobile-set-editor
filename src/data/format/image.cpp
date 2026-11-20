@@ -9,7 +9,6 @@
 #include <util/prec.hpp>
 #include <util/tagged_string.hpp>
 #include <data/format/formats.hpp>
-#include <data/format/clipboard.hpp>
 #include <data/game.hpp>
 #include <data/field/image.hpp>
 #include <data/set.hpp>
@@ -17,7 +16,6 @@
 #include <data/stylesheet.hpp>
 #include <data/settings.hpp>
 #include <script/functions/json.hpp>
-#include <gui/util.hpp>
 #include <render/card/viewer.hpp>
 #include <render/value/text.hpp>
 
@@ -324,7 +322,6 @@ static String export_filename(const SetP& set, const ExportGroup& group, const S
 }
 
 void export_image(const SetP& set, const vector<CardP>& cards, const String& path, const String& filename_template, FilenameConflicts conflicts) {
-  wxBusyCursor busy;
   // Script
   ScriptP filename_script = parse(filename_template, nullptr, true);
   // Path

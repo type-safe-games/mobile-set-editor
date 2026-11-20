@@ -9,7 +9,8 @@
 #include <util/prec.hpp>
 #include <render/value/image.hpp>
 #include <render/card/viewer.hpp>
-#include <gui/util.hpp>
+#include <gfx/dc_util.hpp>
+#include <gfx/image_load.hpp>
 
 // ----------------------------------------------------------------------------- : ImageValueViewer
 

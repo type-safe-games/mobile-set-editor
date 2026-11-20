@@ -13,7 +13,7 @@
 #include <data/set.hpp>
 #include <script/scriptable.hpp>
 #include <script/image.hpp>
-#include <gui/util.hpp>
+#include <gfx/image_load.hpp>
 #include <util/io/package.hpp>
 
 // ----------------------------------------------------------------------------- : ImageField

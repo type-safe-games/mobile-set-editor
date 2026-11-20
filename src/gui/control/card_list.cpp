@@ -24,12 +24,12 @@
 #include <data/card.hpp>
 #include <data/settings.hpp>
 #include <data/stylesheet.hpp>
-#include <data/format/clipboard.hpp>
+#include <gui/clipboard.hpp>
 #include <data/format/formats.hpp>
 #include <data/action/set.hpp>
 #include <data/action/value.hpp>
 #include <script/functions/json.hpp>
-#include <util/window_id.hpp>
+#include <gui/window_id.hpp>
 #include <wx/clipbrd.h>
 #include <wx/webrequest.h>
 #include <wx/wfstream.h>
@@ -126,6 +126,9 @@ void CardListBase::onAction(const Action& action, bool undone) {
   }
   TYPE_CASE_(action, GlobalDisplayChangeAction) {
     rebuild();
+  }
+  TYPE_CASE_(action, BulkAction) {
+    Refresh();
   }
 }
 
@@ -582,7 +585,7 @@ bool CardListBase::doUnlink(CardP linked_card) {
   int linked_index = linked_card->findUIDLink(selected_card->uid);
   actions.emplace_back(make_intrusive<OneWayLinkCardsAction>(selected_card, _(""), _(""), selected_index));
   if (linked_index >= 0) actions.emplace_back(make_intrusive<OneWayLinkCardsAction>(linked_card,   _(""), _(""), linked_index));
-  set->actions.addAction(make_unique<BulkAction>(actions, set, this, false), false);
+  set->actions.addAction(make_unique<BulkAction>(actions, set, false), false);
   set->actions.tellListeners(GlobalDisplayChangeAction(),true);
   return true;
 }

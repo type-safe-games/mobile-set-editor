@@ -13,6 +13,8 @@
 // ----------------------------------------------------------------------------- : Includes
 
 #include <util/prec.hpp>
+#include <gfx/dc_util.hpp>
+#include <gfx/image_load.hpp>
 
 class RotatedDC;
 class RealRect;
@@ -28,24 +30,10 @@ void set_status_text(Window* window, const String& text);
 /// Set the help text for a window, it will be shown in the status bar on mouse over
 void set_help_text(Window* window, const String& text);
 
-// ----------------------------------------------------------------------------- : DC related
+// ----------------------------------------------------------------------------- : Progress
 
-/// Fill a DC with a single color
-void clearDC(DC& dc, const wxBrush& brush);
-
-/// Fill a newly allocated DC with black, if the platform doesn't do so automaticly
-void clearDC_black(DC& dc);
-
-/// Draw a checkerboard pattern
-void draw_checker(RotatedDC& dc, const RealRect&);
-
-// ----------------------------------------------------------------------------- : Image related
-
-/// Proxy around Image.LoadFile that suppresses errors. 
-bool image_load_file(Image& image, wxInputStream &stream);
-
-/// Proxy around Image.LoadFile that suppresses errors. 
-bool image_load_file(Image& image, const wxString &name);
+/// A progress callback for importing cards, shows a progress dialog that lets the user cancel
+function<bool(int done, int total)> import_cards_progress();
 
 // ----------------------------------------------------------------------------- : Tool/menu bar
 
@@ -68,9 +56,6 @@ wxToolBarToolBase* add_tool(wxToolBar*, int id, const char* resource, const Stri
 wxToolBarToolBase* add_tool_tr(wxToolBar*, int id, const char* resource, const String& locale_key, bool label = false, wxItemKind kind = wxITEM_NORMAL);
 
 // ----------------------------------------------------------------------------- : Resource related
-
-/// Load an image from a resource
-Image load_resource_image(const String& name);
 
 /// Load a cursor from a resource
 wxCursor load_resource_cursor(const String& name);

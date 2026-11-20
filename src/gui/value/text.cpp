@@ -7,6 +7,7 @@
 // ----------------------------------------------------------------------------- : Includes
 
 #include <util/prec.hpp>
+#include <gui/insert_symbol_menu.hpp>
 #include <gui/value/text.hpp>
 #include <gui/util.hpp>
 #include <gui/drop_down_list.hpp>
@@ -15,9 +16,9 @@
 #include <data/settings.hpp>
 #include <data/action/value.hpp>
 #include <util/tagged_string.hpp>
-#include <util/find_replace.hpp>
+#include <gui/find_replace.hpp>
 #include <util/spell_checker.hpp>
-#include <util/window_id.hpp>
+#include <gui/window_id.hpp>
 #include <wx/fontdlg.h>
 #include <wx/colordlg.h>
 #include <wx/clipbrd.h>
@@ -615,7 +616,7 @@ bool TextValueEditor::onCommand(int id) {
   if (id >= ID_INSERT_SYMBOL_MENU_MIN && id <= ID_INSERT_SYMBOL_MENU_MAX) {
     // Insert a symbol
     if ((style().always_symbol || style().allow_formating) && style().symbol_font.valid()) {
-      String code = style().symbol_font.font->insertSymbolCode(id);
+      String code = insert_symbol_code(*style().symbol_font.font, id);
       if (!style().always_symbol) {
         code = _("<sym>") + code + _("</sym>");
       }
@@ -647,7 +648,7 @@ wxMenu* TextValueEditor::getMenu(int type) const {
     Context& ctx = getContext();
     Color color(wxSystemSettings::GetColour(wxSYS_COLOUR_MENUTEXT));
     ctx.setVariable(_("active_color"), to_script(color));
-    return style().symbol_font.font->insertSymbolMenu(ctx);
+    return insert_symbol_menu(*style().symbol_font.font, ctx);
   } else {
     return nullptr;
   }

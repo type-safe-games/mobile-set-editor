@@ -160,6 +160,8 @@ public:
   
   /// Add a file to the list of recent files
   void addRecentFile(const String& filename);
+  /// Called after the list of recent files changes (the desktop gui updates its menus)
+  function<void()> on_recent_sets_changed;
   
   // --------------------------------------------------- : Files/directories
   String default_set_dir;    ///< Where to look for .mse-set files
@@ -232,6 +234,8 @@ public:
   DarkModeType dark_mode_type;
   /// Is the app currently displayed in dark mode?
   bool darkMode();
+  /// Is the host's user interface in dark mode? Installed by the host; without one, it is light.
+  function<bool()> dark_mode_hook;
   /// Prefix for resource files depending on dark mode
   String darkModePrefix();
   /// Background color for windows depending on dark mode

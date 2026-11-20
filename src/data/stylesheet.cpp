@@ -12,7 +12,6 @@
 #include <data/field.hpp>
 #include <data/update_cards_script.hpp>
 #include <util/io/package_manager.hpp>
-#include <gui/new_window.hpp> // for selecting stylesheets on load error
 
 // ----------------------------------------------------------------------------- : StyleSheet
 
@@ -23,6 +22,8 @@ StyleSheet::StyleSheet()
   , card_dpi(96), card_background(*wxWHITE)
   , dependencies_initialized(false)
 {}
+
+function<StyleSheetP(const Game&, const String&, const String&)> StyleSheet::select_alternative;
 
 StyleSheetP StyleSheet::byGameAndName(const Game& game, const String& name) {
   /// Alternative stylesheets for game
@@ -42,7 +43,7 @@ StyleSheetP StyleSheet::byGameAndName(const Game& game, const String& name) {
     String missing = wxFileName(e.package_name).GetFullName();
     String failed_dep = (!missing.empty() && missing != full_name) ? missing : String();
     // load an alternative stylesheet
-    StyleSheetP ss = select_stylesheet(game, full_name, failed_dep);
+    StyleSheetP ss = select_alternative ? select_alternative(game, full_name, failed_dep) : StyleSheetP();
     if (ss) {
       stylesheet_alternatives[full_name] = ss->relativeFilename();
       return ss;

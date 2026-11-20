@@ -114,7 +114,5 @@ String card_layout_dump(const SetP& set, const CardP& card);
 String export_metadata(const SetP& set, const CardP& card, double zoom, Radians angle_radians, int width, int height, double offset_x, double offset_y);
 
 /// Export a set to Magic Workstation format
-void export_mws(Window* parent, const SetP& set);
+void export_mws(const SetP& set, const String& filename);
 
-/// Export a set to Apprentice
-void export_apprentice(Window* parent, const SetP& set);

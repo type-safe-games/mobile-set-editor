@@ -70,10 +70,6 @@ void TextIOHandler::init() {
   // write to standard output
   stream = stdout;
   raw_mode = false;
-  // always write to stderr if possible
-  if (have_console) {
-    write_errors_to_cli = true;
-  }
 }
 
 bool TextIOHandler::haveConsole() const {

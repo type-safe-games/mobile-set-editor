@@ -6,7 +6,7 @@
 
 #pragma once
 
-/** @file util/window_id.hpp
+/** @file gui/window_id.hpp
  *
  *  @brief Enumerations of all window ids used.
  */
@@ -30,7 +30,6 @@ enum MenuID {
   ID_FILE_EXPORT_HTML = 3,
   ID_FILE_EXPORT_IMAGE = 4,
   ID_FILE_EXPORT_IMAGES = 5,
-  ID_FILE_EXPORT_APPR = 6,
   ID_FILE_EXPORT_MWS = 7,
   ID_FILE_PRINT = wxID_PRINT,
   ID_FILE_PRINT_PREVIEW = wxID_PREVIEW,

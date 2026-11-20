@@ -8,8 +8,6 @@
 
 #include <util/prec.hpp>
 #include <util/error.hpp>
-#include <cli/text_io_handler.hpp>
-#include <cli/text_io_handler.hpp>
 #if wxUSE_STACKWALKER
   #include <wx/stackwalk.h>
 #endif
@@ -163,17 +161,11 @@ ScriptParseErrors::ScriptParseErrors(const vector<ScriptParseError>& errors)
 wxMutex crit_error_handling;
 typedef pair<MessageType,String> Message;
 deque<Message> message_queue;
-bool show_message_box_for_fatal_errors = true;
-bool write_errors_to_cli = false;
+ErrorSink error_sink;
 
 void queue_message(MessageType type, String const& msg) {
-  if (write_errors_to_cli && wxThread::IsMain()) {
-    cli.show_message(type,msg);
-    return; // TODO: is this the right thing to do?
-  }
-  if (show_message_box_for_fatal_errors && type == MESSAGE_FATAL_ERROR && wxThread::IsMain()) {
-    // bring this to the user's attention right now!
-    wxMessageBox(msg, _("Error"), wxOK | wxICON_ERROR);
+  if (error_sink && wxThread::IsMain() && error_sink(type, msg)) {
+    return;
   }
   // Thread safety
   wxMutexLocker lock(crit_error_handling);

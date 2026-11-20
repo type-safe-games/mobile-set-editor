@@ -9,7 +9,7 @@
 #include <util/prec.hpp>
 #include <gui/image_slice_window.hpp>
 #include <gui/util.hpp>
-#include <util/window_id.hpp>
+#include <gui/window_id.hpp>
 #include <util/rotation.hpp>
 #include <gfx/gfx.hpp>
 #include <wx/spinctrl.h>

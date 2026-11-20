@@ -15,7 +15,7 @@
 #include <data/format/image_to_symbol.hpp>
 #include <data/action/value.hpp>
 #include <data/set.hpp> // :(
-#include <util/window_id.hpp>
+#include <gui/window_id.hpp>
 #include <util/io/reader.hpp>
 #include <util/io/package.hpp>
 #include <util/error.hpp>

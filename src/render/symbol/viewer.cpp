@@ -9,7 +9,7 @@
 #include <util/prec.hpp>
 #include <render/symbol/viewer.hpp>
 #include <util/error.hpp> // clearDC_black
-#include <gui/util.hpp> // clearDC_black
+#include <gfx/dc_util.hpp>
 
 // ----------------------------------------------------------------------------- : Simple rendering
 

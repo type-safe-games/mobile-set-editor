@@ -10,7 +10,7 @@
 #include <gui/symbol/select_editor.hpp>
 #include <gui/symbol/window.hpp>
 #include <gui/util.hpp>
-#include <util/window_id.hpp>
+#include <gui/window_id.hpp>
 #include <data/action/symbol.hpp>
 #include <data/settings.hpp>
 #include <util/error.hpp>

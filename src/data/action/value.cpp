@@ -381,8 +381,8 @@ void ScriptStyleEvent::perform(bool) {
 
 // ----------------------------------------------------------------------------- : Bulk action
 
-BulkAction::BulkAction(const vector<ActionP>& actions, const SetP& set, CardListBase* card_list_window, bool change_name)
-  : actions(actions), set(set), card_list_window(card_list_window)
+BulkAction::BulkAction(const vector<ActionP>& actions, const SetP& set, bool change_name)
+  : actions(actions), set(set)
 {
   if (actions.empty()) throw ScriptError(_("BulkAction created with no actions"));
   if (change_name) {
@@ -407,7 +407,6 @@ void BulkAction::perform(bool to_undo) {
     action->perform(to_undo);
     set->actions.tellListeners(*action, to_undo);
   }
-  card_list_window->Refresh();
 }
 
 bool BulkAction::merge(const Action& action) {

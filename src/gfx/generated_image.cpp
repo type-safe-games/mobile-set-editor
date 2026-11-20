@@ -15,8 +15,7 @@
 #include <data/field/symbol.hpp>
 #include <script/functions/json.hpp>
 #include <render/symbol/filter.hpp>
-#include <gui/util.hpp> // load_resource_image
-#include <gui/web_request_window.hpp>
+#include <gfx/image_load.hpp>
 #include <wx/wfstream.h>
 
 // ----------------------------------------------------------------------------- : GeneratedImage
@@ -822,6 +821,8 @@ bool ImportedImage::operator == (const GeneratedImage& that) const {
 
 // ----------------------------------------------------------------------------- : DownloadedImage
 
+function<bool(const String& url, ImageDownload& out)> download_image_hook;
+
 DownloadedImage::DownloadedImage(Set* set, const String& url) {
   // determine save name
   loadpath = url;
@@ -830,19 +831,19 @@ DownloadedImage::DownloadedImage(Set* set, const String& url) {
   savename.Replace("/",  "-");
 
   // can we download the data?
-  WebRequestWindow wnd(loadpath);
-  if (wnd.ShowModal() != wxID_OK) {
+  ImageDownload download;
+  if (!download_image_hook || !download_image_hook(loadpath, download)) {
     if (set->contains(savename)) return;
     else throw ScriptError(_ERROR_1_("can't download image", loadpath));
   }
 
   // is the data an image?
-  if (!wnd.content_type.StartsWith(_("image/"))) throw ScriptError(_ERROR_1_("download not image", loadpath));
+  if (!download.content_type.StartsWith(_("image/"))) throw ScriptError(_ERROR_1_("download not image", loadpath));
   
   // add the file to the set
   LocalFileName new_image_file = set->newFileName(savename, _(".png"));
   String out_path = set->nameOut(new_image_file);
-  if (!retry_io([&]{ return wnd.image_out.SaveFile(out_path, wxBITMAP_TYPE_PNG); })) {
+  if (!retry_io([&]{ return download.image.SaveFile(out_path, wxBITMAP_TYPE_PNG); })) {
     throw ScriptError(_ERROR_1_("can't write image to set", out_path));
   }
   savename = new_image_file.toStringForWriting();

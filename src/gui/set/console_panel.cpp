@@ -11,7 +11,7 @@
 #include <gui/set/window.hpp>
 #include <gui/control/text_ctrl.hpp>
 #include <gui/util.hpp>
-#include <util/window_id.hpp>
+#include <gui/window_id.hpp>
 #include <data/stylesheet.hpp>
 #include <data/card.hpp>
 #include <script/functions/json.hpp>

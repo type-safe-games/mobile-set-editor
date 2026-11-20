@@ -7,6 +7,7 @@
 // ----------------------------------------------------------------------------- : Includes
 
 #include <util/prec.hpp>
+#include <gfx/color.hpp>
 #include <render/value/text.hpp>
 #include <render/card/viewer.hpp>
 
@@ -23,7 +24,7 @@ void TextValueViewer::draw(RotatedDC& dc) {
   drawFieldBorder(dc);
   // draw background
   if (nativeLook()) {
-    dc.SetBrush(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW));
+    dc.SetBrush(ui_color(UIColor::WINDOW));
     dc.SetPen(*wxTRANSPARENT_PEN);
     dc.DrawRectangle(RealRect(0, 0, dc.getWidth(), dc.getHeight()));
   }
