@@ -258,11 +258,9 @@ void FontRegistry::scanFile(const String& path, FontSource source) {
     entries.push_back(Entry{make_shared<FontFace>(f), source});
     const FontFace& face = *entries.back().face;
     // index each face once per distinct lower case name
-    set<String> families, full_names;
+    set<String> families;
     for (const String& n : face.family_names) families.insert(to_lower(n));
-    for (const String& n : face.full_names)   full_names.insert(to_lower(n));
-    for (const String& n : families)   by_family[n].push_back(i);
-    for (const String& n : full_names) by_full_name[n].push_back(i);
+    for (const String& n : families) by_family[n].push_back(i);
   }
 }
 
@@ -277,14 +275,12 @@ FontFaceP FontRegistry::resolve(const String& family, bool bold, bool italic) {
   auto cached = cache.find(key);
   if (cached != cache.end()) return cached->second;
   // candidates
+  // Like the fontconfig-based desktop reference: family names only (a full name such as
+  // "Arsenal Regular" does not match), and an unknown family gets the fallback family.
   const vector<size_t>* candidates = nullptr;
   auto it = by_family.find(name);
-  if (it != by_family.end()) {
-    candidates = &it->second;
-  } else {
-    it = by_full_name.find(name);
-    if (it != by_full_name.end()) candidates = &it->second;
-  }
+  if (it == by_family.end()) it = by_family.find(to_lower(fallback_family));
+  if (it != by_family.end()) candidates = &it->second;
   FontFaceP best;
   if (candidates) {
     // the requested slant first, then the closest weight (the heavier one of two equally close

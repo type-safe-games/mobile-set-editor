@@ -63,12 +63,16 @@ public:
   /// Add the fonts inside the Template packages (*.mse-*) in a directory of installed Templates
   void addTemplateDirectory(const String& dir);
 
-  /// The face for a family name, bold and italic. Null if no face has that family name.
+  /// The face for a family name, bold and italic.
   /** Families match case-insensitively on the family and typographic family names (in any
-   *  language), or else on the full name. Among the faces of the family, the one with the requested slant and the
-   *  closest weight is used.
+   *  language), never on the full name, as fontconfig does for the desktop reference (ADR 0004).
+   *  An unknown family gets fallback_family; null if that isn't registered either.
+   *  Among the faces of the family, the one with the requested slant and the closest weight is used.
    */
   FontFaceP resolve(const String& family, bool bold, bool italic);
+
+  /// Family used for unknown names; fontconfig falls back to Noto Sans in the reference environment
+  String fallback_family = _("Noto Sans");
 
   /// All faces, after scanning
   vector<FontFaceP> faces();
@@ -88,7 +92,6 @@ private:
   set<String>                   known_files;
   vector<Entry>                 entries;
   map<String, vector<size_t>>   by_family;    ///< lower case family name -> entries
-  map<String, vector<size_t>>   by_full_name; ///< lower case full name -> entries
   map<String, FontFaceP>        cache;        ///< resolved requests
 
   void scanPending();

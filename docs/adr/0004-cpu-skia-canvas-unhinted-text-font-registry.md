@@ -16,3 +16,11 @@ Cairo+Pango (the reference's own stack) was the runner-up and remains the fallba
 - Changing the hinting rule or the font registry's resolution invalidates every golden image.
 - The F-Droid recipe must build `gn` (or Skia via our own build files, as OsmAnd does) from source rather than letting `git-sync-deps` download it.
 - Native Skia anti-aliased text is a possible later optimisation, accepted only if golden images still pass.
+
+## Amendment (2026-11-20): the registry resolves the way the reference does
+
+Building the registry (#32) showed that the fontconfig-based desktop reference matches **family names only**. Styles that name a full name such as "Arsenal Regular" or "MyriadPro-Regular" render in the fallback family, Noto Sans, in the golden images. We chose to keep the goldens as they are and make the registry copy that behaviour, rather than resolve the intended faces and re-capture 18 Tier 1 Sets:
+
+- Families match case-insensitively on family and typographic family names, never on the full name.
+- An unknown family resolves to the fallback family, Noto Sans. Android has no system fonts, so the app must ship Noto Sans (OFL) in its font store. On desktop the wx `Canvas` still selects by name through fontconfig.
+- Known remaining gaps against fontconfig: tie-breaking between faces of equal weight (seen once, ITC Souvenir Medium vs Demi), system fonts the pack doesn't ship (DejaVu, Verdana, Minion Pro), and Type 1 `.pfb` fonts. These are checked when the Skia `Canvas` is compared with the goldens (#42).
