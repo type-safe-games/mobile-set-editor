@@ -18,6 +18,9 @@
 #include <gfx/generated_image.hpp>
 #include <gfx/color.hpp>
 #include <gfx/wx_image_codec.hpp>
+#ifdef MSE_SKIA_CODEC
+#include <gfx/skia/skia_image_codec.hpp>
+#endif
 #include <gfx/wx_canvas.hpp>
 #include <gfx/font_registry.hpp>
 #include <util/file_utils.hpp>
@@ -173,7 +176,11 @@ bool preload_resource_fonts(bool recursive) {
 }
 
 void install_desktop_hooks() {
+#ifdef MSE_SKIA_CODEC
+  set_image_codec(make_skia_image_codec()); // (CMake option MSE_SKIA_CODEC, #41)
+#else
   set_image_codec(make_wx_image_codec()); // (needs wxInitAllImageHandlers)
+#endif
   set_canvas_factory(make_unique<WxCanvasFactory>());
   error_sink = [](MessageType type, String const& msg) {
     if (cli.haveConsole()) {

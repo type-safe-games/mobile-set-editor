@@ -84,9 +84,35 @@ include_directories(${HUNSPELL_INCLUDE_DIRS})
 file(GLOB_RECURSE core_sources src/*.cpp)
 list(FILTER core_sources EXCLUDE REGEX "/src/(gui|cli|facade)/")
 list(FILTER core_sources EXCLUDE REGEX "/src/main\\.cpp$")
+list(FILTER core_sources EXCLUDE REGEX "/src/gfx/skia/")
 add_library(mse_core OBJECT ${core_sources})
 target_link_libraries(mse_core PUBLIC wxWidgets::wxWidgets Boost::regex Boost::json MINIZIP::minizip ${HUNSPELL_LIBRARIES})
 target_precompile_headers(mse_core PRIVATE src/util/prec.hpp)
+
+# The Skia backends (ADR 0004), built from the pinned submodules by tools/skia/build.sh. Skia's
+# headers need C++20, so the files that include them are a separate C++20 library. With
+# MSE_SKIA_CODEC the desktop decodes and encodes images through Skia instead of wx (#41).
+option(MSE_SKIA_CODEC "Decode and encode images with Skia (needs tools/skia/build.sh linux-x64)" OFF)
+set(MSE_SKIA_LIB_DIR "${PROJECT_SOURCE_DIR}/out/skia/linux-x64" CACHE PATH "Skia build output (tools/skia/build.sh)")
+if(MSE_SKIA_CODEC)
+  if(NOT EXISTS "${MSE_SKIA_LIB_DIR}/libskia.a")
+    message(FATAL_ERROR "No Skia build in ${MSE_SKIA_LIB_DIR}: run tools/skia/build.sh linux-x64")
+  endif()
+  # Only std and Skia headers in here, no MSE ones (gfx/skia/skia_codec.hpp)
+  add_library(mse_skia STATIC src/gfx/skia/skia_codec.cpp)
+  set_target_properties(mse_skia PROPERTIES CXX_STANDARD 20 CXX_STANDARD_REQUIRED ON)
+  target_compile_options(mse_skia PRIVATE -fno-rtti) # as Skia itself (it subclasses SkWStream)
+  target_include_directories(mse_skia PRIVATE "${PROJECT_SOURCE_DIR}/third_party/skia")
+  foreach(lib skia png jpeg freetype2 zlib skcms)
+    target_link_libraries(mse_skia PUBLIC "${MSE_SKIA_LIB_DIR}/lib${lib}.a")
+  endforeach()
+  # Keep Skia's libpng/libjpeg/zlib symbols out of the dynamic symbol table, so wx's shared
+  # libraries keep using the system's
+  target_link_options(mse_skia INTERFACE "LINKER:--exclude-libs,ALL")
+  target_sources(mse_core PRIVATE src/gfx/skia/skia_image_codec.cpp)
+  target_link_libraries(mse_core PUBLIC mse_skia)
+  target_compile_definitions(mse_core PUBLIC MSE_SKIA_CODEC)
+endif()
 
 # On wxGTK the shared font store's files are given to fontconfig with wxFont::AddPrivateFont, and
 # Pango has to be told to reread the configuration afterwards (gfx/wx_canvas.cpp)
@@ -122,6 +148,13 @@ target_precompile_headers(magicseteditor REUSE_FROM mse_core)
 add_executable(facade_tests test/facade/facade_tests.cpp src/facade/desktop/desktop_host.cpp)
 target_link_libraries(facade_tests PRIVATE mse_facade mse_core)
 target_precompile_headers(facade_tests REUSE_FROM mse_core)
+
+# The Skia image codec against the wx one (#41)
+if(MSE_SKIA_CODEC)
+  add_executable(image_codec_tests test/image_codec/image_codec_tests.cpp)
+  target_link_libraries(image_codec_tests PRIVATE mse_core)
+  target_precompile_headers(image_codec_tests REUSE_FROM mse_core)
+endif()
 
 configure_file(src/config.hpp.in src/config.hpp)
 

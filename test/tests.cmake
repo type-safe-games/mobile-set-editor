@@ -75,3 +75,8 @@ add_test(
           -P ${test_dir}/run_cli.cmake
 )
 set_tests_properties(facade-new-set-desktop PROPERTIES ENVIRONMENT "${fixture_env}" FIXTURES_REQUIRED facade-output)
+
+# The Skia image codec decodes like the wx one and round-trips (#41). Only in builds with MSE_SKIA_CODEC.
+if(TARGET image_codec_tests)
+  add_test(NAME image-codec COMMAND image_codec_tests ${test_dir}/image_codec/images)
+endif()

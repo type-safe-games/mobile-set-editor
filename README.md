@@ -72,7 +72,9 @@ Planned. The app will be Jetpack Compose over the same C++ facade through JNI
 ([ADR 0006](docs/adr/0006-compose-jni-over-cpp-facade.md)), with Skia built from source
 ([ADR 0011](docs/adr/0011-skia-official-gn-build-from-source.md)).
 Skia already builds, for the host and both Android ABIs, from pinned submodules with no network
-access: see [`tools/skia/README.md`](tools/skia/README.md).
+access: see [`tools/skia/README.md`](tools/skia/README.md). With a host Skia build, `cmake -DMSE_SKIA_CODEC=ON` makes
+the desktop decode and encode images through Skia instead of wx, and adds the `image-codec` test,
+which checks that both codecs decode alike.
 
 ## Documentation
 

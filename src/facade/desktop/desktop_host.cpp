@@ -6,6 +6,9 @@
 #include <gfx/image_codec.hpp>
 #include <gfx/canvas.hpp>
 #include <gfx/wx_image_codec.hpp>
+#ifdef MSE_SKIA_CODEC
+#include <gfx/skia/skia_image_codec.hpp>
+#endif
 #include <gfx/wx_canvas.hpp>
 #include <wx/app.h>
 #include <wx/init.h>
@@ -40,7 +43,11 @@ bool start_host(int& argc, char** argv) {
     return false;
   }
   wxInitAllImageHandlers();
+#ifdef MSE_SKIA_CODEC
+  set_image_codec(make_skia_image_codec()); // (CMake option MSE_SKIA_CODEC, #41)
+#else
   set_image_codec(make_wx_image_codec());
+#endif
   set_canvas_factory(make_unique<WxCanvasFactory>());
   return true;
 }

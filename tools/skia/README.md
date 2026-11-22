@@ -23,6 +23,16 @@ custom-empty one, which loads only the font files it is given (`SkFontMgr_New_Cu
 then `makeFromFile`/`makeFromData`); fontconfig and Android's system fonts are not used. Android
 targets compile against API 26, the app's minSdk (`SKIA_NDK_API` overrides it).
 
+## Using it on the desktop
+
+`cmake -S . -B build-skia -DMSE_SKIA_CODEC=ON` (after `tools/skia/build.sh linux-x64`) builds the
+desktop with the Skia image codec (`src/gfx/skia/`) in place of the wx one. `MSE_SKIA_LIB_DIR`
+points at another Skia build. Only `src/gfx/skia/skia_codec.cpp` includes Skia headers; it uses no
+MSE headers, because the core is C++17 with `using namespace std`, which clashes with C++20's
+`std::format_string`, and it is built with `-fno-rtti` like Skia. The `image-codec` test decodes
+`test/image_codec/images` with both codecs; give it a pack directory as a second argument to
+compare every image in the pack.
+
 ## What is pinned
 
 | Submodule | Pinned to | Licence |
