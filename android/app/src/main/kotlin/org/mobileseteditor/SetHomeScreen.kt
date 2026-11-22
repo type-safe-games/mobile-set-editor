@@ -67,6 +67,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
+import org.mobileseteditor.core.StyleSupport
+import org.mobileseteditor.core.Support
 import org.mobileseteditor.editor.EditTarget
 import org.mobileseteditor.editor.FieldSheet
 import org.mobileseteditor.render.RenderKey
@@ -157,6 +159,7 @@ fun SetHomeScreen(
                 onDone = { selected = null },
             )
         }
+        UnsupportedNotice(state)
         TabRow(selectedTabIndex = tab.ordinal) {
             for (t in SetTab.entries) Tab(selected = tab == t, onClick = { tab = t }, text = { Text(t.title) })
         }
@@ -365,5 +368,27 @@ private fun MoveDialog(count: Int, cards: Int, onMove: (Int) -> Unit, onCancel: 
             TextButton(onClick = { position?.let { onMove(it - 1) } }, enabled = position != null, modifier = Modifier.testTag("move-confirm")) { Text("Move") }
         },
         dismissButton = { TextButton(onClick = onCancel) { Text("Cancel") } },
+    )
+}
+
+/** A notice when the Set or one of its Cards uses an Unsupported style (ADR 0010) */
+@Composable
+private fun UnsupportedNotice(state: SetState) {
+    val context = LocalContext.current
+    val styles = remember(state.cardStyles) { state.cardStyles.map { it.stylesheet }.toSet() }
+    var unsupported by remember { mutableStateOf<List<String>>(emptyList()) }
+    LaunchedEffect(styles) {
+        if (styles.isEmpty()) return@LaunchedEffect
+        val support = StyleSupport.get(context)
+        unsupported = org.mobileseteditor.core.Core.listTemplates().templates
+            .filter { it.name in styles && support.of(it) == Support.Unsupported }
+            .map { it.fullName.ifEmpty { it.name } }
+    }
+    if (unsupported.isEmpty()) return
+    Text(
+        "Unsupported in this version: ${unsupported.joinToString()}. Cards with it may not look as they do in the desktop editor.",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.error,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp).testTag("unsupported-notice"),
     )
 }

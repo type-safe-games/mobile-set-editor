@@ -204,6 +204,38 @@ def write_styles(path: Path, results: list[SetResult], mode: str) -> None:
     path.write_text("style\tstatus\n" + "".join(f"{s}\t{v}\n" for s, v in sorted(status.items())), encoding="utf-8")
 
 
+def style_status(results: list[SetResult]) -> dict[str, str]:
+    """A Style passes only if every Set using it rendered and its Layout dumps match."""
+    status: dict[str, str] = {}
+    for r in results:
+        ok = r.render_status in ("ok", "warning") and r.dump_ok
+        status[r.gs.style] = "pass" if ok and status.get(r.gs.style, "pass") == "pass" else "fail"
+    return status
+
+
+def write_status(path: Path, results: list[SetResult], data: Path) -> None:
+    """The app's Style support status (#72, ADR 0010): each Style the Android run tested, with the
+    version tested; a Style that failed the Layout dump gate (or didn't render) is unsupported.
+    The app treats Styles not listed, or of another version, as untested."""
+    lines = []
+    for style, st in sorted(style_status([r for r in results if r.gs.corpus != "fixture"]).items()):
+        version = ""
+        style_file = data / f"{style}.mse-style" / "style"
+        if style_file.exists():
+            for line in style_file.read_text(encoding="utf-8-sig", errors="replace").splitlines():
+                if line.startswith("version:"):
+                    version = line.split(":", 1)[1].strip()
+                    break
+        lines.append(f"{style}.mse-style\t{version}\t{'supported' if st == 'pass' else 'unsupported'}\n")
+    path.write_text(
+        "# Style support for this app version: an Android golden run (tools/goldens/goldens.py --android\n"
+        "# --status-out, ADR 0010). package, version tested, supported/unsupported. Styles not listed\n"
+        "# (or of another version) are untested.\n" + "".join(lines),
+        encoding="utf-8",
+    )
+    print(f"status: {path} ({sum(1 for l in lines if l.endswith('unsupported\n'))} unsupported of {len(lines)})")
+
+
 def write_report(path: Path, results: list[SetResult], mode: str) -> None:
     rendered = sum(len(r.cards) for r in results)
     errors = [r for r in results if r.render_status not in ("ok", "warning")]
@@ -248,6 +280,9 @@ def main() -> int:
     ap.add_argument("--android", action="store_true",
                     help="run the renderer on an Android device (default renderer: build-android-x86_64/golden_render)")
     ap.add_argument("--serial", help="with --android: the adb serial of the device")
+    ap.add_argument("--status-out", type=Path,
+                    help="with --android check of the whole corpus: write the app's Style support status file here "
+                         "(android/app/src/main/assets/style-status.tsv, #72)")
     ap.add_argument("only", nargs="*", help="limit to these Sets, Styles or corpus/set keys")
     args = ap.parse_args()
     if args.templates and args.mode == "capture":
@@ -259,6 +294,8 @@ def main() -> int:
         ap.error("goldens are captured from the desktop reference; --renderer and --android are only for check")
     if args.android and not args.renderer:
         args.renderer = REPO / "build-android-x86_64" / "golden_render"
+    if args.status_out and not (args.android and args.mode == "check" and not args.only and not args.fixture_only):
+        ap.error("--status-out needs an --android check of the whole corpus")
     if args.renderer and not args.renderer.exists():
         ap.error(f"no renderer at {args.renderer}: build the golden_render target first")
 
@@ -270,6 +307,8 @@ def main() -> int:
 
     if args.renderer:
         results = render_native(args, sets, run_root, images)
+        if args.status_out:
+            write_status(args.status_out, results, args.templates or args.pack / "data")
         return finish(args, results, imported)
 
     def work(gs: GoldenSet) -> SetResult:

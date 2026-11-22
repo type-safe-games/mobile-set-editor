@@ -49,6 +49,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.mobileseteditor.core.Core
 import org.mobileseteditor.core.Stores
+import org.mobileseteditor.core.StyleSupport
+import org.mobileseteditor.core.Support
 import org.mobileseteditor.core.TemplateInfo
 
 /**
@@ -98,7 +100,12 @@ fun NewSetScreen(onCreate: (game: String, style: String) -> Unit, onTemplates: (
  * Style is chosen: the Card details sheet, the Set info tab.
  */
 @Composable
-fun StylePicker(styles: List<TemplateInfo>, onPick: (TemplateInfo) -> Unit, modifier: Modifier = Modifier) {
+fun StylePicker(
+    styles: List<TemplateInfo>,
+    onPick: (TemplateInfo) -> Unit,
+    modifier: Modifier = Modifier,
+    support: StyleSupport = StyleSupport.get(LocalContext.current),
+) {
     var query by remember { mutableStateOf("") }
     val sorted = remember(styles) { styles.sortedBy { it.fullName.lowercase() } }
     val shown = remember(sorted, query) {
@@ -117,7 +124,7 @@ fun StylePicker(styles: List<TemplateInfo>, onPick: (TemplateInfo) -> Unit, modi
         LaunchedEffect(query) { list.scrollToItem(0) }
         LazyColumn(Modifier.fillMaxSize().testTag("styles"), state = list) {
             items(shown, key = { it.name }) { style ->
-                TemplateRow(style, Modifier.clickable { onPick(style) }.testTag("style-${style.name}"))
+                TemplateRow(style, Modifier.clickable { onPick(style) }.testTag("style-${style.name}"), support.of(style))
             }
         }
     }
@@ -125,13 +132,29 @@ fun StylePicker(styles: List<TemplateInfo>, onPick: (TemplateInfo) -> Unit, modi
 
 /** A Template as pickers list it: its icon, full name and package name */
 @Composable
-private fun TemplateRow(t: TemplateInfo, modifier: Modifier) {
+private fun TemplateRow(t: TemplateInfo, modifier: Modifier, support: Support? = null) {
     Row(modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
         TemplateIcon(t.iconPath)
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(t.fullName, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(t.name, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            // Unsupported styles (ADR 0010): still usable, but flagged
+            when (support) {
+                Support.Unsupported -> Text(
+                    "Unsupported in this version: Cards may not look as they do in the desktop editor",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.testTag("unsupported-${t.name}"),
+                )
+                Support.Untested -> Text(
+                    "Untested in this version",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.testTag("untested-${t.name}"),
+                )
+                else -> {}
+            }
         }
     }
 }
