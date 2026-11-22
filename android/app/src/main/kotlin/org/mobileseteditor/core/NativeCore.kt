@@ -39,6 +39,8 @@ internal object NativeCore {
     external fun listCards(session: Long): CardListResult
     external fun cardSize(session: Long, cardUid: String): CardSizeResult
     /** Draw a card into an ARGB_8888 bitmap, scaled to its width */
+    external fun symbolMenu(session: Long, kind: Int, cardUid: String, field: String): SymbolMenuResult
+    external fun symbolPreview(session: Long, kind: Int, cardUid: String, field: String, itemId: Int, size: Int): SymbolPreviewResult
     external fun fieldAt(session: Long, cardUid: String, x: Double, y: Double, width: Int): FieldAtResult
     external fun renderCard(session: Long, cardUid: String, bitmap: Bitmap): RenderResult
 

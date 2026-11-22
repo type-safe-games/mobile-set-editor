@@ -47,6 +47,57 @@ object TextDiff {
     }
 }
 
+/**
+ * The field's text as the editor shows it and as the core holds it. They differ while the core
+ * has rewritten what was typed (auto-replace, scripts) and more typing came before that could be
+ * shown: further changes are made against the shown text, and moved to where the core's caret is.
+ */
+class TextSync {
+    var core = ""
+        private set
+    var shown = ""
+        private set
+    private var coreCaret = 0
+    private var shownCaret = 0
+
+    /** The core's text, and the shown text it came from ([shownText] with its caret), in code points */
+    fun answered(coreText: String, coreCaret: Int, shownText: String = coreText, shownCaret: Int = coreCaret) {
+        core = coreText
+        this.coreCaret = coreCaret
+        shown = shownText
+        this.shownCaret = shownCaret
+    }
+
+    /** A change of the shown text, as a change of the core's: positions from the caret on move with it */
+    fun toCore(change: TextChange): TextChange {
+        val shift = coreCaret - shownCaret
+        fun map(p: Int) = if (p >= shownCaret) p + shift else p
+        return TextChange(map(change.start), map(change.end), change.text)
+    }
+}
+
+/**
+ * Typing as keystrokes: text typed faster than the core answers arrives as one change, but the
+ * core applies auto-replace at the caret after each insertion, as the desktop does per key. So an
+ * insertion goes to the core one character (code point) at a time; a long one (a paste) at once.
+ */
+object Keystrokes {
+    const val MAX_SPLIT = 64
+
+    fun of(text: String): List<String> {
+        val n = text.codePointCount(0, text.length)
+        if (n <= 1 || n > MAX_SPLIT) return listOf(text)
+        val out = ArrayList<String>(n)
+        var i = 0
+        while (i < text.length) {
+            val next = text.offsetByCodePoints(i, 1)
+            out += text.substring(i, next)
+            i = next
+        }
+        return out
+    }
+}
+
 object LockedSpans {
     /** A position (code points) moved out of any locked span, to its nearest edge */
     fun snap(position: Int, locked: List<IntRange>): Int {

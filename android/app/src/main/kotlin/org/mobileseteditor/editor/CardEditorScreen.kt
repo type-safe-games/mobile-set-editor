@@ -63,6 +63,7 @@ import org.mobileseteditor.SetViewModel
 import org.mobileseteditor.core.Core
 import org.mobileseteditor.core.FieldInfo
 import org.mobileseteditor.core.TargetKind
+import org.mobileseteditor.core.SymbolMenuResult
 import org.mobileseteditor.core.TextResult
 import org.mobileseteditor.render.RenderKey
 
@@ -285,12 +286,30 @@ private fun TextEditor(model: SetViewModel, session: Long, target: EditTarget, m
     var value by remember(target) { mutableStateOf<TextFieldValue?>(null) }
     val focus = remember { FocusRequester() }
     fun show(t: TextResult) {
-        holder.text = t.text
+        holder.sync.answered(t.text, t.selectionEnd)
         holder.locked = t.locked
         value = TextFieldValue(t.text, TextRange(CodePoints.toUtf16(t.text, t.selectionStart), CodePoints.toUtf16(t.text, t.selectionEnd)))
     }
     LaunchedEffect(target, revision) {
         show(Core.getText(session, TargetKind.Card, target.uid, target.field))
+    }
+    // the field's symbol font, if any: a symbol bar, and typing in symbols (#64)
+    var symbols by remember(target) { mutableStateOf<SymbolMenuResult?>(null) }
+    var symbolMode by remember(target) { mutableStateOf(false) }
+    LaunchedEffect(target) { symbols = Core.symbolMenu(session, TargetKind.Card, target.uid, target.field) }
+    /** Insert a symbol's code at the caret (over the selection), as a symbol */
+    fun insertSymbol(code: String) = scope.launch {
+        holder.mutex.withLock {
+            val shown = value ?: return@withLock
+            if (shown.text != holder.sync.shown || code.isEmpty()) return@withLock
+            val start = CodePoints.fromUtf16(shown.text, shown.selection.min)
+            val end = CodePoints.fromUtf16(shown.text, shown.selection.max)
+            val atomic = LockedSpans.adjust(holder.sync.toCore(TextChange(start, end, code)), holder.locked)
+            val r = Core.replaceRange(session, TargetKind.Card, target.uid, target.field, atomic.start, atomic.end, code, asSymbol = true)
+            model.edited(r.action)
+            show(if (r.action.result.ok) r else Core.getText(session, TargetKind.Card, target.uid, target.field))
+        }
+        focus.requestFocus()
     }
     val current = value ?: return
     OutlinedTextField(
@@ -299,7 +318,9 @@ private fun TextEditor(model: SetViewModel, session: Long, target: EditTarget, m
             val old = value ?: return@OutlinedTextField
             if (new.text == old.text) {
                 // the caret moved: not into a locked span
-                fun snap(i: Int) = CodePoints.toUtf16(new.text, LockedSpans.snap(CodePoints.fromUtf16(new.text, i), holder.locked))
+                fun snap(i: Int) =
+                    if (new.text != holder.sync.core) i // (locked spans are where the core's text has them)
+                    else CodePoints.toUtf16(new.text, LockedSpans.snap(CodePoints.fromUtf16(new.text, i), holder.locked))
                 value = new.copy(selection = TextRange(snap(new.selection.start), snap(new.selection.end)))
                 return@OutlinedTextField
             }
@@ -307,12 +328,23 @@ private fun TextEditor(model: SetViewModel, session: Long, target: EditTarget, m
             scope.launch {
                 holder.mutex.withLock {
                     val typed = value ?: return@withLock
-                    val change = TextDiff.between(holder.text, typed.text, typed.selection.end) ?: return@withLock
-                    val atomic = LockedSpans.adjust(change, holder.locked)
-                    val r = Core.replaceRange(session, TargetKind.Card, target.uid, target.field, atomic.start, atomic.end, atomic.text)
-                    model.edited(r.action, renderDelayMillis = TYPING_RENDER_DELAY)
-                    if (!r.action.result.ok) return@withLock show(Core.getText(session, TargetKind.Card, target.uid, target.field))
-                    holder.text = r.text
+                    val change = TextDiff.between(holder.sync.shown, typed.text, typed.selection.end) ?: return@withLock
+                    val atomic = LockedSpans.adjust(holder.sync.toCore(change), holder.locked)
+                    val asSymbol = symbolMode && atomic.text.isNotEmpty()
+                    // a key at a time, each at the caret the core answers with (auto-replace may move it)
+                    var start = atomic.start
+                    var end = atomic.end
+                    var r: TextResult? = null
+                    for (key in Keystrokes.of(atomic.text)) {
+                        val step = Core.replaceRange(session, TargetKind.Card, target.uid, target.field, start, end, key, asSymbol)
+                        model.edited(step.action, renderDelayMillis = TYPING_RENDER_DELAY)
+                        if (!step.action.result.ok) return@withLock show(Core.getText(session, TargetKind.Card, target.uid, target.field))
+                        r = step
+                        start = step.selectionEnd
+                        end = start
+                    }
+                    r ?: return@withLock
+                    holder.sync.answered(r.text, r.selectionEnd, typed.text, CodePoints.fromUtf16(typed.text, typed.selection.end))
                     holder.locked = r.locked
                     // nothing typed meanwhile: show what the core made of it
                     if (value?.text == typed.text) show(r)
@@ -324,13 +356,21 @@ private fun TextEditor(model: SetViewModel, session: Long, target: EditTarget, m
         maxLines = if (multiLine) 6 else 1,
         modifier = Modifier.fillMaxWidth().focusRequester(focus).testTag("field-text"),
     )
+    symbols?.takeIf { it.hasSymbols }?.let { menu ->
+        SymbolBar(
+            menu, session, target.uid, target.field,
+            symbolMode = symbolMode,
+            onSymbolMode = { symbolMode = it; focus.requestFocus() },
+            onInsert = { insertSymbol(it) },
+        )
+    }
     // (once the field is there to take it)
     LaunchedEffect(target) { focus.requestFocus() }
 }
 
 /** The text as the core last answered it, which edits are diffed against */
 private class CoreText {
-    var text = ""
+    val sync = TextSync()
     var locked: List<IntRange> = emptyList()
     val mutex = Mutex()
 }

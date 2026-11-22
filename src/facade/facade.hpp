@@ -332,6 +332,44 @@ AutoReplaceResult getAutoReplace(SessionHandle session);
 TextResult replaceRange(SessionHandle session, const Target& target, const std::string& field,
                         int start, int end, const std::string& text, bool as_symbol = false);
 
+// ----------------------------------------------------------------------------- : Inserting symbols
+
+/// An item of a symbol font's "insert symbol" menu (as the desktop's Insert symbol menu shows it)
+struct SymbolMenuItem {
+  enum class Type {
+    Code,    ///< insert `code` with replaceRange(..., as_symbol = true)
+    Custom,  ///< ask the user for a code (`prompt` says what to ask), and insert that the same way
+    Line,    ///< a separator
+    Submenu, ///< `items`
+  };
+  Type        type = Type::Code;
+  std::string label;  ///< the item's text, without '&' accelerators or the shortcut hint after a tab
+  std::string code;   ///< Code: what to insert
+  std::string prompt; ///< Custom: the question to ask
+  int         id = -1; ///< Code, Custom: the item's id for symbolPreview
+  std::vector<SymbolMenuItem> items; ///< Submenu: its items
+};
+
+struct SymbolMenu : Result {
+  /// can the field hold symbols (text inserted with as_symbol)? If not, the rest is empty
+  bool has_symbols = false;
+  /// is all of the field's text drawn in the symbol font (e.g. a mana cost)? Then plain typing
+  /** already gives symbols, and as_symbol changes nothing */
+  bool always_symbol = false;
+  std::vector<SymbolMenuItem> items; ///< the menu; empty if the symbol font has none
+};
+/// The insert-symbol menu of a text field's symbol font (in the card's Style, for card fields)
+SymbolMenu symbolMenu(SessionHandle session, const Target& target, const std::string& field);
+
+/// An image as RGBA pixels (8 bits each, row by row, not premultiplied)
+struct ImageData : Result {
+  int width = 0, height = 0;
+  std::vector<std::uint8_t> rgba;
+};
+/// The symbol a menu item inserts, drawn about `size` pixels square, for showing in a menu.
+/** Empty (width 0) when the item has no preview, as on the desktop. */
+ImageData symbolPreview(SessionHandle session, const Target& target, const std::string& field, int item_id, int size);
+
 // ----------------------------------------------------------------------------- : Keywords
 
 // A Set's keywords are its own plus the Game's. The Game's are read-only. Cards use a keyword by

@@ -24,6 +24,7 @@
 #include <data/action/set.hpp>
 #include <data/action/keyword.hpp>
 #include <data/field/text.hpp>
+#include <data/symbol_font.hpp>
 #include <data/field/choice.hpp>
 #include <data/field/multiple_choice.hpp>
 #include <data/field/color.hpp>
@@ -1072,6 +1073,102 @@ TextResult replaceRange(SessionHandle h, const Target& t, const std::string& fie
       }
     });
     text_state(*tv, sel.start, sel.end, r);
+  });
+}
+
+// ----------------------------------------------------------------------------- : Inserting symbols
+
+/// A text field's style with its scripts up to date, so its symbol font is loaded
+static const TextStyle& updated_text_style(Session& s, const FieldRef& ref, const std::string& field) {
+  const TextStyle* style = dynamic_cast<const TextStyle*>(ref.style.get());
+  if (!style) fail(Status::InvalidArgument, "'" + field + "' is not a text field with a style");
+  Context& ctx = ref.card ? s.set->getContext(ref.card) : s.set->getContext();
+  ref.style->update(ctx);
+  return *style;
+}
+
+/// The field's symbol font, if it can hold symbols; its scripts (e.g. which symbols are enabled) up to date
+static SymbolFont* field_symbol_font(Session& s, const FieldRef& ref, const TextStyle& style) {
+  if (!(style.always_symbol || style.allow_formating) || !style.symbol_font.valid()) return nullptr;
+  SymbolFont& font = *style.symbol_font.font;
+  Context& ctx = ref.card ? s.set->getContext(ref.card) : s.set->getContext();
+  ctx.setVariable(_("active_color"), to_script(Color(0, 0, 0)));
+  font.update(ctx);
+  return &font;
+}
+
+static SymbolMenuItem symbol_menu_item(const InsertSymbolMenu& m, int& id) {
+  SymbolMenuItem item;
+  // as the menu shows it: without '&' accelerators, and without the shortcut after a tab
+  String label = replace_all(m.label.get(), _("&"), _(""));
+  item.label = to_utf8(label.substr(0, label.find(_('\t'))));
+  switch (m.type) {
+    case InsertSymbolMenu::Type::CODE:
+      item.type = SymbolMenuItem::Type::Code;
+      item.code = to_utf8(m.name);
+      item.id   = id++;
+      break;
+    case InsertSymbolMenu::Type::CUSTOM:
+      item.type   = SymbolMenuItem::Type::Custom;
+      item.prompt = to_utf8(m.prompt.get());
+      item.id     = id++;
+      break;
+    case InsertSymbolMenu::Type::LINE:
+      item.type = SymbolMenuItem::Type::Line;
+      break;
+    case InsertSymbolMenu::Type::SUBMENU:
+      item.type = SymbolMenuItem::Type::Submenu;
+      for (const InsertSymbolMenuP& i : m.items) item.items.push_back(symbol_menu_item(*i, id));
+      break;
+  }
+  return item;
+}
+
+SymbolMenu symbolMenu(SessionHandle h, const Target& t, const std::string& field) {
+  return guarded<SymbolMenu>(t.card_uid, field, [&](SymbolMenu& r) {
+    Session& s = get_session(h);
+    FieldRef ref = find_field(s, t, field);
+    text_value(ref, field);
+    const TextStyle& style = updated_text_style(s, ref, field);
+    SymbolFont* font = field_symbol_font(s, ref, style);
+    if (!font) return;
+    r.has_symbols   = true;
+    r.always_symbol = style.always_symbol;
+    if (const InsertSymbolMenu* menu = font->insertSymbolMenu()) {
+      // ids count the code and custom items in order, as InsertSymbolMenu::itemAt does
+      int id = 0;
+      SymbolMenuItem top = symbol_menu_item(*menu, id);
+      if (top.type == SymbolMenuItem::Type::Submenu) r.items = std::move(top.items);
+      else r.items.push_back(std::move(top));
+    }
+  });
+}
+
+ImageData symbolPreview(SessionHandle h, const Target& t, const std::string& field, int item_id, int size) {
+  return guarded<ImageData>(t.card_uid, field, [&](ImageData& r) {
+    Session& s = get_session(h);
+    if (size <= 0 || size > 1024) fail(Status::InvalidArgument, "invalid preview size");
+    FieldRef ref = find_field(s, t, field);
+    text_value(ref, field);
+    const TextStyle& style = updated_text_style(s, ref, field);
+    SymbolFont* font = field_symbol_font(s, ref, style);
+    if (!font) fail(Status::InvalidArgument, "'" + field + "' has no symbols");
+    const InsertSymbolMenu* menu = font->insertSymbolMenu();
+    const InsertSymbolMenu* item = menu ? menu->itemAt(item_id) : nullptr;
+    if (!item) fail(Status::NotFound, "no symbol menu item " + std::to_string(item_id));
+    Image img = font->insertSymbolPreview(*item, IntSize(size, size));
+    if (!img.Ok()) return;
+    r.width  = img.GetWidth();
+    r.height = img.GetHeight();
+    const Byte* rgb = img.GetData();
+    const Byte* alpha = img.GetAlpha();
+    r.rgba.resize((size_t)r.width * r.height * 4);
+    for (size_t i = 0 ; i < (size_t)r.width * r.height ; ++i) {
+      r.rgba[4*i+0] = rgb[3*i+0];
+      r.rgba[4*i+1] = rgb[3*i+1];
+      r.rgba[4*i+2] = rgb[3*i+2];
+      r.rgba[4*i+3] = alpha ? alpha[i] : 255;
+    }
   });
 }
 

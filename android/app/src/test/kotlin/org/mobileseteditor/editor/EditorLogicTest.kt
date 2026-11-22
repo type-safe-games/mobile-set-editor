@@ -33,6 +33,28 @@ class EditorLogicTest {
     }
 
     @Test
+    fun typingAfterAnAutoReplaceMovesWithTheCoresCaret() {
+        val sync = TextSync()
+        sync.answered("until ", 6)
+        // "EOT" typed: the core made it "end of turn", while " y" was typed after it
+        sync.answered("until end of turn", 17, shownText = "until EOT", shownCaret = 9)
+        val typed = TextDiff.between(sync.shown, "until EOT y", cursor = 11)!!
+        assertEquals(TextChange(9, 9, " y"), typed)
+        assertEquals(TextChange(17, 17, " y"), sync.toCore(typed))
+        // a change before the caret stays where it is
+        assertEquals(TextChange(0, 1, "U"), sync.toCore(TextChange(0, 1, "U")))
+    }
+
+    @Test
+    fun typingSplitsIntoKeystrokes() {
+        assertEquals(listOf("E", "O", "T", " "), Keystrokes.of("EOT "))
+        assertEquals(listOf("a", emoji), Keystrokes.of("a$emoji"))
+        assertEquals(listOf(""), Keystrokes.of(""))
+        val paste = "x".repeat(Keystrokes.MAX_SPLIT + 1)
+        assertEquals(listOf(paste), Keystrokes.of(paste))
+    }
+
+    @Test
     fun positionsSnapOutOfLockedSpans() {
         val locked = listOf(4 until 10)
         assertEquals(4, LockedSpans.snap(5, locked))

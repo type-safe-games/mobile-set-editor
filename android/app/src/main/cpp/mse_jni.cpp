@@ -36,13 +36,13 @@ constexpr const char* PKG = "org/mobileseteditor/core/";
 struct Classes {
   jclass string, message, result, open_result, card_list_result, card_size_result, field_region, render_result;
   jclass scanned_package, scan_result, imported_package, import_result, template_info, template_list_result, progress_listener;
-  jclass action_result, session_info, value_result, field_at_result, field_list_result, text_result;
+  jclass action_result, session_info, value_result, field_at_result, symbol_menu_result, symbol_preview_result, field_list_result, text_result;
   jmethodID string_from_bytes, string_get_bytes;
   jmethodID message_init, result_init, open_result_init, card_list_result_init, card_size_result_init,
             field_region_init, render_result_init;
   jmethodID scanned_package_init, scan_result_init, imported_package_init, import_result_init,
             template_info_init, template_list_result_init, progress_on_progress;
-  jmethodID action_result_init, session_info_init, value_result_init, field_at_result_init, field_list_result_init, text_result_init;
+  jmethodID action_result_init, session_info_init, value_result_init, field_at_result_init, symbol_menu_result_init, symbol_preview_result_init, field_list_result_init, text_result_init;
   jstring utf8;
 } cls;
 
@@ -74,6 +74,8 @@ bool load_classes(JNIEnv* env) {
   cls.session_info         = global_class(env, p + "SessionInfo");
   cls.value_result         = global_class(env, p + "ValueResult");
   cls.field_at_result      = global_class(env, p + "FieldAtResult");
+  cls.symbol_menu_result   = global_class(env, p + "SymbolMenuResult");
+  cls.symbol_preview_result = global_class(env, p + "SymbolPreviewResult");
   cls.field_list_result    = global_class(env, p + "FieldListResult");
   cls.text_result          = global_class(env, p + "TextResult");
   if (env->ExceptionCheck()) return false;
@@ -100,6 +102,9 @@ bool load_classes(JNIEnv* env) {
     ("(" + result_sig + "Z[Ljava/lang/String;ZZZZLjava/lang/String;Ljava/lang/String;)V").c_str());
   cls.session_info_init     = env->GetMethodID(cls.session_info, "<init>",
     ("(" + result_sig + "Ljava/lang/String;Ljava/lang/String;ZZZ)V").c_str());
+  cls.symbol_menu_result_init = env->GetMethodID(cls.symbol_menu_result, "<init>",
+    ("(" + result_sig + "ZZ[I[Ljava/lang/String;[Ljava/lang/String;[Ljava/lang/String;[I[I)V").c_str());
+  cls.symbol_preview_result_init = env->GetMethodID(cls.symbol_preview_result, "<init>", ("(" + result_sig + "II[I)V").c_str());
   cls.field_at_result_init  = env->GetMethodID(cls.field_at_result, "<init>", ("(" + result_sig + "Ljava/lang/String;)V").c_str());
   cls.value_result_init     = env->GetMethodID(cls.value_result, "<init>", ("(" + result_sig + "Ljava/lang/String;Ljava/lang/String;)V").c_str());
   cls.field_list_result_init = env->GetMethodID(cls.field_list_result, "<init>",
@@ -388,6 +393,67 @@ Java_org_mobileseteditor_core_NativeCore_listFields(JNIEnv* env, jobject, jlong 
                                color_names, color_values, allow_custom);
   for (jobject o : {result, (jobject)jn, (jobject)jt, (jobject)editable, (jobject)multi, (jobject)choices,
                     (jobject)color_names, (jobject)color_values, (jobject)allow_custom, (jobject)string_array}) env->DeleteLocalRef(o);
+  return out;
+}
+
+/// The menu's items in depth-first order, each with its parent's index (-1 at the top)
+static void flatten(const std::vector<F::SymbolMenuItem>& items, int parent, std::vector<const F::SymbolMenuItem*>& out, std::vector<jint>& parents) {
+  for (const F::SymbolMenuItem& i : items) {
+    int index = (int)out.size();
+    out.push_back(&i);
+    parents.push_back(parent);
+    flatten(i.items, index, out, parents);
+  }
+}
+
+static jintArray to_java_ints(JNIEnv* env, const std::vector<jint>& v) {
+  jintArray a = env->NewIntArray((jsize)v.size());
+  if (!v.empty()) env->SetIntArrayRegion(a, 0, (jsize)v.size(), v.data());
+  return a;
+}
+
+JNIEXPORT jobject JNICALL
+Java_org_mobileseteditor_core_NativeCore_symbolMenu(JNIEnv* env, jobject, jlong session, jint kind, jstring card_uid, jstring field) {
+  F::Target target = target_from(env, kind, card_uid);
+  std::string f = from_java(env, field);
+  F::SymbolMenu r = guarded<F::SymbolMenu>([&] { return F::symbolMenu(session, target, f); });
+  std::vector<const F::SymbolMenuItem*> items;
+  std::vector<jint> parents, types, ids;
+  flatten(r.items, -1, items, parents);
+  std::vector<std::string> labels, codes, prompts;
+  for (const F::SymbolMenuItem* i : items) {
+    types.push_back((jint)i->type);
+    ids.push_back(i->id);
+    labels.push_back(i->label);
+    codes.push_back(i->code);
+    prompts.push_back(i->prompt);
+  }
+  jobject result = to_java(env, r);
+  jintArray jtypes = to_java_ints(env, types), jids = to_java_ints(env, ids), jparents = to_java_ints(env, parents);
+  jobjectArray jlabels = to_java(env, labels), jcodes = to_java(env, codes), jprompts = to_java(env, prompts);
+  jobject out = env->NewObject(cls.symbol_menu_result, cls.symbol_menu_result_init, result, (jboolean)r.has_symbols,
+                               (jboolean)r.always_symbol, jtypes, jlabels, jcodes, jprompts, jids, jparents);
+  for (jobject o : {result, (jobject)jtypes, (jobject)jids, (jobject)jparents, (jobject)jlabels, (jobject)jcodes, (jobject)jprompts}) env->DeleteLocalRef(o);
+  return out;
+}
+
+JNIEXPORT jobject JNICALL
+Java_org_mobileseteditor_core_NativeCore_symbolPreview(JNIEnv* env, jobject, jlong session, jint kind, jstring card_uid,
+                                                      jstring field, jint item_id, jint size) {
+  F::Target target = target_from(env, kind, card_uid);
+  std::string f = from_java(env, field);
+  F::ImageData r = guarded<F::ImageData>([&] { return F::symbolPreview(session, target, f, item_id, size); });
+  // as Android's ARGB ints
+  std::vector<jint> argb((size_t)r.width * r.height);
+  for (size_t i = 0 ; i < argb.size() ; ++i) {
+    const std::uint8_t* p = &r.rgba[4 * i];
+    argb[i] = (jint)((std::uint32_t)p[3] << 24 | (std::uint32_t)p[0] << 16 | (std::uint32_t)p[1] << 8 | p[2]);
+  }
+  jobject result = to_java(env, r);
+  jintArray pixels = to_java_ints(env, argb);
+  jobject out = env->NewObject(cls.symbol_preview_result, cls.symbol_preview_result_init, result, (jint)r.width, (jint)r.height, pixels);
+  env->DeleteLocalRef(result);
+  env->DeleteLocalRef(pixels);
   return out;
 }
 

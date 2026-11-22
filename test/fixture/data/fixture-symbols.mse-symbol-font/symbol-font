@@ -8,3 +8,17 @@ symbol:
 symbol:
 	code: U
 	image: blue.png
+insert symbol menu:
+	item: R
+	item:
+		type: line
+	item:
+		name: colors
+		label: &Colors
+		item: U
+		item: R
+	item:
+		type: custom
+		name: other
+		label: Other…	Ctrl+O
+		prompt: Which symbol?

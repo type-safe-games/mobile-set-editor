@@ -76,6 +76,14 @@ object Core {
         withContext(dispatcher) { NativeCore.cardSize(session, cardUid) }
 
     /** Draw a card into [bitmap] (ARGB_8888, the card's aspect ratio), returning its field regions */
+    /** A text field's insert-symbol menu (its symbol font's) */
+    suspend fun symbolMenu(session: Long, kind: TargetKind, cardUid: String, field: String): SymbolMenuResult =
+        withContext(dispatcher) { NativeCore.symbolMenu(session, kind.ordinal, cardUid, field) }
+
+    /** The symbol a menu item inserts, about [size] pixels square */
+    suspend fun symbolPreview(session: Long, kind: TargetKind, cardUid: String, field: String, itemId: Int, size: Int): SymbolPreviewResult =
+        withContext(dispatcher) { NativeCore.symbolPreview(session, kind.ordinal, cardUid, field, itemId, size) }
+
     /** The field a tap at (x, y) on a render [width] pixels wide picks, as the desktop picks it ("" for none) */
     suspend fun fieldAt(session: Long, cardUid: String, x: Double, y: Double, width: Int): FieldAtResult =
         withContext(dispatcher) { NativeCore.fieldAt(session, cardUid, x, y, width) }

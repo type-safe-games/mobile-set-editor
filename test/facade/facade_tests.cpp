@@ -352,6 +352,50 @@ TEST(replace_range_symbols_and_auto_replace) {
   F::closeSession(s);
 }
 
+TEST(symbol_menu_and_previews) {
+  F::SessionHandle s = open_fixture();
+  F::Target wrap = F::Target::card("fixture-wrap");
+  // the rules use the fixture's symbol font, and its menu
+  F::SymbolMenu menu = F::symbolMenu(s, wrap, "rules");
+  REQUIRE_OK(menu);
+  CHECK(menu.has_symbols);
+  CHECK(!menu.always_symbol);
+  REQUIRE(menu.items.size() == 4);
+  CHECK(menu.items[0].type == F::SymbolMenuItem::Type::Code);
+  CHECK_EQ(menu.items[0].code, std::string("R"));
+  CHECK_EQ(menu.items[0].id, 0);
+  CHECK(menu.items[1].type == F::SymbolMenuItem::Type::Line);
+  CHECK(menu.items[2].type == F::SymbolMenuItem::Type::Submenu);
+  CHECK_EQ(menu.items[2].label, std::string("Colors")); // without the '&'
+  REQUIRE(menu.items[2].items.size() == 2);
+  CHECK_EQ(menu.items[2].items[0].code, std::string("U"));
+  CHECK_EQ(menu.items[2].items[0].id, 1);
+  CHECK(menu.items[3].type == F::SymbolMenuItem::Type::Custom);
+  CHECK_EQ(menu.items[3].prompt, std::string("Which symbol?"));
+  CHECK_EQ(menu.items[3].label, std::string("Other…")); // (without the shortcut after the tab)
+  CHECK_EQ(menu.items[3].id, 3);
+  // the blue symbol's preview: square-ish, mostly blue where it is opaque
+  F::ImageData blue = F::symbolPreview(s, wrap, "rules", 1, 32);
+  REQUIRE_OK(blue);
+  CHECK(blue.width > 0 && blue.width <= 32 && blue.height > 0 && blue.height <= 32);
+  REQUIRE(blue.rgba.size() == (size_t)blue.width * blue.height * 4);
+  long r = 0, b = 0;
+  for (size_t i = 0 ; i < blue.rgba.size() ; i += 4) if (blue.rgba[i+3] > 128) { r += blue.rgba[i]; b += blue.rgba[i+2]; }
+  CHECK(b > r);
+  CHECK_EQ(F::symbolPreview(s, wrap, "rules", 9, 32).status, F::Status::NotFound);
+  // inserting the item's code as a symbol
+  F::TextResult t = F::replaceRange(s, wrap, "rules", 0, 0, menu.items[2].items[0].code, true);
+  REQUIRE_OK(t);
+  CHECK(F::getValue(s, wrap, "rules").value.rfind("<sym>U</sym>", 0) == 0);
+  // the name has no symbol font; a choice field is not a text field
+  F::SymbolMenu name = F::symbolMenu(s, wrap, "name");
+  REQUIRE_OK(name);
+  CHECK(!name.has_symbols);
+  CHECK(name.items.empty());
+  CHECK_EQ(F::symbolMenu(s, wrap, "frame").status, F::Status::InvalidArgument);
+  CHECK_OK(F::closeSession(s));
+}
+
 TEST(visible_text_and_separators) {
   // the core side of replaceRange's positions: atoms show as their contents and are locked
   VisibleText vt = visible_text(_("a<sep> - </sep>b<atom-reminder>(x)</atom-reminder>"));

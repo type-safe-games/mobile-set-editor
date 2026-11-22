@@ -37,6 +37,42 @@ class FieldRegion(
     val editable: Boolean,
 )
 
+/** An item of a symbol font's insert-symbol menu; mirrors the facade's SymbolMenuItem */
+class SymbolMenuItem(val type: Type, val label: String, val code: String, val prompt: String, val id: Int, val items: List<SymbolMenuItem>) {
+    enum class Type {
+        /** insert [code] as a symbol */
+        Code,
+        /** ask for a code ([prompt]) and insert that as a symbol */
+        Custom,
+        Line,
+        Submenu,
+    }
+}
+
+/** A text field's symbol menu: [hasSymbols] if it can hold symbols; [alwaysSymbol] if all its text is symbols */
+class SymbolMenuResult(
+    val result: CoreResult,
+    val hasSymbols: Boolean,
+    val alwaysSymbol: Boolean,
+    types: IntArray,
+    labels: Array<String>,
+    codes: Array<String>,
+    prompts: Array<String>,
+    ids: IntArray,
+    parents: IntArray,
+) {
+    /** The menu's top items (the JNI hands it over flattened, each item with its parent's index) */
+    val items: List<SymbolMenuItem> = run {
+        fun children(parent: Int): List<SymbolMenuItem> = types.indices.filter { parents[it] == parent }.map {
+            SymbolMenuItem(SymbolMenuItem.Type.entries[types[it]], labels[it], codes[it], prompts[it], ids[it], children(it))
+        }
+        children(-1)
+    }
+}
+
+/** A symbol preview as ARGB pixels; width 0 if the item has none */
+class SymbolPreviewResult(val result: CoreResult, val width: Int, val height: Int, val pixels: IntArray)
+
 /** The field under a tap; empty if none */
 class FieldAtResult(val result: CoreResult, val field: String)
 
