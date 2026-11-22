@@ -123,6 +123,15 @@ fun CardEditorScreen(model: SetViewModel, onBack: () -> Unit) {
                     onClick = { details = state.cardUids.getOrNull(pager.currentPage) },
                     modifier = Modifier.padding(start = 8.dp).testTag("details"),
                 ) { Text("Details") }
+                TextButton(
+                    onClick = {
+                        scope.launch {
+                            val added = model.addCard(pager.currentPage)
+                            if (added >= 0) pager.scrollToPage(added)
+                        }
+                    },
+                    modifier = Modifier.testTag("add-card-here"),
+                ) { Text("Add") }
                 Box(Modifier.weight(1f)) {
                     LinkBar(model, state, pager.currentPage) { target -> scope.launch { pager.animateScrollToPage(target) } }
                 }
@@ -133,6 +142,10 @@ fun CardEditorScreen(model: SetViewModel, onBack: () -> Unit) {
                 if (state.session != 0L || state.opening) CircularProgressIndicator() else Text("The Set has no Cards")
             }
         } else {
+            // the card list changed (added, removed, moved): stay on the model's current Card
+            LaunchedEffect(state.cardUids) {
+                if (pager.currentPage != state.index && state.index in state.cardUids.indices) pager.scrollToPage(state.index)
+            }
             LaunchedEffect(pager) {
                 snapshotFlow { pager.currentPage }.collect { page ->
                     model.go(page)

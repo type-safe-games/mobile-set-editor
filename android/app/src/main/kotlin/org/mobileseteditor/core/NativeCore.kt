@@ -35,6 +35,10 @@ internal object NativeCore {
     external fun getText(session: Long, kind: Int, cardUid: String, field: String): TextResult
     /** Replace [start, end) of a text field's visible text (code points), as typing does */
     external fun replaceRange(session: Long, kind: Int, cardUid: String, field: String, start: Int, end: Int, text: String, asSymbol: Boolean): TextResult
+    external fun addCard(session: Long, position: Int): NewCardsResult
+    external fun duplicateCards(session: Long, cardUids: Array<String>): NewCardsResult
+    external fun removeCards(session: Long, cardUids: Array<String>): ActionResult
+    external fun moveCards(session: Long, cardUids: Array<String>, position: Int): ActionResult
     external fun setCardStyle(session: Long, cardUid: String, stylesheet: String): ActionResult
     external fun setSetStyle(session: Long, stylesheet: String): ActionResult
     external fun setCardOwnStyling(session: Long, cardUid: String, own: Boolean): ActionResult

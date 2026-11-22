@@ -202,6 +202,9 @@ class ActionResult(
     val stale = Stale(staleAll, staleUids.toList(), staleCardList)
 }
 
+/** The result of making Cards: [uids] are the new ones, in the Set's order */
+class NewCardsResult(val action: ActionResult, val uids: Array<String>)
+
 class SessionInfo(
     val result: CoreResult,
     val game: String,

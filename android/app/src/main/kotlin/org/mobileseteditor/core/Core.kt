@@ -71,6 +71,21 @@ object Core {
         session: Long, kind: TargetKind, cardUid: String, field: String, start: Int, end: Int, text: String, asSymbol: Boolean = false,
     ): TextResult = withContext(dispatcher) { NativeCore.replaceRange(session, kind.ordinal, cardUid, field, start, end, text, asSymbol) }
 
+    /** Add a new Card at [position] (-1: at the end), one undo step */
+    suspend fun addCard(session: Long, position: Int = -1): NewCardsResult = withContext(dispatcher) { NativeCore.addCard(session, position) }
+
+    /** Duplicate Cards (and the Cards linked to them), one undo step; the copies follow the last of them */
+    suspend fun duplicateCards(session: Long, uids: List<String>): NewCardsResult =
+        withContext(dispatcher) { NativeCore.duplicateCards(session, uids.toTypedArray()) }
+
+    /** Remove Cards, one undo step */
+    suspend fun removeCards(session: Long, uids: List<String>): ActionResult =
+        withContext(dispatcher) { NativeCore.removeCards(session, uids.toTypedArray()) }
+
+    /** Move Cards (in their Set order) so that the first of them is at [position], one undo step */
+    suspend fun moveCards(session: Long, uids: List<String>, position: Int): ActionResult =
+        withContext(dispatcher) { NativeCore.moveCards(session, uids.toTypedArray(), position) }
+
     /** Give a Card a Style of its own ("" or the Set's: follow the Set's again), one undo step */
     suspend fun setCardStyle(session: Long, cardUid: String, stylesheet: String): ActionResult =
         withContext(dispatcher) { NativeCore.setCardStyle(session, cardUid, stylesheet) }

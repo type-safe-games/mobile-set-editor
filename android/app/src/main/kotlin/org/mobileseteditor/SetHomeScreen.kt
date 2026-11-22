@@ -6,6 +6,19 @@ package org.mobileseteditor
 import android.content.pm.ApplicationInfo
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.border
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -82,9 +95,14 @@ fun SetHomeScreen(
     // a Set info field being edited (#68), and a count of undos and redos (the sheet reads its value again)
     var editing by remember { mutableStateOf<EditTarget?>(null) }
     var revision by remember { mutableIntStateOf(0) }
+    // the Cards picked in selection mode (null: not in it), and asking where to move them
+    var selected by remember { mutableStateOf<Set<String>?>(null) }
+    var moving by remember { mutableStateOf(false) }
+    val snackbar = remember { SnackbarHostState() }
     val close: () -> Unit = { if (state.dirty) askClose = true else { model.close(CloseChoice.Keep, onClosed) } }
-    BackHandler { if (editing != null) editing = null else close() }
+    BackHandler { if (editing != null) editing = null else if (selected != null) selected = null else close() }
 
+    Box(Modifier.fillMaxSize()) {
     Column(Modifier.fillMaxSize().safeDrawingPadding()) {
         // the top bar
         Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -120,11 +138,46 @@ fun SetHomeScreen(
                 }
             }
         }
+        selected?.let { picked ->
+            SelectionBar(
+                count = picked.size,
+                onAll = { selected = state.cardUids.toSet() },
+                onDuplicate = { scope.launch { model.duplicateCards(inSetOrder(state, picked)); selected = null } },
+                onDelete = {
+                    scope.launch {
+                        val n = picked.size
+                        if (model.removeCards(inSetOrder(state, picked))) {
+                            selected = null
+                            val r = snackbar.showSnackbar("Deleted $n Card${if (n == 1) "" else "s"}", actionLabel = "Undo", duration = SnackbarDuration.Long)
+                            if (r == SnackbarResult.ActionPerformed) model.undo()
+                        }
+                    }
+                },
+                onMove = { moving = true },
+                onDone = { selected = null },
+            )
+        }
         TabRow(selectedTabIndex = tab.ordinal) {
             for (t in SetTab.entries) Tab(selected = tab == t, onClick = { tab = t }, text = { Text(t.title) })
         }
         when (tab) {
-            SetTab.Cards -> CardsGrid(model, state, grid, onOpenCard)
+            SetTab.Cards -> Box(Modifier.weight(1f)) {
+                CardsGrid(
+                    model, state, grid, selected,
+                    onOpenCard = { index ->
+                        val picked = selected
+                        if (picked == null) onOpenCard(index)
+                        else state.cardUids.getOrNull(index)?.let { uid -> selected = if (uid in picked) picked - uid else picked + uid }
+                    },
+                    onSelect = { index -> state.cardUids.getOrNull(index)?.let { selected = (selected ?: emptySet()) + it } },
+                )
+                if (selected == null && state.session != 0L) {
+                    ExtendedFloatingActionButton(
+                        onClick = { scope.launch { model.addCard(state.cardUids.size - 1).takeIf { it >= 0 }?.let(onOpenCard) } },
+                        modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp).testTag("add-card"),
+                    ) { Text("Add Card") }
+                }
+            }
             SetTab.SetInfo -> Box(Modifier.weight(1f)) { SetInfoTab(model, state, revision) { editing = it } }
             SetTab.Keywords -> Placeholder("The Set's keywords come here.")
         }
@@ -138,6 +191,20 @@ fun SetHomeScreen(
                 }
             }
         }
+    }
+    SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).safeDrawingPadding().testTag("snackbar"))
+    }
+    if (moving) {
+        val picked = selected.orEmpty()
+        MoveDialog(
+            count = picked.size,
+            cards = state.cardUids.size,
+            onMove = { position ->
+                moving = false
+                scope.launch { model.moveCards(inSetOrder(state, picked), position); selected = null }
+            },
+            onCancel = { moving = false },
+        )
     }
     if (askClose) {
         AlertDialog(
@@ -166,7 +233,14 @@ private fun Placeholder(text: String) {
 
 /** The grid: as many columns as fit (at least 3 on a phone), each Card's thumbnail and name */
 @Composable
-private fun CardsGrid(model: SetViewModel, state: SetState, grid: LazyGridState, onOpenCard: (Int) -> Unit) {
+private fun CardsGrid(
+    model: SetViewModel,
+    state: SetState,
+    grid: LazyGridState,
+    selected: Set<String>?,
+    onOpenCard: (Int) -> Unit,
+    onSelect: (Int) -> Unit,
+) {
     if (state.session == 0L) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
         return
@@ -197,19 +271,37 @@ private fun CardsGrid(model: SetViewModel, state: SetState, grid: LazyGridState,
         ) {
             itemsIndexed(state.cardUids, key = { _, uid -> uid }) { index, uid ->
                 val linked = state.cardLinks.getOrElse(index) { emptyList() }.isNotEmpty()
-                Thumbnail(model, RenderKey(uid, cellWidthPx), state.cardNames.getOrElse(index) { "" }, state.aspect, linked) {
-                    onOpenCard(index)
-                }
+                Thumbnail(
+                    model, RenderKey(uid, cellWidthPx), state.cardNames.getOrElse(index) { "" }, state.aspect, linked,
+                    picked = selected?.contains(uid),
+                    onClick = { onOpenCard(index) },
+                    onLongClick = { onSelect(index) },
+                )
             }
         }
     }
 }
 
 @Composable
-private fun Thumbnail(model: SetViewModel, key: RenderKey, name: String, aspect: Float, linked: Boolean, onClick: () -> Unit) {
+private fun Thumbnail(
+    model: SetViewModel,
+    key: RenderKey,
+    name: String,
+    aspect: Float,
+    linked: Boolean,
+    picked: Boolean?,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit,
+) {
     val flow = remember(key) { model.observe(key) }
     val rendered = flow?.collectAsState()?.value
-    Column(Modifier.clickable(onClick = onClick).testTag("thumbnail-${key.uid}")) {
+    val outline = if (picked == true) Modifier.border(3.dp, MaterialTheme.colorScheme.primary) else Modifier
+    Column(
+        Modifier.combinedClickable(onClick = onClick, onLongClick = onLongClick, onLongClickLabel = "Select")
+            .then(outline)
+            .semantics { if (picked != null) selected = picked }
+            .testTag("thumbnail-${key.uid}"),
+    ) {
         if (rendered != null) {
             Image(
                 bitmap = rendered.image.asImageBitmap(),
@@ -228,4 +320,50 @@ private fun Thumbnail(model: SetViewModel, key: RenderKey, name: String, aspect:
             Text(name, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
+}
+
+/** The picked Cards in the Set's order (as the core's calls want them) */
+private fun inSetOrder(state: SetState, picked: Set<String>) = state.cardUids.filter { it in picked }
+
+/** Selection mode's bar: how many Cards are picked, and what to do with them */
+@Composable
+private fun SelectionBar(count: Int, onAll: () -> Unit, onDuplicate: () -> Unit, onDelete: () -> Unit, onMove: () -> Unit, onDone: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp).testTag("selection-bar"),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text("$count selected", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(horizontal = 8.dp).testTag("selected-count"))
+        TextButton(onClick = onAll, modifier = Modifier.testTag("select-all")) { Text("Select all") }
+        TextButton(onClick = onDuplicate, enabled = count > 0, modifier = Modifier.testTag("duplicate")) { Text("Duplicate") }
+        TextButton(onClick = onMove, enabled = count > 0, modifier = Modifier.testTag("move")) { Text("Move…") }
+        TextButton(onClick = onDelete, enabled = count > 0, modifier = Modifier.testTag("delete")) { Text("Delete") }
+        // (exporting Cards as images comes with M5)
+        TextButton(onClick = {}, enabled = false) { Text("Export") }
+        TextButton(onClick = onDone, modifier = Modifier.testTag("selection-done")) { Text("Done") }
+    }
+}
+
+/** Where to move the picked Cards: the position (1 = first) the first of them goes to */
+@Composable
+private fun MoveDialog(count: Int, cards: Int, onMove: (Int) -> Unit, onCancel: () -> Unit) {
+    val last = cards - count + 1
+    var text by remember { mutableStateOf("1") }
+    val position = text.toIntOrNull()?.takeIf { it in 1..last }
+    AlertDialog(
+        onDismissRequest = onCancel,
+        title = { Text("Move $count Card${if (count == 1) "" else "s"}") },
+        text = {
+            OutlinedTextField(
+                text, { text = it.filter(Char::isDigit) },
+                label = { Text("To position (1 to $last)") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.testTag("move-position"),
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = { position?.let { onMove(it - 1) } }, enabled = position != null, modifier = Modifier.testTag("move-confirm")) { Text("Move") }
+        },
+        dismissButton = { TextButton(onClick = onCancel) { Text("Cancel") } },
+    )
 }

@@ -253,6 +253,8 @@ class SetViewModel(app: Application) : AndroidViewModel(app) {
         if (!result.result.ok) return
         staleAll = staleAll || result.stale.all
         staleUids += result.stale.cardUids
+        // Cards added, removed or moved: list them again at once
+        if (result.stale.cardList) viewModelScope.launch { reloadCards() }
         renderJob?.cancel()
         if (renderDelayMillis <= 0) invalidateStale() else renderJob = viewModelScope.launch {
             delay(renderDelayMillis)
@@ -291,6 +293,67 @@ class SetViewModel(app: Application) : AndroidViewModel(app) {
         if (!cards.result.ok || s.session != session || cards.uids.toList() != s.cardUids) return
         _state.value = s.copy(cardNames = cards.names.toList(), cardLinks = cards.links, cardStyles = cardStyles(cards))
         nameAfterTitle()
+    }
+
+    /**
+     * The card list changed (Cards added, removed, moved): list them again. The current Card stays
+     * current while it exists; renders of Cards that are gone are dropped.
+     */
+    private suspend fun reloadCards() {
+        val session = _state.value.session.takeIf { it != 0L } ?: return
+        val cards = Core.listCards(session)
+        val s = _state.value
+        if (!cards.result.ok || s.session != session) return
+        val uids = cards.uids.toList()
+        val current = s.cardUids.getOrNull(s.index)
+        val index = uids.indexOf(current).takeIf { it >= 0 } ?: s.index.coerceIn(0, maxOf(0, uids.size - 1))
+        val gone = s.cardUids - uids.toSet()
+        if (gone.isNotEmpty()) renders?.invalidate(false, gone)
+        _state.value = s.copy(
+            cardUids = uids,
+            cardNames = cards.names.toList(),
+            cardLinks = cards.links,
+            cardStyles = cardStyles(cards),
+            index = index,
+            card = if (index == s.index && uids.getOrNull(index) == current) s.card else null,
+        )
+        show()
+    }
+
+    // ------------------------------------------------------------------- Changing the card list
+
+    /** Add a new Card after [after] (an index; -1: at the start), one undo step; its index, or -1 */
+    suspend fun addCard(after: Int): Int {
+        val session = _state.value.session.takeIf { it != 0L } ?: return -1
+        val r = Core.addCard(session, (after + 1).coerceIn(0, _state.value.cardUids.size))
+        edited(r.action)
+        reloadCards()
+        return r.uids.firstOrNull()?.let { _state.value.cardUids.indexOf(it) } ?: -1
+    }
+
+    /** Duplicate Cards, one undo step; the copies' uids */
+    suspend fun duplicateCards(uids: List<String>): List<String> {
+        val session = _state.value.session.takeIf { it != 0L } ?: return emptyList()
+        val r = Core.duplicateCards(session, uids)
+        edited(r.action)
+        reloadCards()
+        return r.uids.toList()
+    }
+
+    /** Remove Cards, one undo step */
+    suspend fun removeCards(uids: List<String>): Boolean {
+        val session = _state.value.session.takeIf { it != 0L } ?: return false
+        val r = Core.removeCards(session, uids)
+        edited(r)
+        reloadCards()
+        return r.result.ok
+    }
+
+    /** Move Cards so that the first of them (in Set order) is at [position], one undo step */
+    suspend fun moveCards(uids: List<String>, position: Int) {
+        val session = _state.value.session.takeIf { it != 0L } ?: return
+        edited(Core.moveCards(session, uids, position))
+        reloadCards()
     }
 
     /** A Set without a document yet is called by its title, once it has one */
