@@ -83,9 +83,16 @@ String ActionStack::redoName() const {
   }
 }
 
+// a save point that no action is: atSavePoint() is then false until setSavePoint()
+static const char unsaved_marker = 0;
+
+void ActionStack::setUnsaved() {
+  save_point = reinterpret_cast<const Action*>(&unsaved_marker);
+}
+
 bool ActionStack::atSavePoint() const {
-  return (undo_actions.empty() && save_point == nullptr)
-      || (undo_actions.back().get() == save_point);
+  if (undo_actions.empty()) return save_point == nullptr;
+  return undo_actions.back().get() == save_point;
 }
 void ActionStack::setSavePoint() {
   if (undo_actions.empty()) {

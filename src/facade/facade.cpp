@@ -417,6 +417,24 @@ OpenResult newSession(const std::string& game, const std::string& stylesheet, co
   });
 }
 
+OpenResult openWorkingCopy(const std::string& working_copy_dir, bool unsaved) {
+  return guarded<OpenResult>("", "", [&](OpenResult& r) {
+    if (!initialized) fail(Status::Failed, "the facade is not initialised");
+    auto s = make_unique<Session>();
+    {
+      std::lock_guard<std::mutex> lock(loading_mutex);
+      String work = from_utf8(working_copy_dir);
+      if (!dir_exists(work)) fail(Status::NotFound, "no working copy at '" + working_copy_dir + "'");
+      SetP set = make_intrusive<Set>();
+      set->open(work);
+      if (unsaved) set->actions.setUnsaved();
+      s->set = set;
+      s->working_copy = work;
+    }
+    add_session(std::move(s), r);
+  });
+}
+
 Result closeSession(SessionHandle h) {
   return guarded<Result>("", "", [&](Result&) {
     get_session(h);

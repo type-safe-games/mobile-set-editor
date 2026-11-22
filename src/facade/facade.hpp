@@ -126,6 +126,12 @@ OpenResult openSession(const std::string& set_path, const std::string& working_c
  *  is a MissingTemplate result; a Style of another Game is an InvalidArgument. */
 OpenResult newSession(const std::string& game, const std::string& stylesheet, const std::string& working_copy_dir);
 
+/// Reopen a working copy that an earlier session left (e.g. before the process was killed).
+/** The Set is opened from working_copy_dir itself and keeps being autosaved there. unsaved says
+ *  whether it differs from the user's file (the host remembers that, as it does where the file is):
+ *  if so, the session is dirty until saveTo(). */
+OpenResult openWorkingCopy(const std::string& working_copy_dir, bool unsaved);
+
 Result closeSession(SessionHandle session);
 
 /// Autosave: write the working copy if the Set changed since the last flush.

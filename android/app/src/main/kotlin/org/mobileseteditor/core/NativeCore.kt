@@ -21,6 +21,15 @@ internal object NativeCore {
     /** Open a Set from a file descriptor opened for reading; it is read, not closed */
     external fun openSessionFd(fd: Int, workingCopyDir: String): OpenResult
     external fun closeSession(session: Long): CoreResult
+    /** Reopen a working copy left by an earlier session (e.g. before the process was killed) */
+    external fun openWorkingCopy(workingCopyDir: String, unsaved: Boolean): OpenResult
+    /** Autosave: write the working copy if the Set changed since the last flush */
+    external fun flush(session: Long): CoreResult
+    /** Write the Set as an .mse-set to a descriptor opened for writing (not closed) */
+    external fun saveToFd(session: Long, fd: Int): ActionResult
+    external fun sessionInfo(session: Long): SessionInfo
+    external fun getValue(session: Long, kind: Int, cardUid: String, field: String): ValueResult
+    external fun setValue(session: Long, kind: Int, cardUid: String, field: String, value: String): ActionResult
     external fun listCards(session: Long): CardListResult
     external fun cardSize(session: Long, cardUid: String): CardSizeResult
     /** Draw a card into an ARGB_8888 bitmap, scaled to its width */

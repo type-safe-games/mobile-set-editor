@@ -36,11 +36,13 @@ constexpr const char* PKG = "org/mobileseteditor/core/";
 struct Classes {
   jclass string, message, result, open_result, card_list_result, card_size_result, field_region, render_result;
   jclass scanned_package, scan_result, imported_package, import_result, template_info, template_list_result, progress_listener;
+  jclass action_result, session_info, value_result;
   jmethodID string_from_bytes, string_get_bytes;
   jmethodID message_init, result_init, open_result_init, card_list_result_init, card_size_result_init,
             field_region_init, render_result_init;
   jmethodID scanned_package_init, scan_result_init, imported_package_init, import_result_init,
             template_info_init, template_list_result_init, progress_on_progress;
+  jmethodID action_result_init, session_info_init, value_result_init;
   jstring utf8;
 } cls;
 
@@ -68,6 +70,9 @@ bool load_classes(JNIEnv* env) {
   cls.template_info        = global_class(env, p + "TemplateInfo");
   cls.template_list_result = global_class(env, p + "TemplateListResult");
   cls.progress_listener    = global_class(env, p + "ImportProgressListener");
+  cls.action_result        = global_class(env, p + "ActionResult");
+  cls.session_info         = global_class(env, p + "SessionInfo");
+  cls.value_result         = global_class(env, p + "ValueResult");
   if (env->ExceptionCheck()) return false;
   std::string result_sig = "L" + p + "CoreResult;";
   cls.string_from_bytes     = env->GetMethodID(cls.string, "<init>", "([BLjava/lang/String;)V");
@@ -88,6 +93,11 @@ bool load_classes(JNIEnv* env) {
     "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V");
   cls.template_list_result_init = env->GetMethodID(cls.template_list_result, "<init>", ("(" + result_sig + "[L" + p + "TemplateInfo;)V").c_str());
   cls.progress_on_progress  = env->GetMethodID(cls.progress_listener, "onProgress", "(JJ)Z");
+  cls.action_result_init    = env->GetMethodID(cls.action_result, "<init>",
+    ("(" + result_sig + "Z[Ljava/lang/String;ZZZZLjava/lang/String;Ljava/lang/String;)V").c_str());
+  cls.session_info_init     = env->GetMethodID(cls.session_info, "<init>",
+    ("(" + result_sig + "Ljava/lang/String;Ljava/lang/String;ZZZ)V").c_str());
+  cls.value_result_init     = env->GetMethodID(cls.value_result, "<init>", ("(" + result_sig + "Ljava/lang/String;Ljava/lang/String;)V").c_str());
   jstring utf8 = env->NewStringUTF("UTF-8");
   cls.utf8 = (jstring)env->NewGlobalRef(utf8);
   env->DeleteLocalRef(utf8);
@@ -165,6 +175,25 @@ R guarded(Fun fun) {
   } catch (...) {
     return failed<R>("internal error");
   }
+}
+
+jobject to_java(JNIEnv* env, const F::ActionResult& r) {
+  jobject result = to_java(env, static_cast<const F::Result&>(r));
+  jobjectArray uids = to_java(env, r.stale.card_uids);
+  jstring undo = to_java(env, r.undo_name), redo = to_java(env, r.redo_name);
+  jobject out = env->NewObject(cls.action_result, cls.action_result_init, result, (jboolean)r.stale.all, uids,
+                               (jboolean)r.stale.card_list, (jboolean)r.dirty, (jboolean)r.can_undo, (jboolean)r.can_redo,
+                               undo, redo);
+  for (jobject o : {result, (jobject)uids, (jobject)undo, (jobject)redo}) env->DeleteLocalRef(o);
+  return out;
+}
+
+/// A facade Target from the Kotlin side's kind (Target.Kind's order) and card uid
+F::Target target_from(JNIEnv* env, jint kind, jstring card_uid) {
+  F::Target t;
+  t.kind = (F::Target::Kind)kind;
+  t.card_uid = from_java(env, card_uid);
+  return t;
 }
 
 // ----------------------------------------------------------------------------- : Opening from a file descriptor
@@ -245,6 +274,57 @@ Java_org_mobileseteditor_core_NativeCore_openSessionFd(JNIEnv* env, jobject, jin
   jobject out = env->NewObject(cls.open_result, cls.open_result_init, result, (jlong)r.session);
   env->DeleteLocalRef(result);
   return out;
+}
+
+JNIEXPORT jobject JNICALL
+Java_org_mobileseteditor_core_NativeCore_openWorkingCopy(JNIEnv* env, jobject, jstring working_copy_dir, jboolean unsaved) {
+  std::string work = from_java(env, working_copy_dir);
+  F::OpenResult r = guarded<F::OpenResult>([&] { return F::openWorkingCopy(work, unsaved == JNI_TRUE); });
+  jobject result = to_java(env, r);
+  jobject out = env->NewObject(cls.open_result, cls.open_result_init, result, (jlong)r.session);
+  env->DeleteLocalRef(result);
+  return out;
+}
+
+JNIEXPORT jobject JNICALL
+Java_org_mobileseteditor_core_NativeCore_flush(JNIEnv* env, jobject, jlong session) {
+  return to_java(env, guarded<F::Result>([&] { return F::flush(session); }));
+}
+
+JNIEXPORT jobject JNICALL
+Java_org_mobileseteditor_core_NativeCore_saveToFd(JNIEnv* env, jobject, jlong session, jint fd) {
+  return to_java(env, guarded<F::ActionResult>([&] { return F::saveTo(session, (int)fd); }));
+}
+
+JNIEXPORT jobject JNICALL
+Java_org_mobileseteditor_core_NativeCore_sessionInfo(JNIEnv* env, jobject, jlong session) {
+  F::SessionInfo r = guarded<F::SessionInfo>([&] { return F::sessionInfo(session); });
+  jobject result = to_java(env, r);
+  jstring game = to_java(env, r.game), stylesheet = to_java(env, r.stylesheet);
+  jobject out = env->NewObject(cls.session_info, cls.session_info_init, result, game, stylesheet,
+                               (jboolean)r.dirty, (jboolean)r.can_undo, (jboolean)r.can_redo);
+  for (jobject o : {result, (jobject)game, (jobject)stylesheet}) env->DeleteLocalRef(o);
+  return out;
+}
+
+JNIEXPORT jobject JNICALL
+Java_org_mobileseteditor_core_NativeCore_getValue(JNIEnv* env, jobject, jlong session, jint kind, jstring card_uid, jstring field) {
+  F::Target target = target_from(env, kind, card_uid);
+  std::string f = from_java(env, field);
+  F::ValueResult r = guarded<F::ValueResult>([&] { return F::getValue(session, target, f); });
+  jobject result = to_java(env, r);
+  jstring type = to_java(env, r.type), value = to_java(env, r.value);
+  jobject out = env->NewObject(cls.value_result, cls.value_result_init, result, type, value);
+  for (jobject o : {result, (jobject)type, (jobject)value}) env->DeleteLocalRef(o);
+  return out;
+}
+
+JNIEXPORT jobject JNICALL
+Java_org_mobileseteditor_core_NativeCore_setValue(JNIEnv* env, jobject, jlong session, jint kind, jstring card_uid,
+                                                 jstring field, jstring value) {
+  F::Target target = target_from(env, kind, card_uid);
+  std::string f = from_java(env, field), v = from_java(env, value);
+  return to_java(env, guarded<F::ActionResult>([&] { return F::setValue(session, target, f, v); }));
 }
 
 JNIEXPORT jobject JNICALL

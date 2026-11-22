@@ -97,6 +97,9 @@ public:
   bool atSavePoint() const;
   /// Indicate that the file is at a savepoint.
   void setSavePoint();
+  /// Indicate that the file differs from what was saved, whatever the actions say (e.g. a working
+  /// copy restored with unsaved changes); until the next setSavePoint.
+  void setUnsaved();
   
   /// Add an action listener
   void addListener(ActionListener* listener);

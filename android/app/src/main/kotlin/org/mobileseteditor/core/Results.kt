@@ -106,3 +106,38 @@ class ImportResult(
 fun interface ImportProgressListener {
     fun onProgress(done: Long, total: Long): Boolean
 }
+
+// ----------------------------------------------------------------------------- Sessions and values (ADR 0009)
+
+/** What an action made stale: [all] Cards, or the Cards [cardUids]; [cardList] if Cards were added, removed or moved */
+class Stale(val all: Boolean, val cardUids: List<String>, val cardList: Boolean)
+
+/** The result of anything that changes the Set */
+class ActionResult(
+    val result: CoreResult,
+    staleAll: Boolean,
+    staleUids: Array<String>,
+    staleCardList: Boolean,
+    /** does the Set differ from what was last saved? */
+    val dirty: Boolean,
+    val canUndo: Boolean,
+    val canRedo: Boolean,
+    val undoName: String,
+    val redoName: String,
+) {
+    val stale = Stale(staleAll, staleUids.toList(), staleCardList)
+}
+
+class SessionInfo(
+    val result: CoreResult,
+    val game: String,
+    val stylesheet: String,
+    val dirty: Boolean,
+    val canUndo: Boolean,
+    val canRedo: Boolean,
+)
+
+class ValueResult(val result: CoreResult, val type: String, val value: String)
+
+/** What a value belongs to; mirrors the facade's Target::Kind, in its order */
+enum class TargetKind { Card, Set, CardStyle, SetStyle, Keyword }

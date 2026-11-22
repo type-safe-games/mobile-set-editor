@@ -37,6 +37,25 @@ object Core {
 
     suspend fun closeSession(session: Long): CoreResult = withContext(dispatcher) { NativeCore.closeSession(session) }
 
+    /** Reopen a working copy an earlier session left; [unsaved] if it differs from the user's file */
+    suspend fun openWorkingCopy(workingCopyDir: File, unsaved: Boolean): OpenResult =
+        withContext(dispatcher) { NativeCore.openWorkingCopy(workingCopyDir.path, unsaved) }
+
+    /** Autosave the working copy (cheap when nothing changed) */
+    suspend fun flush(session: Long): CoreResult = withContext(dispatcher) { NativeCore.flush(session) }
+
+    /** Write the Set as an .mse-set to [file] (opened for writing) */
+    suspend fun saveTo(session: Long, file: ParcelFileDescriptor): ActionResult =
+        withContext(dispatcher) { NativeCore.saveToFd(session, file.fd) }
+
+    suspend fun sessionInfo(session: Long): SessionInfo = withContext(dispatcher) { NativeCore.sessionInfo(session) }
+
+    suspend fun getValue(session: Long, kind: TargetKind, cardUid: String, field: String): ValueResult =
+        withContext(dispatcher) { NativeCore.getValue(session, kind.ordinal, cardUid, field) }
+
+    suspend fun setValue(session: Long, kind: TargetKind, cardUid: String, field: String, value: String): ActionResult =
+        withContext(dispatcher) { NativeCore.setValue(session, kind.ordinal, cardUid, field, value) }
+
     suspend fun listCards(session: Long): CardListResult = withContext(dispatcher) { NativeCore.listCards(session) }
 
     suspend fun cardSize(session: Long, cardUid: String): CardSizeResult =

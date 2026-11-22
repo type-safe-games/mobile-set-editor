@@ -1825,6 +1825,42 @@ TEST(template_import_install) {
   CHECK_OK(F::refreshTemplates());
 }
 
+TEST(working_copy_reopened) {
+  // a session's working copy, autosaved, then reopened as a later process would
+  fs::path work = work_dir / "sessions" / "reopened.mse-set";
+  F::OpenResult open = F::openSession(fixture_set().string(), work.string());
+  REQUIRE_OK(open);
+  F::ActionResult a = F::setValue(open.session, F::Target::set(), "title", "Changed before the kill");
+  REQUIRE_OK(a);
+  CHECK(a.dirty);
+  REQUIRE_OK(F::flush(open.session));
+  REQUIRE_OK(F::closeSession(open.session));
+  F::OpenResult again = F::openWorkingCopy(work.string(), true);
+  REQUIRE_OK(again);
+  F::ValueResult title = F::getValue(again.session, F::Target::set(), "title");
+  CHECK_EQ(title.value, "Changed before the kill");
+  F::SessionInfo info = F::sessionInfo(again.session);
+  CHECK(info.dirty);
+  // edits keep going to the same working copy
+  REQUIRE_OK(F::setValue(again.session, F::Target::set(), "title", "And after"));
+  REQUIRE_OK(F::flush(again.session));
+  CHECK(read_text(work / "set").find("And after") != std::string::npos);
+  // saved: clean
+  fs::path saved = work_dir / "reopened-saved.mse-set";
+  int fd = ::open(saved.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
+  F::ActionResult s = F::saveTo(again.session, fd);
+  ::close(fd);
+  REQUIRE_OK(s);
+  CHECK(!s.dirty);
+  REQUIRE_OK(F::closeSession(again.session));
+  // reopened as saved: clean; a missing one is NotFound
+  F::OpenResult clean = F::openWorkingCopy(work.string(), false);
+  REQUIRE_OK(clean);
+  CHECK(!F::sessionInfo(clean.session).dirty);
+  F::closeSession(clean.session);
+  CHECK(F::openWorkingCopy((work_dir / "nope").string(), true).status == F::Status::NotFound);
+}
+
 TEST(template_import_progress_and_cancel) {
   using O = F::ImportedPackage::Outcome;
   ZipBuilder z;
