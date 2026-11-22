@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -57,23 +58,120 @@ object ExportNames {
     }
 }
 
+/**
+ * A zip of Card PNGs, written as it goes: each PNG goes into the stream and is not kept, stored as
+ * it is (PNGs are compressed already). Entries are named "001 name.png" so the zip keeps the order.
+ */
+object ZipExport {
+    /** Write the Cards ([names] by uid, in order) into [out]; [png] makes one (null: left out) */
+    suspend fun write(out: java.io.OutputStream, uids: List<String>, names: List<String>, png: suspend (index: Int, uid: String) -> ByteArray?) {
+        val width = maxOf(3, uids.size.toString().length)
+        val used = mutableSetOf<String>()
+        java.util.zip.ZipOutputStream(java.io.BufferedOutputStream(out)).use { zip ->
+            for ((i, uid) in uids.withIndex()) {
+                val data = png(i, uid) ?: continue
+                val name = "${(i + 1).toString().padStart(width, '0')} ${ExportNames.next(names.getOrElse(i) { "" }, i + 1, used)}"
+                val crc = java.util.zip.CRC32().apply { update(data) }
+                val entry = java.util.zip.ZipEntry(name).apply {
+                    method = java.util.zip.ZipEntry.STORED
+                    size = data.size.toLong()
+                    compressedSize = data.size.toLong()
+                    this.crc = crc.value
+                }
+                withContext(Dispatchers.IO) {
+                    zip.putNextEntry(entry)
+                    zip.write(data)
+                    zip.closeEntry()
+                }
+            }
+        }
+    }
+}
+
 /** What the user chose to export */
 data class ExportSettings(val zoom: Double, val bleed: Boolean)
 
 /**
  * Exporting Cards: [start] asks how (size, bleed), then shares them or saves them. Put
  * [CardExportUi] in the screen that calls [start]. Each Card is one core call, so edits and the
- * visible Card's render get their turn between them.
+ * visible Card's render get their turn between them. It belongs to the open Set's view model
+ * ([SetViewModel.export]), so an export goes on while the user moves between screens.
  */
 class CardExport internal constructor(private val model: SetViewModel, private val context: Context, private val scope: CoroutineScope) {
     internal var asking by mutableStateOf<List<String>?>(null)
+    /** the export asked for is the whole Set as a zip */
+    internal var asZip by mutableStateOf(false)
     internal var progress by mutableStateOf<Pair<Int, Int>?>(null)
     internal var job: Job? = null
     internal var pendingSave: Pair<List<String>, ExportSettings>? = null
 
     /** Export these Cards (uids): ask how first */
     fun start(uids: List<String>) {
-        if (uids.isNotEmpty()) asking = uids
+        if (uids.isEmpty()) return
+        asZip = false
+        asking = uids
+    }
+
+    /** Export every Card of the Set as one zip of PNGs (#75) */
+    fun startZip() {
+        val uids = model.state.value.cardUids
+        if (uids.isEmpty()) return
+        asZip = true
+        asking = uids
+    }
+
+    /** The zip's name: the Set's */
+    internal fun zipName(): String =
+        (model.state.value.workingCopy?.name ?: "set").removeSuffix(".mse-set").let { ExportNames.next(it, 0, mutableSetOf()).removeSuffix(".png") } + ".zip"
+
+    /** Write the zip of [uids] into [out], with progress; false if cancelled or nothing was written */
+    private suspend fun writeZip(out: java.io.OutputStream, uids: List<String>, settings: ExportSettings): Boolean {
+        val s = model.state.value
+        val names = uids.map { s.cardNames.getOrElse(s.cardUids.indexOf(it)) { "" } }
+        var any = false
+        ZipExport.write(out, uids, names) { i, uid ->
+            progress = i to uids.size
+            kotlinx.coroutines.currentCoroutineContext().ensureActive()
+            png(uid, settings)?.also { any = true }
+        }
+        return any
+    }
+
+    /** Share the zip: it is written into the FileProvider's directory */
+    internal fun shareZip(uids: List<String>, settings: ExportSettings) {
+        val dir = exportDir(context)
+        job = scope.launch {
+            val file = File(dir, zipName())
+            var ok = false
+            try {
+                withContext(Dispatchers.IO) { dir.deleteRecursively(); dir.mkdirs() }
+                ok = file.outputStream().use { writeZip(it, uids, settings) }
+            } finally {
+                progress = null
+                if (!ok) withContext(kotlinx.coroutines.NonCancellable + Dispatchers.IO) { file.delete() }
+            }
+            val uri = FileProvider.getUriForFile(context, "${context.packageName}.exports", file)
+            val send = Intent(Intent.ACTION_SEND).putExtra(Intent.EXTRA_STREAM, uri).setType("application/zip")
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            send.clipData = ClipData.newUri(context.contentResolver, "Cards", uri)
+            context.startActivity(Intent.createChooser(send, "Share ${file.name}").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        }
+    }
+
+    /** Save the zip into a document the user created; a cancelled or failed export deletes it */
+    internal fun saveZip(uri: Uri, uids: List<String>, settings: ExportSettings) {
+        job = scope.launch {
+            var ok = false
+            try {
+                ok = withContext(Dispatchers.IO) { context.contentResolver.openOutputStream(uri, "wt") }
+                    ?.use { writeZip(it, uids, settings) } ?: false
+            } finally {
+                progress = null
+                if (!ok) withContext(kotlinx.coroutines.NonCancellable + Dispatchers.IO) {
+                    runCatching { DocumentsContract.deleteDocument(context.contentResolver, uri) }
+                }
+            }
+        }
     }
 
     private val prefs get() = context.getSharedPreferences("export", Context.MODE_PRIVATE)
@@ -164,11 +262,7 @@ class CardExport internal constructor(private val model: SetViewModel, private v
 }
 
 @Composable
-fun rememberCardExport(model: SetViewModel): CardExport {
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    return remember(model) { CardExport(model, context, scope) }
-}
+fun rememberCardExport(model: SetViewModel): CardExport = model.export
 
 /** The dialogs of an export: how (size, bleed; share or save), then its progress */
 @Composable
@@ -177,6 +271,11 @@ fun CardExportUi(export: CardExport) {
         val (uids, settings) = export.pendingSave ?: return@rememberLauncherForActivityResult
         export.pendingSave = null
         if (uri != null) export.saveTo(uri, uids.single(), settings)
+    }
+    val createZip = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri ->
+        val (uids, settings) = export.pendingSave ?: return@rememberLauncherForActivityResult
+        export.pendingSave = null
+        if (uri != null) export.saveZip(uri, uids, settings)
     }
     val pickFolder = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { tree ->
         val (uids, settings) = export.pendingSave ?: return@rememberLauncherForActivityResult
@@ -188,9 +287,10 @@ fun CardExportUi(export: CardExport) {
         var bleed by remember { mutableStateOf(false) }
         val settings = ExportSettings(zoom, bleed)
         val count = "${uids.size} Card${if (uids.size == 1) "" else "s"}"
+        val zip = export.asZip
         AlertDialog(
             onDismissRequest = { export.asking = null },
-            title = { Text("Export $count as PNG") },
+            title = { Text(if (zip) "Export all $count as a zip of PNGs" else "Export $count as PNG") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text("Size", style = MaterialTheme.typography.labelLarge)
@@ -214,33 +314,45 @@ fun CardExportUi(export: CardExport) {
                     TextButton(onClick = {
                         export.asking = null
                         export.lastZoom = zoom
-                        export.share(uids, settings)
+                        if (zip) export.shareZip(uids, settings) else export.share(uids, settings)
                     }, modifier = Modifier.testTag("export-share")) { Text("Share") }
                     TextButton(onClick = {
                         export.asking = null
                         export.lastZoom = zoom
                         export.pendingSave = uids to settings
-                        if (uids.size == 1) createOne.launch(export.suggestedName(uids[0])) else pickFolder.launch(null)
+                        when {
+                            zip -> createZip.launch(export.zipName())
+                            uids.size == 1 -> createOne.launch(export.suggestedName(uids[0]))
+                            else -> pickFolder.launch(null)
+                        }
                     }, modifier = Modifier.testTag("export-save")) { Text("Save to…") }
                 }
             },
             dismissButton = { TextButton(onClick = { export.asking = null }) { Text("Cancel") } },
         )
     }
-    // progress, for more than a few Cards
+    // progress, for more than a few Cards: at the top, out of the way of the field sheet (editing goes on meanwhile)
     export.progress?.let { (done, total) ->
         if (total > 3) {
-            AlertDialog(
-                onDismissRequest = {},
-                title = { Text("Exporting") },
-                text = {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("$done of $total Cards")
-                        LinearProgressIndicator(progress = { done.toFloat() / total }, modifier = Modifier.fillMaxWidth())
+            androidx.compose.ui.window.Popup(
+                alignment = Alignment.TopCenter,
+                properties = androidx.compose.ui.window.PopupProperties(focusable = false),
+            ) {
+                androidx.compose.material3.Surface(
+                    tonalElevation = 6.dp,
+                    shadowElevation = 6.dp,
+                    shape = MaterialTheme.shapes.medium,
+                    modifier = Modifier.fillMaxWidth().padding(16.dp).testTag("export-progress"),
+                ) {
+                    Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text("Exporting $done of $total Cards", style = MaterialTheme.typography.bodyMedium)
+                            LinearProgressIndicator(progress = { done.toFloat() / total }, modifier = Modifier.fillMaxWidth())
+                        }
+                        TextButton(onClick = { export.job?.cancel() }, modifier = Modifier.testTag("export-cancel")) { Text("Cancel") }
                     }
-                },
-                confirmButton = { TextButton(onClick = { export.job?.cancel() }) { Text("Cancel") } },
-            )
+                }
+            }
         }
     }
 }

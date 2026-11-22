@@ -126,6 +126,9 @@ class SetViewModel(app: Application) : AndroidViewModel(app) {
 
     private val context get() = getApplication<Application>()
 
+    /** Exporting Cards as PNGs (#74, #75): here, so it goes on across screens */
+    val export: CardExport by lazy { CardExport(this, getApplication(), viewModelScope) }
+
     // ------------------------------------------------------------------- Opening
 
     /** Open a document the user picked: in its Working copy if it has one, else in a new one */

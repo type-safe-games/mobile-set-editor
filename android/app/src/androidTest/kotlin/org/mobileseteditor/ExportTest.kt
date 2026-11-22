@@ -68,4 +68,31 @@ class ExportTest {
         assertTrue("description: $description", description != null && "<mse-card-data>" in description && "Long Wrapping Text" in description)
         Core.closeSession(s)
     }
+
+    @Test
+    fun theWholeSetAsAZip() = runBlocking<Unit> {
+        val file = TestFixture.zip("export-zip.mse-set", TestFixture.assetFiles("sets/fixture-cards.mse-set"))
+        val work = java.io.File(TestFixture.work, "export-zip-working-copy").apply { deleteRecursively() }
+        val open = android.os.ParcelFileDescriptor.open(file, android.os.ParcelFileDescriptor.MODE_READ_ONLY).use { Core.openSession(it, work) }
+        val s = open.session
+        val cards = Core.listCards(s)
+        val out = java.io.ByteArrayOutputStream()
+        ZipExport.write(out, cards.uids.toList(), cards.names.toList()) { _, uid ->
+            Core.exportCardImage(s, uid, 1.0, false).data
+        }
+        Core.closeSession(s)
+        // one PNG per Card, in the Set's order, stored as they are, each with its Card's metadata
+        val entries = mutableListOf<String>()
+        java.util.zip.ZipInputStream(java.io.ByteArrayInputStream(out.toByteArray())).use { zip ->
+            while (true) {
+                val e = zip.nextEntry ?: break
+                assertEquals(java.util.zip.ZipEntry.STORED, e.method)
+                val png = zip.readBytes()
+                val description = text(png, "Description")
+                assertTrue("${e.name}: $description", description != null && "<mse-card-data>" in description)
+                entries += e.name
+            }
+        }
+        assertEquals(listOf("001 Long Wrapping Text.png", "002 Front Face.png", "003 Back Face.png"), entries)
+    }
 }

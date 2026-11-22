@@ -136,6 +136,11 @@ fun SetHomeScreen(
                     enabled = state.canRedo,
                     modifier = Modifier.testTag("home-redo"),
                 ) { Text("Redo") }
+                OutlinedButton(
+                    onClick = { export.startZip() },
+                    enabled = state.cardUids.isNotEmpty(),
+                    modifier = Modifier.testTag("export-all"),
+                ) { Text("Export all…") }
                 if (debuggable && copy != null) {
                     TextButton(onClick = { model.testEdit() }, modifier = Modifier.testTag("test-edit")) { Text("Test edit") }
                 }
