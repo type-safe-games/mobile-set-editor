@@ -250,6 +250,9 @@ class KeywordListResult(
 
 class NewKeywordResult(val action: ActionResult, val id: Long)
 
+/** Bytes the core made, e.g. an exported PNG */
+class BytesResult(val result: CoreResult, val data: ByteArray)
+
 class SessionInfo(
     val result: CoreResult,
     val game: String,

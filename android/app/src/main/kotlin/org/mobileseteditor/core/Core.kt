@@ -99,6 +99,13 @@ object Core {
     suspend fun insertKeywordParameter(session: Long, keyword: Long, start: Int, end: Int, type: String): TextResult =
         withContext(dispatcher) { NativeCore.insertKeywordParameter(session, keyword, start, end, type) }
 
+    /**
+     * A Card as the finished PNG the desktop exports: [zoom] (null: the Style's own), [bleed] (null:
+     * the desktop's setting), with the <mse-card-data> metadata unless [metadata] is false
+     */
+    suspend fun exportCardImage(session: Long, cardUid: String, zoom: Double? = null, bleed: Boolean? = null, metadata: Boolean = true): BytesResult =
+        withContext(dispatcher) { NativeCore.exportCardImage(session, cardUid, zoom ?: 0.0, bleed?.let { if (it) 1 else 0 } ?: -1, metadata) }
+
     /** Give a Card a Style of its own ("" or the Set's: follow the Set's again), one undo step */
     suspend fun setCardStyle(session: Long, cardUid: String, stylesheet: String): ActionResult =
         withContext(dispatcher) { NativeCore.setCardStyle(session, cardUid, stylesheet) }

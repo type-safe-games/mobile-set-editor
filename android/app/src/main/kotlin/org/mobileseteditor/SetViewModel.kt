@@ -632,6 +632,12 @@ class SetViewModel(app: Application) : AndroidViewModel(app) {
         if (lines.isNotEmpty()) _state.value = _state.value.copy(messages = _state.value.messages + lines)
     }
 
+    /** Show what a core call said: its warnings and errors, and its error if it failed */
+    fun report(result: CoreResult) {
+        addMessages(result.messages.toList())
+        if (!result.ok && result.error.isNotEmpty()) _state.value = _state.value.copy(messages = _state.value.messages + result.error)
+    }
+
     private fun report(result: CoreResult, what: String) {
         val line = when (result.status) {
             Status.MissingTemplate -> "$what: the Template ${result.missingPackage} is not installed"

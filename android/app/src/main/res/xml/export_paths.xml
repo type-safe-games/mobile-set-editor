@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Mobile Set Editor - SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Exported Cards waiting to be shared (CardExport.exportDir) -->
+<paths>
+    <cache-path name="exports" path="exports/" />
+</paths>

@@ -101,6 +101,7 @@ fun SetHomeScreen(
     var selected by remember { mutableStateOf<Set<String>?>(null) }
     var moving by remember { mutableStateOf(false) }
     val snackbar = remember { SnackbarHostState() }
+    val export = rememberCardExport(model)
     val close: () -> Unit = { if (state.dirty) askClose = true else { model.close(CloseChoice.Keep, onClosed) } }
     BackHandler { if (editing != null) editing = null else if (selected != null) selected = null else close() }
 
@@ -156,6 +157,7 @@ fun SetHomeScreen(
                     }
                 },
                 onMove = { moving = true },
+                onExport = { export.start(inSetOrder(state, picked)) },
                 onDone = { selected = null },
             )
         }
@@ -197,6 +199,7 @@ fun SetHomeScreen(
     }
     SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).safeDrawingPadding().testTag("snackbar"))
     }
+    CardExportUi(export)
     if (moving) {
         val picked = selected.orEmpty()
         MoveDialog(
@@ -330,7 +333,15 @@ private fun inSetOrder(state: SetState, picked: Set<String>) = state.cardUids.fi
 
 /** Selection mode's bar: how many Cards are picked, and what to do with them */
 @Composable
-private fun SelectionBar(count: Int, onAll: () -> Unit, onDuplicate: () -> Unit, onDelete: () -> Unit, onMove: () -> Unit, onDone: () -> Unit) {
+private fun SelectionBar(
+    count: Int,
+    onAll: () -> Unit,
+    onDuplicate: () -> Unit,
+    onDelete: () -> Unit,
+    onMove: () -> Unit,
+    onExport: () -> Unit,
+    onDone: () -> Unit,
+) {
     Row(
         Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp).testTag("selection-bar"),
         verticalAlignment = Alignment.CenterVertically,
@@ -340,8 +351,7 @@ private fun SelectionBar(count: Int, onAll: () -> Unit, onDuplicate: () -> Unit,
         TextButton(onClick = onDuplicate, enabled = count > 0, modifier = Modifier.testTag("duplicate")) { Text("Duplicate") }
         TextButton(onClick = onMove, enabled = count > 0, modifier = Modifier.testTag("move")) { Text("Move…") }
         TextButton(onClick = onDelete, enabled = count > 0, modifier = Modifier.testTag("delete")) { Text("Delete") }
-        // (exporting Cards as images comes with M5)
-        TextButton(onClick = {}, enabled = false) { Text("Export") }
+        TextButton(onClick = onExport, enabled = count > 0, modifier = Modifier.testTag("export")) { Text("Export…") }
         TextButton(onClick = onDone, modifier = Modifier.testTag("selection-done")) { Text("Done") }
     }
 }

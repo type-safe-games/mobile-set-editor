@@ -43,6 +43,7 @@ internal object NativeCore {
     external fun addKeyword(session: Long): NewKeywordResult
     external fun removeKeyword(session: Long, keyword: Long): ActionResult
     external fun insertKeywordParameter(session: Long, keyword: Long, start: Int, end: Int, type: String): TextResult
+    external fun exportCardImage(session: Long, cardUid: String, zoom: Double, bleed: Int, metadata: Boolean): BytesResult
     external fun setCardStyle(session: Long, cardUid: String, stylesheet: String): ActionResult
     external fun setSetStyle(session: Long, stylesheet: String): ActionResult
     external fun setCardOwnStyling(session: Long, cardUid: String, own: Boolean): ActionResult

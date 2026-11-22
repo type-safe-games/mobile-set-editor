@@ -90,6 +90,7 @@ fun CardEditorScreen(model: SetViewModel, onBack: () -> Unit) {
     var revision by remember { mutableIntStateOf(0) }
     // the Card details sheet, for this Card (#67)
     var details by remember { mutableStateOf<String?>(null) }
+    val export = org.mobileseteditor.rememberCardExport(model)
     BackHandler { if (editing != null) editing = null else onBack() }
     val pager = rememberPagerState(initialPage = state.index.coerceIn(0, maxOf(0, state.cardUids.size - 1))) { state.cardUids.size }
 
@@ -132,6 +133,10 @@ fun CardEditorScreen(model: SetViewModel, onBack: () -> Unit) {
                     },
                     modifier = Modifier.testTag("add-card-here"),
                 ) { Text("Add") }
+                TextButton(
+                    onClick = { state.cardUids.getOrNull(pager.currentPage)?.let { export.start(listOf(it)) } },
+                    modifier = Modifier.testTag("export-card"),
+                ) { Text("Export") }
                 Box(Modifier.weight(1f)) {
                     LinkBar(model, state, pager.currentPage) { target -> scope.launch { pager.animateScrollToPage(target) } }
                 }
@@ -184,6 +189,7 @@ fun CardEditorScreen(model: SetViewModel, onBack: () -> Unit) {
             }
         }
     }
+    org.mobileseteditor.CardExportUi(export)
     details?.let { uid ->
         CardDetailsSheet(
             model, uid, revision,
