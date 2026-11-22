@@ -30,7 +30,7 @@ void scan_templates(const ImportInput& input, ImportScan& out);
 /// Install Templates and loose fonts from a zip; renames happen while holding loading_mutex.
 /** With install_all, every package the scan would install is selected. */
 void install_templates(const ImportInput& input, const ImportSelection& selection, bool install_all,
-                       std::mutex& loading_mutex, ImportResult& out);
+                       const ImportProgress& progress, std::mutex& loading_mutex, ImportResult& out);
 
 /// For tests: called with the path of every file import is about to write; returning false makes
 /// that write fail (as a full disk would).

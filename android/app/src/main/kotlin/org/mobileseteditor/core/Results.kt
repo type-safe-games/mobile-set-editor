@@ -38,3 +38,71 @@ class FieldRegion(
 )
 
 class RenderResult(val result: CoreResult, val regions: Array<FieldRegion>)
+
+// ----------------------------------------------------------------------------- Templates
+
+/** An installed Template */
+class TemplateInfo(val name: String, val type: String, val fullName: String, val version: String, val game: String)
+
+class TemplateListResult(val result: CoreResult, val templates: Array<TemplateInfo>)
+
+// ----------------------------------------------------------------------------- Template import (ADR 0005)
+
+/** What installing a package found in a zip would do; mirrors the facade's Verdict */
+enum class Verdict { Install, Replace, SkipNotNewer, Refuse }
+
+class ScannedPackage(
+    val name: String,
+    val type: String,
+    val fullName: String,
+    val version: String,
+    val installedVersion: String,
+    val installerGroup: String,
+    /** bytes when extracted */
+    val size: Long,
+    verdict: Int,
+    /** why it is refused */
+    val reason: String,
+) {
+    val verdict: Verdict = Verdict.entries[verdict]
+    val installable: Boolean get() = verdict == Verdict.Install || verdict == Verdict.Replace
+}
+
+class ScanResult(
+    val result: CoreResult,
+    val packages: Array<ScannedPackage>,
+    /** the loose fonts in the zip, and their bytes */
+    val fontCount: Int,
+    val fontsSize: Long,
+    /** those of them the font store doesn't have yet (the others are skipped) */
+    val newFontCount: Int,
+    val newFontsSize: Long,
+    val dictionaryCount: Int,
+    val newDictionaryCount: Int,
+) {
+    /** What installing everything installable would extract */
+    val installSize: Long get() = packages.filter { it.installable }.sumOf { it.size } + newFontsSize
+
+    /** Would installing change anything? */
+    val anythingNew: Boolean get() = packages.any { it.installable } || newFontCount > 0 || newDictionaryCount > 0
+}
+
+/** What happened to a package; mirrors the facade's Outcome */
+enum class Outcome { Installed, Replaced, SkippedNotNewer, Refused, Failed, Cancelled }
+
+class ImportedPackage(val name: String, val version: String, outcome: Int, val dependency: Boolean, val error: String) {
+    val outcome: Outcome = Outcome.entries[outcome]
+}
+
+class ImportResult(
+    val result: CoreResult,
+    val packages: Array<ImportedPackage>,
+    val fontCount: Int,
+    val dictionaryCount: Int,
+    val cancelled: Boolean,
+)
+
+/** Called as an install extracts files; return false to cancel */
+fun interface ImportProgressListener {
+    fun onProgress(done: Long, total: Long): Boolean
+}

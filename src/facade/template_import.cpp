@@ -46,6 +46,20 @@ struct ImportError : std::runtime_error {
   using std::runtime_error::runtime_error;
 };
 
+/// The progress callback asked to stop
+struct ImportCancelled {};
+
+/// Counts extracted bytes for the progress callback
+struct ProgressCounter {
+  const ImportProgress& progress;
+  uint64_t done = 0, total = 0;
+  /// Some bytes were extracted; throws ImportCancelled if the callback says to stop
+  void add(uint64_t bytes) {
+    done += bytes;
+    if (progress && !progress(done, total)) throw ImportCancelled();
+  }
+};
+
 // ----------------------------------------------------------------------------- : Helpers
 
 /// The name parts of a path in a zip, or empty if it is unsafe (absolute, or has "..")
@@ -509,6 +523,8 @@ static vector<const LooseFile*> unique_names(const vector<LooseFile>& files) {
   return out;
 }
 
+static bool loose_file_installed(const LooseFile& f, const fs::path& dir, bool keep_both);
+
 void scan_templates(const ImportInput& input, ImportScan& out) {
   std::lock_guard<std::mutex> lock(import_mutex);
   fs::path store, fonts;
@@ -536,18 +552,25 @@ void scan_templates(const ImportInput& input, ImportScan& out) {
     return a.installer_group != b.installer_group ? a.installer_group < b.installer_group : a.name < b.name;
   });
   for (const LooseFile* f : unique_names(scanner->fonts)) {
+    uint64_t size = (uint64_t)std::max<int64_t>(0, f->entry->size);
     out.fonts.push_back(encode_utf8(f->name));
-    out.fonts_size += (uint64_t)std::max<int64_t>(0, f->entry->size);
+    out.fonts_size += size;
+    if (fonts.empty() || !loose_file_installed(*f, fonts, true)) {
+      out.new_fonts.push_back(encode_utf8(f->name));
+      out.new_fonts_size += size;
+    }
   }
   for (const LooseFile* f : unique_names(scanner->dictionaries)) {
     out.dictionaries.push_back(encode_utf8(f->name));
+    if (!loose_file_installed(*f, store / "dictionaries", false)) out.new_dictionaries.push_back(encode_utf8(f->name));
   }
 }
 
 // ----------------------------------------------------------------------------- : Install
 
 /// Extract a package into the temporary directory and rename it into place
-static void install_package(const FoundPackage& p, const fs::path& store, const fs::path& temp, std::mutex& loading_mutex) {
+static void install_package(const FoundPackage& p, const fs::path& store, const fs::path& temp, std::mutex& loading_mutex,
+                            ProgressCounter& counter) {
   fs::path extracted = temp / to_fs_path(p.name);
   std::error_code ec;
   fs::create_directories(extracted, ec);
@@ -558,6 +581,7 @@ static void install_package(const FoundPackage& p, const fs::path& store, const 
     fs::path to = extracted;
     for (const String& part : rel_parts) to /= to_fs_path(part);
     if (!write_entry(*p.zip, *e, to)) throw ImportError("could not extract " + encode_utf8(e->name));
+    counter.add((uint64_t)e->size);
   }
   fs::path target = store / to_fs_path(p.name);
   fs::path old = temp / to_fs_path(p.name + _(".replaced"));
@@ -582,6 +606,33 @@ static void install_package(const FoundPackage& p, const fs::path& store, const 
 /// Copy a loose file into a directory, unless it is already there; returns the name it got.
 /** A different file with the same name is replaced, or with keep_both (for fonts, whose file
  *  names say little) gets a new name: "name (2).ttf". */
+/// Is a loose file already in a directory, with the same contents (under its name, or with
+/// keep_both under a numbered name as install_loose_file gives it)?
+static bool loose_file_installed(const LooseFile& f, const fs::path& dir, bool keep_both) {
+  String stem = f.name, ext;
+  size_t dot = f.name.find_last_of(_('.'));
+  if (dot != String::npos) { stem = f.name.substr(0, dot); ext = f.name.substr(dot); }
+  std::string data;
+  bool have_data = false;
+  for (int n = 1 ; n < 100 ; ++n) {
+    String name = n == 1 ? f.name : stem + _(" (") + int_to_string(n) + _(")") + ext;
+    fs::path to = dir / to_fs_path(name);
+    std::error_code ec;
+    if (!fs::exists(to, ec)) return false;
+    if (fs::file_size(to, ec) == (uintmax_t)f.entry->size) {
+      if (!have_data) {
+        bool ok;
+        data = read_entry(*f.zip, *f.entry, ok);
+        if (!ok) return false;
+        have_data = true;
+      }
+      if (read_file(to) == data) return true;
+    }
+    if (!keep_both) return false;
+  }
+  return false;
+}
+
 static String install_loose_file(const LooseFile& f, const fs::path& dir, bool keep_both) {
   bool ok;
   std::string data = read_entry(*f.zip, *f.entry, ok);
@@ -614,7 +665,7 @@ static String install_loose_file(const LooseFile& f, const fs::path& dir, bool k
 }
 
 void install_templates(const ImportInput& input, const ImportSelection& selection, bool install_all,
-                       std::mutex& loading_mutex, ImportResult& out) {
+                       const ImportProgress& progress, std::mutex& loading_mutex, ImportResult& out) {
   using V = ScannedPackage::Verdict;
   using O = ImportedPackage::Outcome;
   std::lock_guard<std::mutex> lock(import_mutex);
@@ -671,6 +722,12 @@ void install_templates(const ImportInput& input, const ImportSelection& selectio
       visit(*p);
     }
   }
+  // what there is to extract, for the progress callback
+  ProgressCounter counter{progress};
+  for (const FoundPackage* p : order) counter.total += p->size;
+  if (selection.dictionaries) for (const LooseFile* f : unique_names(scanner->dictionaries)) counter.total += (uint64_t)f->entry->size;
+  if (selection.fonts && !fonts.empty()) for (const LooseFile& f : scanner->fonts) counter.total += (uint64_t)f.entry->size;
+  if (progress && !progress(0, counter.total)) out.cancelled = true;
   // install
   set<String> failed;
   for (const FoundPackage* p : order) {
@@ -678,12 +735,21 @@ void install_templates(const ImportInput& input, const ImportSelection& selectio
     r.name       = encode_utf8(p->name);
     r.version    = encode_utf8(p->header.version_string);
     r.dependency = !chosen.count(p->name);
+    if (out.cancelled) {
+      r.outcome = O::Cancelled;
+      out.packages.push_back(r);
+      continue;
+    }
     try {
       for (const String& d : needs[p->name]) {
         if (failed.count(d)) throw ImportError("a package it needs could not be installed: " + encode_utf8(d));
       }
-      install_package(*p, store, temp.path, loading_mutex);
+      install_package(*p, store, temp.path, loading_mutex, counter);
       r.outcome = p->verdict == V::Replace ? O::Replaced : O::Installed;
+    } catch (const ImportCancelled&) {
+      // (its partly extracted files are in the temporary directory, which goes away)
+      out.cancelled = true;
+      r.outcome = O::Cancelled;
     } catch (const std::exception& e) {
       failed.insert(p->name);
       r.outcome = O::Failed;
@@ -691,32 +757,39 @@ void install_templates(const ImportInput& input, const ImportSelection& selectio
     }
     out.packages.push_back(r);
   }
-  // spelling dictionaries go where MSE looks for them
-  if (selection.dictionaries && !scanner->dictionaries.empty()) {
-    fs::path dir = store / "dictionaries";
-    std::error_code ec;
-    fs::create_directories(dir, ec);
-    for (const LooseFile* f : unique_names(scanner->dictionaries)) {
-      try {
-        String name = install_loose_file(*f, dir, false);
-        if (!name.empty()) out.dictionaries.push_back(encode_utf8(name));
-      } catch (const std::exception& e) {
-        out.messages.push_back(Message{Severity::Error, e.what(), std::string(), std::string()});
+  if (out.cancelled) return;
+  try {
+    // spelling dictionaries go where MSE looks for them
+    if (selection.dictionaries && !scanner->dictionaries.empty()) {
+      fs::path dir = store / "dictionaries";
+      std::error_code ec;
+      fs::create_directories(dir, ec);
+      for (const LooseFile* f : unique_names(scanner->dictionaries)) {
+        try {
+          String name = install_loose_file(*f, dir, false);
+          if (!name.empty()) out.dictionaries.push_back(encode_utf8(name));
+          counter.add((uint64_t)f->entry->size);
+        } catch (const std::exception& e) {
+          out.messages.push_back(Message{Severity::Error, e.what(), std::string(), std::string()});
+        }
       }
     }
-  }
-  // loose fonts go to the shared font store (files with the same name and contents only once)
-  if (selection.fonts && !fonts.empty()) {
-    std::error_code ec;
-    if (!scanner->fonts.empty()) fs::create_directories(fonts, ec);
-    for (const LooseFile& f : scanner->fonts) {
-      try {
-        String name = install_loose_file(f, fonts, true);
-        if (!name.empty()) out.fonts.push_back(encode_utf8(name));
-      } catch (const std::exception& e) {
-        out.messages.push_back(Message{Severity::Error, e.what(), std::string(), std::string()});
+    // loose fonts go to the shared font store (files with the same name and contents only once)
+    if (selection.fonts && !fonts.empty()) {
+      std::error_code ec;
+      if (!scanner->fonts.empty()) fs::create_directories(fonts, ec);
+      for (const LooseFile& f : scanner->fonts) {
+        try {
+          String name = install_loose_file(f, fonts, true);
+          if (!name.empty()) out.fonts.push_back(encode_utf8(name));
+          counter.add((uint64_t)f.entry->size);
+        } catch (const std::exception& e) {
+          out.messages.push_back(Message{Severity::Error, e.what(), std::string(), std::string()});
+        }
       }
     }
+  } catch (const ImportCancelled&) {
+    out.cancelled = true;
   }
 }
 

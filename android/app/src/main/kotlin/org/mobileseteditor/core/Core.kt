@@ -45,4 +45,10 @@ object Core {
     /** Draw a card into [bitmap] (ARGB_8888, the card's aspect ratio), returning its field regions */
     suspend fun renderCard(session: Long, cardUid: String, bitmap: Bitmap): RenderResult =
         withContext(dispatcher) { NativeCore.renderCard(session, cardUid, bitmap) }
+
+    /** The installed Templates, by name */
+    suspend fun listTemplates(): TemplateListResult = withContext(dispatcher) { NativeCore.listTemplates() }
+
+    /** After an import: new sessions see the new Templates and fonts */
+    suspend fun refreshTemplates(): CoreResult = withContext(dispatcher) { NativeCore.refreshTemplates() }
 }

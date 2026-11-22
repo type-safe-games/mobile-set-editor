@@ -25,4 +25,12 @@ internal object NativeCore {
     external fun cardSize(session: Long, cardUid: String): CardSizeResult
     /** Draw a card into an ARGB_8888 bitmap, scaled to its width */
     external fun renderCard(session: Long, cardUid: String, bitmap: Bitmap): RenderResult
+
+    external fun listTemplates(): TemplateListResult
+    /** After an import, so that new sessions see the new Templates and fonts */
+    external fun refreshTemplates(): CoreResult
+
+    // Template import: off the core thread (ADR 0009); see TemplateImport
+    external fun scanTemplatesFd(fd: Int): ScanResult
+    external fun installTemplatesFd(fd: Int, packages: Array<String>, listener: ImportProgressListener?): ImportResult
 }

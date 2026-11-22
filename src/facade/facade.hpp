@@ -27,6 +27,7 @@
  */
 
 #include <cstdint>
+#include <functional>
 #include <optional>
 #include <string>
 #include <vector>
@@ -549,7 +550,10 @@ struct ImportScan : Result {
   std::vector<ScannedPackage> packages; ///< one per package name, by installer group and name
   std::vector<std::string> fonts;       ///< the loose font files (file names) for the font store
   std::uint64_t fonts_size = 0;         ///< their bytes
+  std::vector<std::string> new_fonts;   ///< those of them the font store doesn't have yet (the others are skipped)
+  std::uint64_t new_fonts_size = 0;     ///< their bytes
   std::vector<std::string> dictionaries; ///< spelling dictionary files (file names)
+  std::vector<std::string> new_dictionaries; ///< those of them that are new or differ from the installed ones
 };
 
 /// List the Templates and loose fonts in a zip, and what installing each would do.
@@ -575,6 +579,7 @@ struct ImportedPackage {
     SkippedNotNewer,
     Refused, ///< see `error`
     Failed,  ///< could not be installed (not in the zip, the zip is damaged, the disk is full, ...), see `error`
+    Cancelled, ///< not installed because the import was cancelled before it was done
   } outcome = Outcome::Installed;
   bool dependency = false; ///< not selected, but added because a selected package needs it
   std::string error;   ///< for Refused and Failed
@@ -584,17 +589,25 @@ struct ImportResult : Result {
   std::vector<ImportedPackage> packages; ///< the selected packages and the dependencies added, dependencies first
   std::vector<std::string> fonts;        ///< loose font files copied into the font store
   std::vector<std::string> dictionaries; ///< spelling dictionary files copied (new or changed)
+  bool cancelled = false;                ///< the progress callback cancelled the import
 };
+
+/// Progress of an install, called (on the installing thread) as files are extracted: the bytes
+/// extracted so far and the bytes to extract in all. Return false to cancel the import: the
+/// package being extracted and the ones after it are then Cancelled (each package is installed
+/// whole or not at all), and no loose fonts or dictionaries are copied.
+using ImportProgress = std::function<bool(std::uint64_t done, std::uint64_t total)>;
 
 /// Install the selected Templates (and their dependencies) and the loose fonts from a zip.
 /** The zip is scanned again, so the outcomes follow the rules above even if the store changed
  *  since scanTemplates. The descriptor is not closed. */
-ImportResult installTemplates(int fd, const ImportSelection& selection);
+ImportResult installTemplates(int fd, const ImportSelection& selection, const ImportProgress& progress = ImportProgress());
 /// The same for a zip file
-ImportResult installTemplates(const std::string& zip_path, const ImportSelection& selection);
+ImportResult installTemplates(const std::string& zip_path, const ImportSelection& selection,
+                              const ImportProgress& progress = ImportProgress());
 
 /// Install everything in a zip file that scanTemplates says can be installed, its loose fonts and dictionaries
-ImportResult importTemplates(const std::string& zip_path);
+ImportResult importTemplates(const std::string& zip_path, const ImportProgress& progress = ImportProgress());
 
 /// On the core thread, after installing Templates: forget cached packages so new sessions load the
 /// imported versions, and register their fonts and the font store's new files.

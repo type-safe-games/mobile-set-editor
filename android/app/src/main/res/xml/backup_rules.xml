@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Mobile Set Editor - SPDX-License-Identifier: GPL-3.0-or-later
+     Android 11 and earlier: the template store and the shared font store are not backed up (ADR 0005). -->
+<full-backup-content>
+    <exclude domain="file" path="templates/" />
+    <exclude domain="file" path="fonts/" />
+</full-backup-content>

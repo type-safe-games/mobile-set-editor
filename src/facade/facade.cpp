@@ -1433,22 +1433,22 @@ ImportScan scanTemplates(const std::string& zip_path) {
   return import_call<ImportScan>([&](ImportScan& r) { scan_templates(ImportInput{-1, zip_path}, r); });
 }
 
-ImportResult installTemplates(int fd, const ImportSelection& selection) {
+ImportResult installTemplates(int fd, const ImportSelection& selection, const ImportProgress& progress) {
   return import_call<ImportResult>([&](ImportResult& r) {
     if (fd < 0) fail(Status::InvalidArgument, "not a file descriptor");
-    install_templates(ImportInput{fd, std::string()}, selection, false, loading_mutex, r);
+    install_templates(ImportInput{fd, std::string()}, selection, false, progress, loading_mutex, r);
   });
 }
 
-ImportResult installTemplates(const std::string& zip_path, const ImportSelection& selection) {
+ImportResult installTemplates(const std::string& zip_path, const ImportSelection& selection, const ImportProgress& progress) {
   return import_call<ImportResult>([&](ImportResult& r) {
-    install_templates(ImportInput{-1, zip_path}, selection, false, loading_mutex, r);
+    install_templates(ImportInput{-1, zip_path}, selection, false, progress, loading_mutex, r);
   });
 }
 
-ImportResult importTemplates(const std::string& zip_path) {
+ImportResult importTemplates(const std::string& zip_path, const ImportProgress& progress) {
   return import_call<ImportResult>([&](ImportResult& r) {
-    install_templates(ImportInput{-1, zip_path}, ImportSelection(), true, loading_mutex, r);
+    install_templates(ImportInput{-1, zip_path}, ImportSelection(), true, progress, loading_mutex, r);
   });
 }
 

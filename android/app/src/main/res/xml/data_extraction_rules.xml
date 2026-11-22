@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Mobile Set Editor - SPDX-License-Identifier: GPL-3.0-or-later
+     Android 12 and later: the template store and the shared font store are neither backed up nor
+     transferred to a new device; the user imports their Templates again (ADR 0005). -->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="file" path="templates/" />
+        <exclude domain="file" path="fonts/" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="file" path="templates/" />
+        <exclude domain="file" path="fonts/" />
+    </device-transfer>
+</data-extraction-rules>

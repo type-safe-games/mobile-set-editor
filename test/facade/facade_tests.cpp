@@ -1826,6 +1826,47 @@ TEST(template_import_install) {
   CHECK_OK(F::refreshTemplates());
 }
 
+TEST(template_import_progress_and_cancel) {
+  using O = F::ImportedPackage::Outcome;
+  ZipBuilder z;
+  z.package("", "progress-a.mse-symbol-font", symbol_font_data("2026-01-01"));
+  z.package("", "progress-b.mse-symbol-font", symbol_font_data("2026-01-01"));
+  z.add("fonts/LooseC.ttf", read_text(fixture_dir / "fonts" / "DejaVuSans-Oblique.ttf"));
+  fs::path zip = z.write("progress-test.zip");
+  F::ImportSelection sel;
+  sel.packages = {"progress-a.mse-symbol-font", "progress-b.mse-symbol-font"};
+  // cancelled as soon as the first file is extracted: nothing is installed, nothing half-installed
+  F::ImportResult r = F::installTemplates(zip.string(), sel, [](std::uint64_t done, std::uint64_t) { return done == 0; });
+  REQUIRE_OK(r);
+  CHECK(r.cancelled);
+  CHECK_EQ(r.packages.size(), (size_t)2);
+  for (const F::ImportedPackage& p : r.packages) CHECK(p.outcome == O::Cancelled);
+  CHECK(r.fonts.empty());
+  CHECK(!fs::exists(templates_dir / "progress-a.mse-symbol-font"));
+  CHECK(!fs::exists(templates_dir / "progress-b.mse-symbol-font"));
+  CHECK(!fs::exists(font_store_dir / "LooseC.ttf"));
+  // progress: from 0 to the total, never backwards
+  std::vector<std::pair<std::uint64_t, std::uint64_t>> calls;
+  r = F::installTemplates(zip.string(), sel, [&](std::uint64_t done, std::uint64_t total) {
+    calls.emplace_back(done, total);
+    return true;
+  });
+  REQUIRE_OK(r);
+  CHECK(!r.cancelled);
+  CHECK_EQ(r.packages.size(), (size_t)2);
+  for (const F::ImportedPackage& p : r.packages) CHECK(p.outcome == O::Installed);
+  CHECK(fs::exists(font_store_dir / "LooseC.ttf"));
+  F::ImportScan again = F::scanTemplates(zip.string());
+  CHECK_EQ(again.fonts.size(), (size_t)1);
+  CHECK(again.new_fonts.empty() && again.new_fonts_size == 0);
+  CHECK(calls.size() > 2);
+  if (!calls.empty()) {
+    CHECK_EQ(calls.front().first, (std::uint64_t)0);
+    CHECK(calls.back().first == calls.back().second && calls.back().second > 0);
+    for (size_t i = 1 ; i < calls.size() ; ++i) CHECK(calls[i].first >= calls[i-1].first && calls[i].second == calls[0].second);
+  }
+}
+
 TEST(template_import_installer_file) {
   // a standalone .mse-installer as the input
   ZipBuilder z;

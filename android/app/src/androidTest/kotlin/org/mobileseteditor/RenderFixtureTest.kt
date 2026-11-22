@@ -3,14 +3,10 @@
 
 package org.mobileseteditor
 
-import android.content.res.AssetManager
 import android.graphics.Bitmap
 import android.os.ParcelFileDescriptor
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import androidx.test.platform.app.InstrumentationRegistry
 import java.io.File
-import java.util.zip.ZipEntry
-import java.util.zip.ZipOutputStream
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -29,48 +25,14 @@ import org.mobileseteditor.core.Status
 @RunWith(AndroidJUnit4::class)
 class RenderFixtureTest {
     companion object {
-        private val testAssets: AssetManager get() = InstrumentationRegistry.getInstrumentation().context.assets
-        private val root: File get() = File(InstrumentationRegistry.getInstrumentation().targetContext.filesDir, "fixture-test")
-
-        /** The fixture Set's files, as the text of its "set" file can be changed */
-        private fun setFiles(): Map<String, ByteArray> =
-            testAssets.list("sets/fixture-cards.mse-set")!!.associateWith { name ->
-                testAssets.open("sets/fixture-cards.mse-set/$name").use { it.readBytes() }
-            }
+        /** The fixture Set's files (the text of its "set" file can be changed) */
+        private fun setFiles(): Map<String, ByteArray> = TestFixture.assetFiles("sets/fixture-cards.mse-set")
+        private fun zipSet(name: String, files: Map<String, ByteArray>): File = TestFixture.zip(name, files)
+        private val root: File get() = TestFixture.work
 
         @BeforeClass
         @JvmStatic
-        fun installFixture() {
-            root.deleteRecursively()
-            copyAssets("data", File(root, "templates"))
-            copyAssets("fonts", File(root, "fonts"))
-            val init = runBlocking { Core.init(File(root, "templates"), File(root, "fonts")) }
-            assertTrue("init: $init", init.ok)
-        }
-
-        private fun copyAssets(path: String, to: File) {
-            val children = testAssets.list(path) ?: emptyArray()
-            if (children.isEmpty()) {
-                to.parentFile!!.mkdirs()
-                testAssets.open(path).use { input -> to.outputStream().use { input.copyTo(it) } }
-            } else {
-                to.mkdirs()
-                for (child in children) copyAssets("$path/$child", File(to, child))
-            }
-        }
-
-        /** A zipped .mse-set with these files */
-        private fun zipSet(name: String, files: Map<String, ByteArray>): File {
-            val file = File(root, name)
-            ZipOutputStream(file.outputStream()).use { zip ->
-                for ((entry, bytes) in files) {
-                    zip.putNextEntry(ZipEntry(entry))
-                    zip.write(bytes)
-                    zip.closeEntry()
-                }
-            }
-            return file
-        }
+        fun installFixture() = TestFixture.start()
     }
 
     @Test
