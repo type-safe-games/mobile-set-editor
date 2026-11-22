@@ -5,9 +5,8 @@
 //        facade_tests --import <zip> <template store> <font store>
 //
 // Runs the facade (ADR 0009) against the Test fixture (ADR 0008) with the wx backends of the
-// desktop host. GTK needs a display: run under xvfb-run, as ctest does. When the private fixture
-// goldens are there (templates/goldens/images/fixture/fixture-cards), renders are also compared
-// with them; otherwise only with the core's own export.
+// desktop host. GTK needs a display: run under xvfb-run, as ctest does. Renders are also compared
+// with the fixture's Golden images (test/fixture/goldens/fixture-cards) when given.
 //
 // The tests talk to the facade only; core headers are used just to decode PNGs and build a zip.
 //

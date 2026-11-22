@@ -13,7 +13,7 @@
 #
 # It pushes facade_tests_skia (stripped) and the Test fixture to /data/local/tmp/mse-facade-tests
 # on the device adb sees (start the emulator first: emulator -avd <name> -no-window), plus the
-# fixture's Golden images if templates/goldens has them, runs the tests there with the fixture's
+# fixture's Golden images (test/fixture/goldens), runs the tests there with the fixture's
 # fonts as the only system fonts, and exits with their status.
 #
 # Environment: ANDROID_HOME (for adb, if it isn't on PATH) and ANDROID_NDK_HOME (for llvm-strip).
@@ -22,7 +22,7 @@ set -euo pipefail
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 BUILD=${1:-$ROOT/build-android-x86_64}
 DEVICE_DIR=/data/local/tmp/mse-facade-tests
-GOLDENS=$ROOT/templates/goldens/images/fixture/fixture-cards
+GOLDENS=$ROOT/test/fixture/goldens/fixture-cards
 
 die() { echo "run-facade-tests.sh: $*" >&2; exit 1; }
 

@@ -1,0 +1,155 @@
+# Public CI (#52), on GitHub-hosted runners. It uses only the free Test fixture (test/fixture) and
+# its Golden images (test/fixture/goldens): the template pack and the full golden corpus are private
+# and checked on the self-hosted runner (.gitea/workflows/goldens.yml, ADR 0008, ADR 0010).
+# Gitea ignores this directory, because .gitea/workflows exists.
+name: ci
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  desktop:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Submodules
+        run: git submodule update --init third_party/minizip-ng
+
+      - name: Packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends cmake ninja-build pkg-config g++ \
+            libwxgtk3.2-dev libboost-dev libhunspell-dev libpango1.0-dev zlib1g-dev \
+            xvfb xauth perl python3 python3-numpy python3-pil
+
+      - name: Build
+        run: |
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo
+          cmake --build build
+
+      - name: Tests
+        run: cd build && xvfb-run -a ctest --output-on-failure
+
+      - name: Fixture golden check
+        run: xvfb-run -a python3 tools/goldens/goldens.py check --fixture-only --mse build/magicseteditor --goldens "$RUNNER_TEMP/goldens"
+
+      - name: Report
+        if: always()
+        run: cat "$RUNNER_TEMP/goldens/report-check-fixture.md" || true
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: desktop-report
+          path: ${{ runner.temp }}/goldens/report-check-fixture.md
+          if-no-files-found: ignore
+
+  android:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      # pinned as in android/app/build.gradle.kts and #39
+      NDK_VERSION: 29.0.14206865
+      SYSTEM_IMAGE: system-images;android-36;default;x86_64
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Submodules
+        run: git submodule update --init --jobs 8 third_party
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Android SDK packages
+        # (the hosted image has the SDK with its licences accepted; only what is missing is installed)
+        run: |
+          set -eu
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          want=()
+          [ -d "$ANDROID_HOME/ndk/$NDK_VERSION" ] || want+=("ndk;$NDK_VERSION")
+          [ -d "$ANDROID_HOME/platforms/android-36" ] || want+=("platforms;android-36")
+          [ -d "$ANDROID_HOME/build-tools/36.1.0" ] || want+=("build-tools;36.1.0")
+          [ -d "$ANDROID_HOME/system-images/android-36/default/x86_64" ] || want+=("$SYSTEM_IMAGE")
+          [ -x "$ANDROID_HOME/emulator/emulator" ] || want+=("emulator")
+          [ ${#want[@]} -eq 0 ] || yes | "$SDKMANAGER" "${want[@]}" > /dev/null
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/$NDK_VERSION" >> "$GITHUB_ENV"
+          echo "$ANDROID_HOME/emulator" >> "$GITHUB_PATH"
+          echo "$ANDROID_HOME/platform-tools" >> "$GITHUB_PATH"
+          echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
+
+      - name: Skia cache key
+        # the submodule commits and the build script decide Skia's output
+        run: |
+          git submodule status third_party/skia third_party/gn third_party/skia-deps > skia-cache-key
+          cat tools/skia/build.sh >> skia-cache-key
+
+      - uses: actions/cache@v4
+        with:
+          path: out/skia
+          key: skia-${{ runner.os }}-${{ hashFiles('skia-cache-key') }}
+
+      - name: Skia
+        run: tools/skia/build.sh android-x86_64 android-arm64-v8a
+
+      - name: APK
+        run: cd android && ./gradlew assembleDebug --console=plain
+
+      - name: Golden renderer
+        run: |
+          cmake -S . -B build-android-x86_64 -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_TOOLCHAIN_FILE="$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake" \
+            -DANDROID_ABI=x86_64 -DANDROID_PLATFORM=android-26
+          cmake --build build-android-x86_64 -j"$(nproc)" --target golden_render
+
+      - name: Emulator
+        run: |
+          # KVM for the emulator (hosted Linux runners have it, but not for this user by default)
+          if [ -e /dev/kvm ] && [ ! -w /dev/kvm ]; then
+            echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm.rules
+            sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
+          fi
+          export ANDROID_AVD_HOME="$RUNNER_TEMP/avd"
+          echo "ANDROID_AVD_HOME=$ANDROID_AVD_HOME" >> "$GITHUB_ENV"
+          mkdir -p "$ANDROID_AVD_HOME"
+          echo no | avdmanager create avd -n ci -k "$SYSTEM_IMAGE" -d pixel_6 --force
+          echo "disk.dataPartition.size=4G" >> "$ANDROID_AVD_HOME/ci.avd/config.ini"
+          nohup emulator -avd ci -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect \
+            > "$RUNNER_TEMP/emulator.log" 2>&1 &
+          adb wait-for-device
+          for i in $(seq 1 150); do
+            [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = 1 ] && break
+            sleep 2
+          done
+          adb shell getprop ro.build.version.sdk
+
+      - name: Fixture golden check on the emulator
+        run: python3 tools/goldens/goldens.py check --android --fixture-only --goldens "$RUNNER_TEMP/goldens"
+
+      - name: Instrumented tests
+        run: cd android && ./gradlew connectedAndroidTest --console=plain
+
+      - name: Reports
+        if: always()
+        run: cat "$RUNNER_TEMP/goldens/report-check-fixture-android.md" || true
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android-reports
+          path: |
+            ${{ runner.temp }}/goldens/report-check-fixture-android.md
+            android/app/build/reports/androidTests/
+          if-no-files-found: ignore
+
+      - name: Stop the emulator
+        if: always()
+        run: adb emu kill || true

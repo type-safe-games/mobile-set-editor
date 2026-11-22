@@ -1,0 +1,19 @@
+{
+  "fields": [
+    {"angle": 0.000, "height": 420.000, "left": 0.000, "name": "frame", "top": 0.000, "visible": true, "width": 300.000, "z": -1},
+    {"angle": 0.000, "height": 26.000, "left": 20.000, "name": "name", "top": 18.000, "visible": true, "width": 200.000, "z": 0, "text_scale": 1.000, "lines": [
+      {"end": 9, "height": 20.500, "left": 0.000, "start": 0, "top": 0.000, "width": 97.250}
+    ]},
+    {"angle": 0.000, "height": 26.000, "left": 230.000, "name": "level", "top": 18.000, "visible": true, "width": 50.000, "z": 0},
+    {"angle": 0.000, "height": 148.000, "left": 21.000, "name": "picture", "top": 51.000, "visible": true, "width": 258.000, "z": 0},
+    {"angle": 0.000, "height": 138.000, "left": 26.000, "name": "rules", "top": 246.000, "visible": true, "width": 248.000, "z": 0, "text_scale": 1.000, "lines": [
+      {"end": 84, "height": 15.750, "left": 0.000, "start": 0, "top": 0.000, "width": 206.500},
+      {"end": 201, "height": 15.750, "left": 0.000, "start": 85, "top": 16.000, "width": 239.000},
+      {"end": 240, "height": 15.750, "left": 0.000, "start": 202, "top": 32.000, "width": 67.750},
+      {"end": 283, "height": 15.750, "left": 0.000, "start": 241, "top": 48.000, "width": 208.417}
+    ]}
+  ],
+  "height": 420.000,
+  "stylesheet": "fixture-standard",
+  "width": 300.000
+}

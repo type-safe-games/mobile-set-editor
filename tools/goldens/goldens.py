@@ -37,6 +37,14 @@ from common import (  # noqa: E402
 )
 
 FIXTURE = REPO / "test" / "fixture"
+# The Test fixture's Golden images are free, so they are in the repository (#52), not with the
+# private goldens: a public clone checks the fixture against them.
+FIXTURE_GOLDENS = FIXTURE / "goldens"
+
+
+def golden_dir(images: Path, gs: "GoldenSet") -> Path:
+    """Where a Set's Golden images are: the fixture's in the repository, the others under images/."""
+    return FIXTURE_GOLDENS / gs.name if gs.corpus == "fixture" else images / gs.corpus / gs.name
 SSIM_WARN = 0.98  # below this a card's pixels are flagged (advisory only)
 try:  # the pixel comparison needs numpy and Pillow; without them only the Layout dumps are compared
     import numpy  # noqa: F401
@@ -265,9 +273,10 @@ def main() -> int:
         return finish(args, results, imported)
 
     def work(gs: GoldenSet) -> SetResult:
-        res = render(gs, run_root / gs.corpus / gs.name, args.mse, args.timeout)
+        out = golden_dir(images, gs) if args.mode == "capture" else run_root / gs.corpus / gs.name
+        res = render(gs, out, args.mse, args.timeout)
         if args.mode == "check":
-            compare(res, images / gs.corpus / gs.name, run_root / gs.corpus / gs.name)
+            compare(res, golden_dir(images, gs), out)
         return res
 
     results: list[SetResult] = []
@@ -299,7 +308,7 @@ def render_native(args, sets: list[GoldenSet], run_root: Path, images: Path) -> 
         status, output = native.read_result(j.out_dir)
         cards = sorted((p.stem for p in j.out_dir.glob("*.json")), key=int)
         res = SetResult(gs, status, output, cards)
-        compare(res, images / gs.corpus / gs.name, j.out_dir)
+        compare(res, golden_dir(images, gs), j.out_dir)
         results.append(res)
         print(f"[{n}/{len(sets)}] {res.render_status:8} {gs.key}{'  dump ok' if res.dump_ok else '  DUMP DIFFERS'}", flush=True)
     return results

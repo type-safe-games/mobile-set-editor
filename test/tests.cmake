@@ -21,9 +21,8 @@ set(fixture_env
 )
 set(fixture_set "${test_dir}/fixture/sets/fixture-cards.mse-set")
 
-# Golden images of the Test fixture (optional; the private goldens, ADR 0008, ADR 0010)
-set(FIXTURE_GOLDENS_DIR "${PROJECT_SOURCE_DIR}/templates/goldens/images/fixture/fixture-cards"
-    CACHE PATH "Golden images of the Test fixture (optional)")
+# Golden images of the Test fixture: free, so in the repository (#52)
+set(FIXTURE_GOLDENS_DIR "${test_dir}/fixture/goldens/fixture-cards" CACHE PATH "Golden images of the Test fixture")
 
 # The desktop program's tests (wx)
 if(MSE_DESKTOP)
