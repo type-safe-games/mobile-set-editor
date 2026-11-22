@@ -53,7 +53,7 @@ public:
 
   mse_skia::Surface surface;
 
-  wxSize getSize() const override { return wxSize(surface.width(), surface.height()); }
+  IntSize getSize() const override { return IntSize(surface.width(), surface.height()); }
 
   // --------------------------------------------------- : Paint state
 
@@ -82,7 +82,7 @@ public:
   void drawLine(int x1, int y1, int x2, int y2) override { surface.drawLine(x1, y1, x2, y2); }
   void drawRectangle(int x, int y, int w, int h) override { surface.drawRectangle(x, y, w, h); }
   void drawRoundedRectangle(int x, int y, int w, int h, double radius) override { surface.drawRoundedRectangle(x, y, w, h, radius); }
-  void drawPolygon(int n, const wxPoint points[]) override {
+  void drawPolygon(int n, const IntPoint points[]) override {
     std::vector<mse_skia::Point> pts(n);
     for (int i = 0 ; i < n ; ++i) { pts[i].x = points[i].x; pts[i].y = points[i].y; }
     surface.drawPolygon(pts);
@@ -153,7 +153,7 @@ public:
       part.subtract = p.subtract;
       part.is_rect = p.is_rect;
       part.x = p.rect.x; part.y = p.rect.y; part.w = p.rect.width; part.h = p.rect.height;
-      for (const wxPoint& pt : p.polygon) part.polygon.push_back(mse_skia::Point{pt.x, pt.y});
+      for (const IntPoint& pt : p.polygon) part.polygon.push_back(mse_skia::Point{pt.x, pt.y});
       parts.push_back(move(part));
     }
     surface.setClip(parts);

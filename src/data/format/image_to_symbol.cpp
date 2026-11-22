@@ -250,7 +250,7 @@ void fill_alpha(Image& img, int w, int h) {
 SymbolP import_symbol(Image& img) {
   SymbolP symbol;
   if (is_mse1_symbol(img)) {
-    Image img2 = img.GetSubImage(wxRect(20,0,40,40));
+    Image img2 = img.GetSubImage(IntRect(20,0,40,40));
     symbol = image_to_symbol(img2);
   } else if (img.GetWidth() > 100 || img.GetHeight() > 100) {
     // 100x100 ought to be enough, we trow out most afterwards data anyway

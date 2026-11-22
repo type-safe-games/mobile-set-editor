@@ -193,7 +193,7 @@ String symbols_to_html(const String& str, SymbolFont& symbol_font, double size) 
   String html;
   FOR_EACH(sym, symbols) {
     String filename = symbol_font.name() + _("-") + clean_filename(sym.text) + _(".png");
-    map<String,wxSize>::iterator it = ei.exported_images.find(filename);
+    map<String,IntSize>::iterator it = ei.exported_images.find(filename);
     if (it == ei.exported_images.end()) {
       // save symbol image
       Image img = symbol_font.getImage(size, sym);
@@ -201,7 +201,7 @@ String symbols_to_html(const String& str, SymbolFont& symbol_font, double size) 
       if (!retry_io([&]{ return image_save_file(img, out_path); })) {
         throw Error(_("Unable to write symbol image file '") + out_path + _("'"));
       }
-      it = ei.exported_images.insert(make_pair(filename, wxSize(img.GetWidth(), img.GetHeight()))).first;
+      it = ei.exported_images.insert(make_pair(filename, IntSize(img.GetWidth(), img.GetHeight()))).first;
     }
     html += _("<img src='") + filename + _("' alt='") + html_escape(sym.text)
          +  _("' width='")  + int_to_string(it->second.x)
@@ -483,7 +483,7 @@ SCRIPT_FUNCTION(write_image_file) {
   if (!retry_io([&]{ return image_save_file(img, out_path); })) {
     throw Error(_("Unable to write image file '") + out_path + _("'"));
   }
-  ei.exported_images.insert(make_pair(file, wxSize(img.GetWidth(), img.GetHeight())));
+  ei.exported_images.insert(make_pair(file, IntSize(img.GetWidth(), img.GetHeight())));
   SCRIPT_RETURN(file);
 }
 

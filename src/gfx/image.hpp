@@ -55,7 +55,7 @@ public:
 
   int GetWidth() const;
   int GetHeight() const;
-  inline wxSize GetSize() const { return wxSize(GetWidth(), GetHeight()); }
+  inline IntSize GetSize() const { return IntSize(GetWidth(), GetHeight()); }
 
   /// The RGB plane (width*height*3 bytes), shared between copies
   Byte* GetData() const;
@@ -85,14 +85,14 @@ public:
   /// An independent copy (pixels, alpha, mask and options)
   Image Copy() const;
   /// A copy of a part of this image (without options)
-  Image GetSubImage(const wxRect& rect) const;
+  Image GetSubImage(const IntRect& rect) const;
   /// Paste another image into this one at position (x,y), as wxImage::Paste
   void Paste(const Image& image, int x, int y, ImageAlphaBlend blend = IMAGE_ALPHA_BLEND_OVER);
   /// Nearest neighbour scaling, as wxImage::Scale with wxIMAGE_QUALITY_NORMAL
   Image Scale(int width, int height) const;
   inline Image& Rescale(int width, int height) { return *this = Scale(width, height); }
   /// Rotate by an arbitrary angle (radians, counter clockwise) around a point, as wxImage::Rotate
-  Image Rotate(double angle, const wxPoint& centre, bool interpolating = true) const;
+  Image Rotate(double angle, const IntPoint& centre, bool interpolating = true) const;
 
   /// The palette the image was decoded with, if any (r,g,b triples), carried along for the codec.
   /** Like wxImage's palette it only survives copies and in-place operations; the wx PNG encoder

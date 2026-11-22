@@ -29,7 +29,7 @@ Image resample(const Image& img_in, double zoom);
 
 /// Resamples an image, first clips the input image to a specified rectangle
 /** The selected rectangle is resampled into the entire output image */
-void resample_and_clip(const Image& img_in, Image& img_out, wxRect rect);
+void resample_and_clip(const Image& img_in, Image& img_out, IntRect rect);
 
 /// How to preserve the aspect ratio of an image when rescaling
 enum PreserveAspect
@@ -47,7 +47,7 @@ Image resample_preserve_aspect(const Image& img_in, int width, int height);
 void sharp_resample(const Image& img_in, Image& img_out, int amount);
 
 /// Sharpening version of of resample_and_clip
-void sharp_resample_and_clip(const Image& img_in, Image& img_out, wxRect rect, int amount);
+void sharp_resample_and_clip(const Image& img_in, Image& img_out, IntRect rect, int amount);
 
 /// Draw text by first drawing it using a larger font and then downsampling it
 /** optionally rotated by an angle.
@@ -285,7 +285,7 @@ void draw_combine_image(Canvas& dc, UInt x, UInt y, const Image& img, ImageCombi
 /// Use the red channel of img_alpha as alpha channel for img
 void set_alpha(Image& img, const Image& img_alpha);
 /// Use the given bytes as alpha channel for img
-void set_alpha(Image& img, Byte* alphas, const wxSize& alphas_size);
+void set_alpha(Image& img, Byte* alphas, const IntSize& alphas_size);
 /// Set the transparency of img
 void set_alpha(Image& img, double alpha);
 
@@ -312,7 +312,7 @@ public:
   bool isOpaque(int x, int y) const;
   
   /// Determine a convex hull polygon *around* the mask
-  void convexHull(vector<wxPoint>& points) const;
+  void convexHull(vector<IntPoint>& points) const;
   
   /// Make an image of the given color using this mask
   Image colorImage(const Color& color) const;
@@ -324,12 +324,12 @@ public:
   double rowRight(double y, const RealSize& size) const;
   
   /// Does this mask have the given size?
-  inline bool hasSize(const wxSize& compare_size) const { return size == compare_size; }
+  inline bool hasSize(const IntSize& compare_size) const { return size == compare_size; }
   /// Is the mask loaded?
   inline bool isLoaded() const { return alpha; }
   
 private:
-  wxSize size; ///< Size of the mask
+  IntSize size; ///< Size of the mask
   Byte* alpha; ///< Data of alpha mask
   mutable int *lefts, *rights; ///< Row sizes
   

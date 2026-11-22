@@ -69,7 +69,7 @@ public:
   Image getCachedImage(Package& pkg, double size);
   
   /// Get an image with the given size
-  Image getImage(Package& pkg, wxSize size);
+  Image getImage(Package& pkg, IntSize size);
   
   /// Size of a (zoomed) bitmap
   /** This is the size of the resulting image, it does NOT convert back to internal coordinates */
@@ -93,7 +93,7 @@ public:
 private:
   ScriptableImage  image;           ///< The image for this symbol
   double           img_size;        ///< Font size used by the image
-  wxSize           actual_size;     ///< Actual image size, only known after loading the image
+  IntSize           actual_size;     ///< Actual image size, only known after loading the image
   Package*         local_package;   ///< The set the context belongs to, to load images stored in set fields, only valid right after an update(), don't keep it around
 
   /// Cached images for different sizes
@@ -124,7 +124,7 @@ Image SymbolInFont::getImage(Package& pkg, double size) {
     throw Error(_("No image specified for symbol with code '") + code + _("' in symbol font."));
   }
   Image img = image.generate(GeneratedImage::Options(0, 0, &pkg, local_package));
-  actual_size = wxSize(img.GetWidth(), img.GetHeight());
+  actual_size = IntSize(img.GetWidth(), img.GetHeight());
   // scale to match expected size
   Image resampled_image((int) (actual_size.GetWidth()  * size / img_size),
                         (int) (actual_size.GetHeight() * size / img_size), false);
@@ -146,7 +146,7 @@ Image SymbolInFont::getCachedImage(Package& pkg, double size) {
   }
   return img;
 }
-Image SymbolInFont::getImage(Package& pkg, wxSize size) {
+Image SymbolInFont::getImage(Package& pkg, IntSize size) {
   // generate new image
   if (!image.isReady()) {
     throw Error(_("No image specified for symbol with code '") + code + _("' in symbol font."));
@@ -168,7 +168,7 @@ void SymbolInFont::update(Context& ctx, Package* local_package) {
   if (image.update(ctx)) {
     // image has changed, cache is no longer valid
     images.clear();
-    actual_size = wxSize(0,0); // the new image can have a different size, measure it again
+    actual_size = IntSize(0,0); // the new image can have a different size, measure it again
   }
   enabled.update(ctx);
   preview_enabled.update(ctx);
@@ -481,7 +481,7 @@ RealSize SymbolFont::spacingSize(double font_size) {
 
 // ----------------------------------------------------------------------------- : InsertSymbolMenu
 
-Image SymbolFont::insertSymbolPreview(const InsertSymbolMenu& item, wxSize size) {
+Image SymbolFont::insertSymbolPreview(const InsertSymbolMenu& item, IntSize size) {
   SymbolInFont* symbol = nullptr;
   if (item.type == InsertSymbolMenu::Type::CUSTOM) {
     symbol = defaultSymbol();

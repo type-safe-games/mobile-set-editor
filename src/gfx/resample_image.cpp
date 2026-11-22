@@ -125,7 +125,7 @@ void resample_pass(const Image& img_in, Image& img_out, int offset_in, int offse
  * Uses fixed point numbers
  */
 void resample(const Image& img_in, Image& img_out) {
-  resample_and_clip(img_in, img_out, wxRect(0, 0, img_in.GetWidth(), img_in.GetHeight()));
+  resample_and_clip(img_in, img_out, IntRect(0, 0, img_in.GetWidth(), img_in.GetHeight()));
 }
 Image resample(const Image& img_in, int width, int height) {
   width  = max(1, width);
@@ -142,7 +142,7 @@ Image resample(const Image& img_in, double zoom) {
   return resample(img_in, (int)(img_in.GetWidth() * zoom), (int)(img_in.GetHeight() * zoom));
 }
 
-void resample_and_clip(const Image& img_in, Image& img_out, wxRect rect) {
+void resample_and_clip(const Image& img_in, Image& img_out, IntRect rect) {
   // mask to alpha
   if (img_in.HasMask() && !img_in.HasAlpha()) {
     const_cast<Image&>(img_in).InitAlpha();
@@ -230,21 +230,21 @@ void resample_nine_slice(const Image& img_in, Image& img_out, int left, int righ
   int mid_src_h = src_h - t - b, mid_h = height - t - b;
   
   // corners: copied unchanged
-  if (l > 0 && t > 0) img_out.Paste(img_in.GetSubImage(wxRect(0,       0,       l, t)), 0,       0);
-  if (r > 0 && t > 0) img_out.Paste(img_in.GetSubImage(wxRect(src_w-r, 0,       r, t)), width-r, 0);
-  if (l > 0 && b > 0) img_out.Paste(img_in.GetSubImage(wxRect(0,       src_h-b, l, b)), 0,       height-b);
-  if (r > 0 && b > 0) img_out.Paste(img_in.GetSubImage(wxRect(src_w-r, src_h-b, r, b)), width-r, height-b);
+  if (l > 0 && t > 0) img_out.Paste(img_in.GetSubImage(IntRect(0,       0,       l, t)), 0,       0);
+  if (r > 0 && t > 0) img_out.Paste(img_in.GetSubImage(IntRect(src_w-r, 0,       r, t)), width-r, 0);
+  if (l > 0 && b > 0) img_out.Paste(img_in.GetSubImage(IntRect(0,       src_h-b, l, b)), 0,       height-b);
+  if (r > 0 && b > 0) img_out.Paste(img_in.GetSubImage(IntRect(src_w-r, src_h-b, r, b)), width-r, height-b);
   
   // top/bottom edges: stretched horizontally only
   if (mid_src_w > 0 && mid_w > 0) {
     if (t > 0) {
       Image edge(mid_w, t, false);
-      resample_and_clip(img_in, edge, wxRect(l, 0, mid_src_w, t));
+      resample_and_clip(img_in, edge, IntRect(l, 0, mid_src_w, t));
       img_out.Paste(edge, l, 0);
     }
     if (b > 0) {
       Image edge(mid_w, b, false);
-      resample_and_clip(img_in, edge, wxRect(l, src_h-b, mid_src_w, b));
+      resample_and_clip(img_in, edge, IntRect(l, src_h-b, mid_src_w, b));
       img_out.Paste(edge, l, height-b);
     }
   }
@@ -252,19 +252,19 @@ void resample_nine_slice(const Image& img_in, Image& img_out, int left, int righ
   if (mid_src_h > 0 && mid_h > 0) {
     if (l > 0) {
       Image edge(l, mid_h, false);
-      resample_and_clip(img_in, edge, wxRect(0, t, l, mid_src_h));
+      resample_and_clip(img_in, edge, IntRect(0, t, l, mid_src_h));
       img_out.Paste(edge, 0, t);
     }
     if (r > 0) {
       Image edge(r, mid_h, false);
-      resample_and_clip(img_in, edge, wxRect(src_w-r, t, r, mid_src_h));
+      resample_and_clip(img_in, edge, IntRect(src_w-r, t, r, mid_src_h));
       img_out.Paste(edge, width-r, t);
     }
   }
   // center: stretched in both directions
   if (mid_src_w > 0 && mid_src_h > 0 && mid_w > 0 && mid_h > 0) {
     Image center(mid_w, mid_h, false);
-    resample_and_clip(img_in, center, wxRect(l, t, mid_src_w, mid_src_h));
+    resample_and_clip(img_in, center, IntRect(l, t, mid_src_w, mid_src_h));
     img_out.Paste(center, l, t);
   }
   // transfer metadata
@@ -372,7 +372,7 @@ Image crop(const Image& base_img, int width, int height, int offset_x, int offse
       }
       inbounds_cardsv.emplace_back(cardv);
     }
-    metadata = "<mse-card-data>" + json_ugly_print(inbounds_cardsv) + "</mse-card-data>";
+    metadata = _("<mse-card-data>") + json_ugly_print(inbounds_cardsv) + _("</mse-card-data>");
     img.SetMetadata(metadata);
   }
   return img;
@@ -383,10 +383,10 @@ Image crop(const Image& base_img, int width, int height, int offset_x, int offse
 void sharp_downsample(const Image& img_in, Image& img_out, int amount);
 
 void sharp_resample(const Image& img_in, Image& img_out, int amount) {
-  sharp_resample_and_clip(img_in, img_out, wxRect(0, 0, img_in.GetWidth(), img_in.GetHeight()), amount);
+  sharp_resample_and_clip(img_in, img_out, IntRect(0, 0, img_in.GetWidth(), img_in.GetHeight()), amount);
 }
 
-void sharp_resample_and_clip(const Image& img_in, Image& img_out, wxRect rect, int amount) {
+void sharp_resample_and_clip(const Image& img_in, Image& img_out, IntRect rect, int amount) {
   Image img_larger(img_out.GetWidth() * 2, img_out.GetHeight() * 2, false);
   resample_and_clip(img_in, img_larger, rect);
   sharp_downsample(img_larger, img_out, amount);

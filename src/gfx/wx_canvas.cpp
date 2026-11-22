@@ -139,7 +139,7 @@ wxFont to_wx_font(const CanvasFont& f) {
 
 WxCanvas::WxCanvas(wxDC& dc) : dc(dc) {}
 
-wxSize WxCanvas::getSize() const {
+IntSize WxCanvas::getSize() const {
   return dc.GetSize();
 }
 
@@ -169,7 +169,10 @@ void WxCanvas::clear(const Color& color) {
 void WxCanvas::drawLine(int x1, int y1, int x2, int y2) { dc.DrawLine(x1, y1, x2, y2); }
 void WxCanvas::drawRectangle(int x, int y, int w, int h) { dc.DrawRectangle(x, y, w, h); }
 void WxCanvas::drawRoundedRectangle(int x, int y, int w, int h, double radius) { dc.DrawRoundedRectangle(x, y, w, h, radius); }
-void WxCanvas::drawPolygon(int n, const wxPoint points[]) { dc.DrawPolygon(n, points); }
+void WxCanvas::drawPolygon(int n, const IntPoint points[]) {
+  vector<wxPoint> wx_points(points, points + n);
+  dc.DrawPolygon(n, wx_points.data());
+}
 void WxCanvas::drawCircle(int x, int y, int radius) { dc.DrawCircle(x, y, radius); }
 void WxCanvas::drawEllipse(int x, int y, int w, int h) { dc.DrawEllipse(x, y, w, h); }
 void WxCanvas::drawEllipticArc(int x, int y, int w, int h, double start, double end) { dc.DrawEllipticArc(x, y, w, h, start, end); }
@@ -195,7 +198,8 @@ void WxCanvas::setClipRegion(const CanvasRegion& region) {
   wxRegion wx_region;
   bool first = true;
   for (auto const& part : region.getParts()) {
-    wxRegion r = part.is_rect ? wxRegion(part.rect) : wxRegion(part.polygon.size(), part.polygon.data());
+    vector<wxPoint> polygon(part.polygon.begin(), part.polygon.end());
+    wxRegion r = part.is_rect ? wxRegion(wxRect(part.rect)) : wxRegion(polygon.size(), polygon.data());
     if (first) {
       wx_region = r;
       first = false;

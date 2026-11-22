@@ -69,7 +69,7 @@ void ValueViewer::drawFieldBorder(RotatedDC& dc) {
     const AlphaMask& alpha_mask = getMask(dc);
     if (alpha_mask.isLoaded()) {
       // from mask
-      vector<wxPoint> points;
+      vector<IntPoint> points;
       alpha_mask.convexHull(points);
       if (points.size() < 3) return;
       FOR_EACH(p, points) p = dc.trPixelNoZoom(RealPoint(p.x,p.y));

@@ -66,7 +66,7 @@ typedef OffscreenCanvasP MemoryDCP;
 
 // Return a temporary canvas with the same size as the parameter, cleared to black
 MemoryDCP getTempDC(Canvas& dc) {
-  wxSize s = dc.getSize();
+  IntSize s = dc.getSize();
   MemoryDCP newDC = new_canvas(s.GetWidth(), s.GetHeight(), CanvasFormat::RGB);
   newDC->clear(Color(0,0,0));
   return newDC;
@@ -74,7 +74,7 @@ MemoryDCP getTempDC(Canvas& dc) {
 
 // Copy a canvas into an image
 static Image dc_to_image(Canvas& from) {
-  wxSize size = from.getSize();
+  IntSize size = from.getSize();
   return from.readBack(0, 0, size.GetWidth(), size.GetHeight());
 }
 
@@ -90,7 +90,7 @@ void SymbolViewer::combineBuffers(Canvas& dc, Buffers& b) {
   for (Canvas* d : interiors) if (d) any = true;
   if (!any) return;
 
-  wxSize size = dc.getSize();
+  IntSize size = dc.getSize();
   size_t count = (size_t)size.GetWidth() * (size_t)size.GetHeight();
 
   Image out;
@@ -193,7 +193,7 @@ void SymbolViewer::combineSymbolPart(Canvas& dc, const SymbolPart& part, bool& p
       // Clear the buffers
       buffersFilled = false;
       paintedSomething = true;
-      wxSize s = dc.getSize();
+      IntSize s = dc.getSize();
       if (buffers.border) {
         buffers.border->setBrush(Color(0,0,0));
         buffers.border->setPen(  Pen::none());
@@ -333,7 +333,7 @@ void SymbolViewer::combineSymbolShape(const SymbolShape& shape, Canvas& border, 
       MemoryDCP keepInterior = getTempDC(interior);
       drawSymbolShape(shape, keepBorder.get(), keepInterior.get(), 255, 255, false, false);
       // combine the temporary dcs with the result using the AND operator
-      wxSize s = border.getSize();
+      IntSize s = border.getSize();
       border  .blit(0, 0, s.GetWidth(), s.GetHeight(), *keepBorder  , 0, 0, RasterOp::AND);
       interior.blit(0, 0, s.GetWidth(), s.GetHeight(), *keepInterior, 0, 0, RasterOp::AND);
       break;
@@ -371,7 +371,7 @@ void SymbolViewer::combineBorderShape(const SymbolShape& shape, Canvas* border, 
       // only keep the part of the border that is inside the shape
       MemoryDCP keep = getTempDC(extra_border);
       drawSymbolShape(shape, nullptr, keep.get(), 0, 255, false, false);
-      wxSize s = extra_border.getSize();
+      IntSize s = extra_border.getSize();
       for (Canvas* mask : {border, accent_border, &extra_border}) {
         if (mask) mask->blit(0, 0, s.GetWidth(), s.GetHeight(), *keep, 0, 0, RasterOp::AND);
       }
@@ -380,7 +380,7 @@ void SymbolViewer::combineBorderShape(const SymbolShape& shape, Canvas* border, 
       // toggle, where there is border it is removed, where there is none it is added.
       MemoryDCP shapeDC = getTempDC(extra_border);
       drawSymbolShape(shape, nullptr, shapeDC.get(), 0, 255, false, false);
-      wxSize size = extra_border.getSize();
+      IntSize size = extra_border.getSize();
       Image shapeImg = dc_to_image(*shapeDC);
       Image extraImg = dc_to_image(extra_border);
       Image borderImg, accentImg;
@@ -413,7 +413,7 @@ void SymbolViewer::combineBorderShape(const SymbolShape& shape, Canvas* border, 
 
 void SymbolViewer::drawSymbolShape(const SymbolShape& shape, Canvas* border, Canvas* interior, Byte borderCol, Byte interiorCol, bool directB, bool clear) {
   // create point list
-  vector<wxPoint> points;
+  vector<IntPoint> points;
   size_t size = shape.points.size();
   for(size_t i = 0 ; i < size ; ++i) {
     segment_subdivide(*shape.getPoint((int)i), *shape.getPoint((int)i+1), origin, multiply, points);
@@ -460,7 +460,7 @@ void SymbolViewer::highlightPart(Canvas& dc, const SymbolPart& part, HighlightSt
 void SymbolViewer::highlightPart(Canvas& dc, const SymbolShape& shape, HighlightStyle style) {
   if (style == HIGHLIGHT_LESS) return;
   // create point list
-  vector<wxPoint> points;
+  vector<IntPoint> points;
   size_t size = shape.points.size();
   for(size_t i = 0 ; i < size ; ++i) {
     segment_subdivide(*shape.getPoint((int)i), *shape.getPoint((int)i+1), origin, multiply, points);
@@ -519,7 +519,7 @@ void SymbolViewer::highlightPart(Canvas& dc, const SymbolGroup& group, Highlight
   if (style == HIGHLIGHT_BORDER) {
     dc.setBrush(Brush::none());
     dc.setPen  (Pen(Color(255,0,0), 2));
-    wxRect r = rotation.trRectToBB(RealRect(group.bounds));
+    IntRect r = rotation.trRectToBB(RealRect(group.bounds));
     dc.drawRectangle(r.x, r.y, r.width, r.height);
   }
   FOR_EACH_CONST(part, group.parts) {

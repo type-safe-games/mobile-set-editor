@@ -32,7 +32,7 @@ public:
   /// The underlying wx DC
   wxDC& getDC() const { return dc; }
 
-  wxSize getSize() const override;
+  IntSize getSize() const override;
   void setPen(const Pen& pen) override;
   void setBrush(const Brush& brush) override;
   void setRasterOp(RasterOp op) override;
@@ -43,7 +43,7 @@ public:
   void drawLine(int x1, int y1, int x2, int y2) override;
   void drawRectangle(int x, int y, int w, int h) override;
   void drawRoundedRectangle(int x, int y, int w, int h, double radius) override;
-  void drawPolygon(int n, const wxPoint points[]) override;
+  void drawPolygon(int n, const IntPoint points[]) override;
   void drawCircle(int x, int y, int radius) override;
   void drawEllipse(int x, int y, int w, int h) override;
   void drawEllipticArc(int x, int y, int w, int h, double start, double end) override;

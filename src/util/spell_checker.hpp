@@ -41,7 +41,7 @@ private:
   /// The dictionary encoding (hunspell's SET, ISO8859-1 by default)
   enum class Encoding { UTF8, LATIN1, OTHER };
   Encoding encoding;
-  String encoding_name; ///< Only used for Encoding::OTHER
+  const struct SingleByteCharset* charset = nullptr; ///< Only used for Encoding::OTHER
   /// Convert from String to the dictionary encoding; false if the word can't be encoded
   bool convert_encoding(const String& word, std::string& out);
   /// Convert from the dictionary encoding to String; "" if that fails

@@ -58,7 +58,7 @@ void MultipleChoiceValueViewer::draw(RotatedDC& dc) {
 void MultipleChoiceValueViewer::drawChoice(RotatedDC& dc, RealPoint& pos, const String& choice, bool active) {
   RealSize size; size.height = item_height;
   if (style().render_style & RENDER_CHECKLIST) {
-    wxRect rect = dc.trRectToBB(RealRect(pos + RealSize(1,1), RealSize(item_height-2, item_height-2)));
+    IntRect rect = dc.trRectToBB(RealRect(pos + RealSize(1,1), RealSize(item_height-2, item_height-2)));
     draw_checkbox_portable(dc.getCanvas(), rect, active);
     size = add_horizontal(size, RealSize(item_height, item_height));
   }

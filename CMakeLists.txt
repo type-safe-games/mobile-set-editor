@@ -77,17 +77,27 @@ include_directories("${PROJECT_SOURCE_DIR}/src")
 include_directories(${Boost_INCLUDE_DIRS})
 include_directories(${HUNSPELL_INCLUDE_DIRS})
 
-# The core: everything under src/ except the desktop program (gui/, cli/, main.cpp) and the
-# facade. An object library, so every object file (and its static initialisers) goes into each
-# program that uses it, exactly as when the core was compiled into the executable.
+# The core: everything under src/ except the desktop program (gui/, cli/, main.cpp), the facade
+# and the backends (gfx/wx_*, gfx/skia/). It is wx-free (#43): util/prec.hpp includes wx only
+# where MSE_WX is defined. An object library, so every object file (and its static initialisers)
+# goes into each program that uses it, exactly as when the core was compiled into the executable.
 
 file(GLOB_RECURSE core_sources src/*.cpp)
 list(FILTER core_sources EXCLUDE REGEX "/src/(gui|cli|facade)/")
 list(FILTER core_sources EXCLUDE REGEX "/src/main\\.cpp$")
-list(FILTER core_sources EXCLUDE REGEX "/src/gfx/skia/")
+list(FILTER core_sources EXCLUDE REGEX "/src/gfx/(skia/|wx_)")
 add_library(mse_core OBJECT ${core_sources})
-target_link_libraries(mse_core PUBLIC wxWidgets::wxWidgets Boost::regex Boost::json MINIZIP::minizip ${HUNSPELL_LIBRARIES})
+target_link_libraries(mse_core PUBLIC Boost::regex Boost::json MINIZIP::minizip ${HUNSPELL_LIBRARIES})
 target_precompile_headers(mse_core PRIVATE src/util/prec.hpp)
+
+# The wx backends of the core (gfx/wx_*: Canvas, image codec, conversions), for the desktop.
+# Everything that uses wx is compiled with MSE_WX, and gets its own precompiled header.
+
+file(GLOB wx_backend_sources src/gfx/wx_*.cpp)
+add_library(mse_wx OBJECT ${wx_backend_sources})
+target_compile_definitions(mse_wx PUBLIC MSE_WX)
+target_link_libraries(mse_wx PUBLIC mse_core wxWidgets::wxWidgets)
+target_precompile_headers(mse_wx PRIVATE src/util/prec.hpp)
 
 # The Skia backends (ADR 0004), built from the pinned submodules by tools/skia/build.sh. With
 # MSE_SKIA_CODEC the desktop decodes and encodes images through Skia instead of wx (#41); with
@@ -132,7 +142,7 @@ if(UNIX AND NOT APPLE AND PkgConfig_FOUND)
   if(PANGOFC_FOUND)
     set_source_files_properties(src/gfx/wx_canvas.cpp PROPERTIES
       INCLUDE_DIRECTORIES "${PANGOFC_INCLUDE_DIRS}" COMPILE_DEFINITIONS MSE_HAVE_PANGOFC)
-    target_link_libraries(mse_core PUBLIC PkgConfig::PANGOFC)
+    target_link_libraries(mse_wx PUBLIC PkgConfig::PANGOFC)
   endif()
 endif()
 
@@ -147,24 +157,24 @@ target_precompile_headers(mse_facade REUSE_FROM mse_core)
 # Magic Set Editor executable
 
 add_executable(magicseteditor WIN32)
-target_link_libraries(${PROJECT_NAME} PRIVATE mse_core)
+target_link_libraries(${PROJECT_NAME} PRIVATE mse_wx mse_core)
 
 file(GLOB_RECURSE sources src/gui/*.cpp src/cli/*.cpp)
 list(FILTER sources EXCLUDE REGEX win32_cli_wrapper.cpp)
 target_sources(magicseteditor PRIVATE ${sources} src/main.cpp)
-target_precompile_headers(magicseteditor REUSE_FROM mse_core)
+target_precompile_headers(magicseteditor REUSE_FROM mse_wx)
 
 # Headless tests of the facade, on a desktop host that installs the wx backends (test/tests.cmake)
 
 add_executable(facade_tests test/facade/facade_tests.cpp src/facade/desktop/desktop_host.cpp)
-target_link_libraries(facade_tests PRIVATE mse_facade mse_core)
-target_precompile_headers(facade_tests REUSE_FROM mse_core)
+target_link_libraries(facade_tests PRIVATE mse_facade mse_wx mse_core)
+target_precompile_headers(facade_tests REUSE_FROM mse_wx)
 
 # The Skia image codec against the wx one (#41)
 if(MSE_SKIA_CODEC)
   add_executable(image_codec_tests test/image_codec/image_codec_tests.cpp)
-  target_link_libraries(image_codec_tests PRIVATE mse_core)
-  target_precompile_headers(image_codec_tests REUSE_FROM mse_core)
+  target_link_libraries(image_codec_tests PRIVATE mse_wx mse_core)
+  target_precompile_headers(image_codec_tests REUSE_FROM mse_wx)
 endif()
 
 configure_file(src/config.hpp.in src/config.hpp)

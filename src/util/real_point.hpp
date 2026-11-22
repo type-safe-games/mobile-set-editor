@@ -39,9 +39,10 @@ public:
   inline RealSize(double w, double h)
     : width(w), height(h)
   {}
-  inline RealSize(wxSize s)
+  inline RealSize(IntSize s)
     : width(s.x), height(s.y)
   {}
+  RealSize(const wxSize& s);     ///< (defined by the wx backend, gfx/wx_conversions.cpp)
   inline explicit RealSize(const Vector2D& v)
     : width(v.x), height(v.y)
   {}
@@ -69,10 +70,11 @@ public:
     return RealSize(width / r, height / r);
   }
   
-  /// Can be converted to a wxSize, with integer components
-  inline operator wxSize() {
-    return wxSize(to_int(width), to_int(height));
+  /// Can be converted to a IntSize, with integer components
+  inline operator IntSize() {
+    return IntSize(to_int(width), to_int(height));
   }
+  operator wxSize();             ///< (defined by the wx backend; not const, like the conversion to IntSize)
 };
 
 /// Add two sizes horizontally
@@ -131,9 +133,10 @@ public:
   using RealSize::width;
   using RealSize::height;
     
-  inline RealRect(const wxRect& rect)
+  inline RealRect(const IntRect& rect)
     : RealPoint(rect.x, rect.y), RealSize(rect.width, rect.height)
   {}
+  RealRect(const wxRect& rect);  ///< (defined by the wx backend)
   inline RealRect(const RealPoint& position, const RealSize& size)
     : RealPoint(position), RealSize(size)
   {}
@@ -204,7 +207,7 @@ public:
     }
   }
 
-  inline operator wxRect() const {
+  inline operator IntRect() const {
     // Prevent rounding errors, for example if
     // x = 0.6 and width = 0.6
     // the right = 1.2
@@ -212,11 +215,13 @@ public:
     // not from 0 to 0
     int i_l = to_int(x), i_r = to_int(right());
     int i_t = to_int(y), i_b = to_int(bottom());
-    return wxRect(i_l, i_t, i_r - i_l, i_b - i_t);
+    return IntRect(i_l, i_t, i_r - i_l, i_b - i_t);
   }
   
-  /// Explicit conversion to wxRect, to not confuse gcc
-  inline wxRect toRect() const {
+  operator wxRect() const;       ///< (defined by the wx backend)
+
+  /// Explicit conversion to IntRect, to not confuse gcc
+  inline IntRect toRect() const {
     return *this;
   }
 };

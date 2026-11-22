@@ -104,9 +104,10 @@ public:
     return atan2(y,x);
   }
   
-  inline operator wxPoint() const {
-    return wxPoint(to_int(x), to_int(y));
+  inline operator IntPoint() const {
+    return IntPoint(to_int(x), to_int(y));
   }
+  operator wxPoint() const;      ///< (defined by the wx backend, gfx/wx_conversions.cpp)
   
   // Vector at infinity
   static inline Vector2D infinity() {

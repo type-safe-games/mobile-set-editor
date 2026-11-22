@@ -68,7 +68,7 @@ void deCasteljau(const Vector2D& a1, Vector2D& a21, Vector2D& a34, const Vector2
 /** Adds the resulting corner points of those lines to out, the last point is not added.
  *  All points are converted to display coordinates by multiplying with m and adding origin
  */
-void segment_subdivide(const ControlPoint& p0, const ControlPoint& p1, const Vector2D& origin, const Matrix2D& m, vector<wxPoint>& out);
+void segment_subdivide(const ControlPoint& p0, const ControlPoint& p1, const Vector2D& origin, const Matrix2D& m, vector<IntPoint>& out);
 
 // ----------------------------------------------------------------------------- : Bounds
 

@@ -116,12 +116,12 @@ private:
   // Calculate the points on a bezier curve between p0 and p1
   // Stores the Points in p_out, at most count points are stored
   // after this call p_out points to just beyond the last point
-  void calcBezierPoint(const ControlPointP& p0, const ControlPointP& p1, wxPoint*& p_out, UInt count);
+  void calcBezierPoint(const ControlPointP& p0, const ControlPointP& p1, IntPoint*& p_out, UInt count);
   
   // Subdivide a bezier curve by adding at most count points
   //   p0 = c(t0), p1 = c(p1)
   // subdivides linearly between t0 and t1, and only when necessary
   // adds points to p_out and increments the pointer when a point is added
-  void calcBezierOpt(const BezierCurve& c, const Vector2D& p0, const Vector2D& p1, double t0, double t1, wxPoint*& p_out, UInt count);
+  void calcBezierOpt(const BezierCurve& c, const Vector2D& p0, const Vector2D& p1, double t0, double t1, IntPoint*& p_out, UInt count);
 */};
 

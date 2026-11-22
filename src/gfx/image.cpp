@@ -200,7 +200,7 @@ const vector<pair<String,String>>& Image::GetOptions() const {
 
 // ----------------------------------------------------------------------------- : Sub images and pasting
 
-Image Image::GetSubImage(const wxRect& rect) const {
+Image Image::GetSubImage(const IntRect& rect) const {
   Image image;
   if (!IsOk()) return image;
   if (!(rect.GetLeft() >= 0 && rect.GetTop() >= 0 && rect.GetRight() <= GetWidth() && rect.GetBottom() <= GetHeight())) {
@@ -539,7 +539,7 @@ static inline int wx_round(double x) {
   return int(std::lround(x)); // as wxRound
 }
 
-Image Image::Rotate(double angle, const wxPoint& centre_of_rotation, bool interpolating) const {
+Image Image::Rotate(double angle, const IntPoint& centre_of_rotation, bool interpolating) const {
   // screen coordinates are a mirror image of "real" coordinates
   angle = -angle;
 

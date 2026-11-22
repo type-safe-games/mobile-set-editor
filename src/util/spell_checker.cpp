@@ -8,6 +8,7 @@
 
 #include <util/prec.hpp>
 #include <util/spell_checker.hpp>
+#include <util/charset.hpp>
 #include <util/string.hpp>
 #include <util/io/package_manager.hpp>
 
@@ -60,7 +61,7 @@ SpellChecker* SpellChecker::get(const String& filename, const String& language) 
 SpellChecker::SpellChecker(const char* aff_path, const char* dic_path)
   : Hunspell(aff_path,dic_path)
 {
-  // Dictionaries are UTF-8 or (hunspell's default without a SET line) ISO8859-1; those are converted without wx.
+  // Dictionaries are UTF-8, ISO8859-1 (hunspell's default without a SET line) or another 8-bit set (util/charset.hpp)
   String name = decode_utf8_or_latin1(get_dic_encoding(), strlen(get_dic_encoding()));
   String key;
   for (Char c : name) {
@@ -72,7 +73,7 @@ SpellChecker::SpellChecker(const char* aff_path, const char* dic_path)
     encoding = Encoding::LATIN1;
   } else {
     encoding = Encoding::OTHER;
-    encoding_name = name;
+    charset = find_single_byte_charset(name); // null if unknown: then no word can be encoded
   }
 }
 
@@ -115,9 +116,7 @@ bool SpellChecker::convert_encoding(const String& word, std::string& out) {
       out += (char)(unsigned char)c;
     }
   } else {
-    // wx boundary (#30): other 8-bit dictionary encodings (none in the template pack) have no wx-free converter yet
-    wxCharBuffer buf = wxString(fixed).mb_str(wxCSConv(wxString(encoding_name)));
-    if (buf.data()) out = buf.data();
+    if (charset) encode_single_byte(*charset, fixed, out);
   }
   if (out.empty() || out[0] == '\0') {
     // If encoding fails we get an empty string, since the word was not empty this can never happen
@@ -136,8 +135,7 @@ String SpellChecker::convert_from_encoding(const std::string& word) {
     for (char c : word) ret += (Char)(unsigned char)c;
     return ret;
   } else {
-    // wx boundary (#30): no wx-free converter for arbitrary 8-bit encodings yet
-    return wxString(word.c_str(), wxCSConv(wxString(encoding_name))).ToStdWstring();
+    return charset ? decode_single_byte(*charset, word) : String();
   }
 }
 

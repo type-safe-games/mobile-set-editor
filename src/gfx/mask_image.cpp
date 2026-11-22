@@ -71,10 +71,10 @@ bool AlphaMask::isOpaque(const RealPoint& p, const RealSize& resize) const {
 }
 
 /// Do the points form a (counter??)clockwise angle?
-bool convex(const wxPoint& p, const wxPoint& q, const wxPoint& r) {
+bool convex(const IntPoint& p, const IntPoint& q, const IntPoint& r) {
   return p.y*q.x - p.x*q.y - p.y*r.x + q.y*r.x + p.x*r.y - q.x*r.y > 0;
 }
-void make_convex(vector<wxPoint>& points) {
+void make_convex(vector<IntPoint>& points) {
   while (points.size() > 2 &&
          !convex(points[points.size() - 3]
                 ,points[points.size() - 2]
@@ -82,12 +82,12 @@ void make_convex(vector<wxPoint>& points) {
     points.erase(points.end() - 2);
   }
 }
-void add_convex_point(vector<wxPoint>& points, int x, int y) {
-  points.push_back(wxPoint(x,y));
+void add_convex_point(vector<IntPoint>& points, int x, int y) {
+  points.push_back(IntPoint(x,y));
   make_convex(points);
 }
 
-void AlphaMask::convexHull(vector<wxPoint>& points) const {
+void AlphaMask::convexHull(vector<IntPoint>& points) const {
   if (!alpha) throw InternalError(_("AlphaMask::convexHull"));
   // Left side, top to bottom
   int miny = size.y, maxy = -1, lastx = 0;

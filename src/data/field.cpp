@@ -226,33 +226,33 @@ void Style::markDependencyMember(const String& name, const Dependency& dep) cons
   if (
     dep.type == DEP_DUMMY && dep.index == false && (
       starts_with(name, _("content")) ||
-      name == "layout" ||
-      name == "lines" ||
-      name == "paragraphs" ||
-      name == "blocks" ||
-      name == "separators" ||
-      name == "font" ||
-      name == "symbol_font" ||
-      name == "always_symbol" ||
-      name == "allow_formating" ||
-      name == "alignment" ||
-      name == "padding_left" ||
-      name == "padding_right" ||
-      name == "padding_top" ||
-      name == "padding_bottom" ||
-      name == "padding_left_min" ||
-      name == "padding_right_min" ||
-      name == "padding_top_min" ||
-      name == "padding_bottom_min" ||
-      name == "line_height_soft" ||
-      name == "line_height_hard" ||
-      name == "line_height_line" ||
-      name == "line_height_soft_max" ||
-      name == "line_height_hard_max" ||
-      name == "line_height_line_max" ||
-      name == "paragraph_height" ||
-      name == "block_height_min" ||
-      name == "direction"
+      name == _("layout") ||
+      name == _("lines") ||
+      name == _("paragraphs") ||
+      name == _("blocks") ||
+      name == _("separators") ||
+      name == _("font") ||
+      name == _("symbol_font") ||
+      name == _("always_symbol") ||
+      name == _("allow_formating") ||
+      name == _("alignment") ||
+      name == _("padding_left") ||
+      name == _("padding_right") ||
+      name == _("padding_top") ||
+      name == _("padding_bottom") ||
+      name == _("padding_left_min") ||
+      name == _("padding_right_min") ||
+      name == _("padding_top_min") ||
+      name == _("padding_bottom_min") ||
+      name == _("line_height_soft") ||
+      name == _("line_height_hard") ||
+      name == _("line_height_line") ||
+      name == _("line_height_soft_max") ||
+      name == _("line_height_hard_max") ||
+      name == _("line_height_line_max") ||
+      name == _("paragraph_height") ||
+      name == _("block_height_min") ||
+      name == _("direction")
     )
   ) {
     const_cast<Dependency&>(dep).index = true;

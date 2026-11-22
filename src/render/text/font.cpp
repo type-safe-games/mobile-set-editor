@@ -50,7 +50,7 @@ void FontTextElement::getCharInfo(RotatedDC& dc, double scale, vector<CharInfo>&
         RealSize(s.width - prev_width, s.height),
         c == _(' ') ? LineBreak::SPACE : LineBreak::MAYBE,
         draw_as == DRAW_ACTIVE, // from <soft> tag
-        c == wxChar(0x2022) //bullet point character
+        c == Char(0x2022) //bullet point character
       ));
       prev_width = s.width;
     }

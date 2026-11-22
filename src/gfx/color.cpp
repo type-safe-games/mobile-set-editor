@@ -9,6 +9,104 @@
 #include <util/prec.hpp>
 #include <gfx/color.hpp>
 
+// ----------------------------------------------------------------------------- : Named colors
+
+/// The colors of wxWidgets 3.2's colour database (wxColourDatabase::Initialize), which named
+/// colors in templates were looked up in before the core became wx-free (#43)
+static const struct { const wchar_t* name; unsigned char r, g, b; } named_colors[] = {
+  {L"AQUAMARINE", 112, 219, 147},
+  {L"BLACK", 0, 0, 0},
+  {L"BLUE", 0, 0, 255},
+  {L"BLUE VIOLET", 159, 95, 159},
+  {L"BROWN", 165, 42, 42},
+  {L"CADET BLUE", 95, 159, 159},
+  {L"CORAL", 255, 127, 0},
+  {L"CORNFLOWER BLUE", 66, 66, 111},
+  {L"CYAN", 0, 255, 255},
+  {L"DARK GREY", 47, 47, 47},
+  {L"DARK GREEN", 47, 79, 47},
+  {L"DARK OLIVE GREEN", 79, 79, 47},
+  {L"DARK ORCHID", 153, 50, 204},
+  {L"DARK SLATE BLUE", 107, 35, 142},
+  {L"DARK SLATE GREY", 47, 79, 79},
+  {L"DARK TURQUOISE", 112, 147, 219},
+  {L"DIM GREY", 84, 84, 84},
+  {L"FIREBRICK", 142, 35, 35},
+  {L"FOREST GREEN", 35, 142, 35},
+  {L"GOLD", 204, 127, 50},
+  {L"GOLDENROD", 219, 219, 112},
+  {L"GREY", 128, 128, 128},
+  {L"GREEN", 0, 255, 0},
+  {L"GREEN YELLOW", 147, 219, 112},
+  {L"INDIAN RED", 79, 47, 47},
+  {L"KHAKI", 159, 159, 95},
+  {L"LIGHT BLUE", 191, 216, 216},
+  {L"LIGHT GREY", 192, 192, 192},
+  {L"LIGHT STEEL BLUE", 143, 143, 188},
+  {L"LIME GREEN", 50, 204, 50},
+  {L"LIGHT MAGENTA", 255, 119, 255},
+  {L"MAGENTA", 255, 0, 255},
+  {L"MAROON", 142, 35, 107},
+  {L"MEDIUM AQUAMARINE", 50, 204, 153},
+  {L"MEDIUM GREY", 100, 100, 100},
+  {L"MEDIUM BLUE", 50, 50, 204},
+  {L"MEDIUM FOREST GREEN", 107, 142, 35},
+  {L"MEDIUM GOLDENROD", 234, 234, 173},
+  {L"MEDIUM ORCHID", 147, 112, 219},
+  {L"MEDIUM SEA GREEN", 66, 111, 66},
+  {L"MEDIUM SLATE BLUE", 127, 0, 255},
+  {L"MEDIUM SPRING GREEN", 127, 255, 0},
+  {L"MEDIUM TURQUOISE", 112, 219, 219},
+  {L"MEDIUM VIOLET RED", 219, 112, 147},
+  {L"MIDNIGHT BLUE", 47, 47, 79},
+  {L"NAVY", 35, 35, 142},
+  {L"ORANGE", 204, 50, 50},
+  {L"ORANGE RED", 255, 0, 127},
+  {L"ORCHID", 219, 112, 219},
+  {L"PALE GREEN", 143, 188, 143},
+  {L"PINK", 255, 192, 203},
+  {L"PLUM", 234, 173, 234},
+  {L"PURPLE", 176, 0, 255},
+  {L"RED", 255, 0, 0},
+  {L"SALMON", 111, 66, 66},
+  {L"SEA GREEN", 35, 142, 107},
+  {L"SIENNA", 142, 107, 35},
+  {L"SKY BLUE", 50, 153, 204},
+  {L"SLATE BLUE", 0, 127, 255},
+  {L"SPRING GREEN", 0, 255, 127},
+  {L"STEEL BLUE", 35, 107, 142},
+  {L"TAN", 219, 147, 112},
+  {L"THISTLE", 216, 191, 216},
+  {L"TURQUOISE", 173, 234, 234},
+  {L"VIOLET", 79, 47, 79},
+  {L"VIOLET RED", 204, 50, 153},
+  {L"WHEAT", 216, 216, 191},
+  {L"WHITE", 255, 255, 255},
+  {L"YELLOW", 255, 255, 0},
+  {L"YELLOW GREEN", 153, 204, 50},
+};
+
+/// Look up a color name as wxColourDatabase::Find did: case-insensitively, with "gray" also as "grey"
+static optional<Color> find_named_color(const String& name) {
+  String upper = name;
+  for (Char& c : upper) c = toUpper(c);
+  String alt = upper;
+  bool has_alt = false;
+  for (size_t pos = alt.find(L"GRAY") ; pos != String::npos ; pos = alt.find(L"GRAY", pos + 4)) {
+    alt.replace(pos, 4, L"GREY");
+    has_alt = true;
+  }
+  for (auto const& c : named_colors) {
+    if (upper == c.name) return Color(c.r, c.g, c.b);
+  }
+  if (has_alt) {
+    for (auto const& c : named_colors) {
+      if (alt == c.name) return Color(c.r, c.g, c.b);
+    }
+  }
+  return nullopt;
+}
+
 // ----------------------------------------------------------------------------- : Parsing etc.
 
 template <> void Reader::handle(Color& out) {
@@ -68,12 +166,7 @@ optional<Color> parse_color(const String& v) {
     return Color(200,180,0);
   } else {
     // Try to find a named color
-    wxColour c = wxTheColourDatabase->Find(v);
-    if (c.Ok()) {
-      return Color(c);
-    } else {
-      return nullopt;
-    }
+    return find_named_color(v);
   }
 }
 

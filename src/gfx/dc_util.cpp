@@ -35,7 +35,7 @@ void draw_checker(RotatedDC& dc, const RealRect& rect) {
 }
 
 
-void draw_checkbox_portable(Canvas& dc, const wxRect& rect, bool checked, bool enabled) {
+void draw_checkbox_portable(Canvas& dc, const IntRect& rect, bool checked, bool enabled) {
   if (checked) {
     // a tick, drawn like wxDC::DrawCheckMark does it
     int x1 = rect.x + 1, y1 = rect.y + 1, width = rect.width - 2, height = rect.height - 2;

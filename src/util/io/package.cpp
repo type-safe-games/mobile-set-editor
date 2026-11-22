@@ -492,7 +492,6 @@ void Package::saveToZipfile(const String& saveAs, bool remove_unused, bool is_co
   }
   // replace the old file with the new file, in effect commiting the changes
   {
-    wxLogNull noLog;
     // move .bak to .bak.temp
     bool bak_temp_created = false;
     if (file_exists(bakFile)) {
@@ -507,7 +506,7 @@ void Package::saveToZipfile(const String& saveAs, bool remove_unused, bool is_co
           _("(for example another MSE instance, a virus scanner, cloud sync, etc...).\n\n") +
           _("Your changes have not been lost, but the save did not complete.\n") +
           _("Please try saving to a different file name (use 'Save As').\n\n") +
-          _("System error: ") + wxSysErrorMsg(wxSysErrorCode())
+          _("System error: ") + last_system_error_message()
         );
       }
     }
@@ -522,7 +521,7 @@ void Package::saveToZipfile(const String& saveAs, bool remove_unused, bool is_co
           _("(for example another MSE instance, a virus scanner, cloud sync, etc...).\n\n") +
           _("Your changes have not been lost, but the save did not complete.\n") +
           _("Please try saving to a different file name (use 'Save As').\n\n") +
-          _("System error: ") + wxSysErrorMsg(wxSysErrorCode())
+          _("System error: ") + last_system_error_message()
         );
       }
     }
@@ -539,7 +538,7 @@ void Package::saveToZipfile(const String& saveAs, bool remove_unused, bool is_co
           _("(for example another MSE instance, a virus scanner, cloud sync, etc...).\n\n") +
           _("Your changes have not been lost, but the save did not complete.\n") +
           _("Please try saving to a different file name (use 'Save As').\n\n") +
-          _("System error: ") + wxSysErrorMsg(wxSysErrorCode())
+          _("System error: ") + last_system_error_message()
         );
       } else {
         // could not even restore .bak, there is now no .mse-set file
@@ -553,7 +552,7 @@ void Package::saveToZipfile(const String& saveAs, bool remove_unused, bool is_co
           _("You can rename that file to\n'") + saveAs + _("'\n") +
           _("manually yourself (outside of the program) to recover this save,\n") +
           _("or try saving to a different file name (use 'Save As').\n\n") +
-          _("System error: ") + wxSysErrorMsg(wxSysErrorCode())
+          _("System error: ") + last_system_error_message()
         );
       }
     }

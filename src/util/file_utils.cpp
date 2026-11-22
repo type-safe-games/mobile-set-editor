@@ -554,6 +554,11 @@ static bool rename_file_or_dir_once(const String& from, const String& to) {
   return false;
 }
 
+String last_system_error_message() {
+  const char* msg = strerror(errno);
+  return decode_utf8_or_latin1(msg, strlen(msg));
+}
+
 bool rename_file_or_dir(const String& from, const String& to) {
   return retry_io([&]{ return rename_file_or_dir_once(from, to); });
 }

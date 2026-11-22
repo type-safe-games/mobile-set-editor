@@ -213,7 +213,7 @@ const AlphaMask& CachedScriptableMask::get(const GeneratedImage::Options& img_op
   if (mask.isLoaded()) {
     // already loaded?
     if (img_options.width == 0 && img_options.height == 0) return mask;
-    if (mask.hasSize(wxSize(img_options.width,img_options.height))) return mask;
+    if (mask.hasSize(IntSize(img_options.width,img_options.height))) return mask;
   }
   // load?
   getNoCache(img_options,mask);

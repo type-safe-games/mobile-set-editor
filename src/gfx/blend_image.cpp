@@ -123,7 +123,7 @@ void set_alpha(Image& img, const Image& img_alpha) {
   }
 }
 
-void set_alpha(Image& img, Byte* al, const wxSize& alpha_size) {
+void set_alpha(Image& img, Byte* al, const IntSize& alpha_size) {
   int width = img.GetWidth(), height = img.GetHeight();
   if (width != alpha_size.GetWidth() || height != alpha_size.GetHeight()) {
     throw Error(_ERROR_3_("blending different mask", _("set_alpha"), int_to_string(width) + _("x") + int_to_string(height), int_to_string(alpha_size.GetWidth()) + _("x") + int_to_string(alpha_size.GetHeight())));

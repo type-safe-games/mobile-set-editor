@@ -262,7 +262,7 @@ SCRIPT_FUNCTION(to_color) {
 SCRIPT_FUNCTION(to_date) {
   try {
     SCRIPT_PARAM_C(String, input);
-    if (input == "now") {
+    if (input == _("now")) {
       SCRIPT_RETURN(DateTime::now());
     }
     else {

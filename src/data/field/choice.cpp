@@ -10,7 +10,6 @@
 #include <data/field/choice.hpp>
 #include <util/io/package.hpp>
 #include <util/defaultable.hpp>
-#include <wx/imaglist.h>
 
 // ----------------------------------------------------------------------------- : ChoiceField
 

@@ -22,7 +22,7 @@
  *  (gfx/font_registry.hpp) resolved for it.
  *
  *  Coordinates are device pixels. Geometry still uses wx's plain value types
- *  (wxPoint, wxSize, wxRect); replacing those is a separate, mechanical cleanup.
+ *  (IntPoint, IntSize, IntRect); replacing those is a separate, mechanical cleanup.
  *
  *  Implementations: gfx/wx_canvas.hpp (the desktop, over a wxDC) and gfx/skia/skia_canvas.hpp
  *  (CPU-only Skia, for Android; on the desktop with the CMake option MSE_SKIA_CANVAS).
@@ -86,12 +86,12 @@ public:
   struct Part {
     bool            subtract = false; ///< remove this part from the region instead of adding it
     bool            is_rect  = true;
-    wxRect          rect;
-    vector<wxPoint> polygon;          ///< when !is_rect, filled with the odd-even rule
+    IntRect          rect;
+    vector<IntPoint> polygon;          ///< when !is_rect, filled with the odd-even rule
   };
 
-  CanvasRegion(const wxRect& rect);
-  CanvasRegion(vector<wxPoint> polygon);
+  CanvasRegion(const IntRect& rect);
+  CanvasRegion(vector<IntPoint> polygon);
 
   /// Remove another region from this one
   void subtract(const CanvasRegion& other);
@@ -142,7 +142,7 @@ public:
   virtual ~Canvas() {}
 
   /// Size in pixels
-  virtual wxSize getSize() const = 0;
+  virtual IntSize getSize() const = 0;
 
   // --------------------------------------------------- : Paint state
 
@@ -165,7 +165,7 @@ public:
   virtual void drawLine(int x1, int y1, int x2, int y2) = 0;
   virtual void drawRectangle(int x, int y, int w, int h) = 0;
   virtual void drawRoundedRectangle(int x, int y, int w, int h, double radius) = 0;
-  virtual void drawPolygon(int n, const wxPoint points[]) = 0;
+  virtual void drawPolygon(int n, const IntPoint points[]) = 0;
   virtual void drawCircle(int x, int y, int radius) = 0;
   virtual void drawEllipse(int x, int y, int w, int h) = 0;
   /// Arc of the ellipse in the given bounding box, angles in degrees, counter clockwise

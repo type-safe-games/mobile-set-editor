@@ -100,7 +100,7 @@ Image rotate_image(const Image& image, Radians angle) {
   if (is_rad270(a)) return rotate_image_impl<Rotate270deg>(image);
   else {
     if (!image.HasAlpha()) const_cast<Image&>(image).InitAlpha();
-    Image ret = image.Rotate(angle, wxPoint(0,0));
+    Image ret = image.Rotate(angle, IntPoint(0,0));
     ret.SetMetadata(image.GetMetadata());
     return ret;
   }

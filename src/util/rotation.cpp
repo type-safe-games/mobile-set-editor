@@ -117,7 +117,7 @@ CanvasRegion Rotation::trRectToRegion(const RealRect& r) const {
   if (is_straight(angle)) {
     return trRectToBB(r).toRect();
   } else {
-    vector<wxPoint> points = {trPixel(RealPoint(r.left(),  r.top()   ))
+    vector<IntPoint> points = {trPixel(RealPoint(r.left(),  r.top()   ))
                              ,trPixel(RealPoint(r.left(),  r.bottom()))
                              ,trPixel(RealPoint(r.right(), r.bottom()))
                              ,trPixel(RealPoint(r.right(), r.top()   ))};
@@ -245,16 +245,16 @@ void RotatedDC::DrawPreRotatedImage (const Image& image, const RealRect& rect, I
 }
 
 void RotatedDC::DrawLine  (const RealPoint& p1,  const RealPoint& p2) {
-  wxPoint p1_ext = tr(p1), p2_ext = tr(p2);
+  IntPoint p1_ext = tr(p1), p2_ext = tr(p2);
   canvas.drawLine(p1_ext.x, p1_ext.y, p2_ext.x, p2_ext.y);
 }
 
 void RotatedDC::DrawRectangle(const RealRect& r) {
   if (is_straight(angle)) {
-    wxRect r_ext = trRectToBB(r);
+    IntRect r_ext = trRectToBB(r);
     canvas.drawRectangle(r_ext.x, r_ext.y, r_ext.width, r_ext.height);
   } else {
-    wxPoint points[4] = {trPixel(RealPoint(r.left(),  r.top()   ))
+    IntPoint points[4] = {trPixel(RealPoint(r.left(),  r.top()   ))
                         ,trPixel(RealPoint(r.left(),  r.bottom()))
                         ,trPixel(RealPoint(r.right(), r.bottom()))
                         ,trPixel(RealPoint(r.right(), r.top()   ))};
@@ -264,7 +264,7 @@ void RotatedDC::DrawRectangle(const RealRect& r) {
 
 void RotatedDC::DrawRoundedRectangle(const RealRect& r, double radius) {
   if (is_straight(angle)) {
-    wxRect r_ext = trRectToBB(r);
+    IntRect r_ext = trRectToBB(r);
     canvas.drawRoundedRectangle(r_ext.x, r_ext.y, r_ext.width, r_ext.height, trS(radius));
   } else {
     // TODO
@@ -273,7 +273,7 @@ void RotatedDC::DrawRoundedRectangle(const RealRect& r, double radius) {
 }
 
 void RotatedDC::DrawInvertRectangle(const RealRect& r) {
-  wxRect r_ext = trRectToBB(r);
+  IntRect r_ext = trRectToBB(r);
 
   Image img = canvas.readBack(r_ext.x, r_ext.y, r_ext.width, r_ext.height);
   Byte* data = img.GetData();
@@ -285,23 +285,23 @@ void RotatedDC::DrawInvertRectangle(const RealRect& r) {
 }
 
 void RotatedDC::DrawCircle(const RealPoint& center, double radius) {
-  wxPoint p = tr(center);
+  IntPoint p = tr(center);
   canvas.drawCircle(p.x + 1, p.y + 1, int(trS(radius)));
 }
 
 void RotatedDC::DrawEllipse(const RealPoint& center, const RealSize& size) {
-  wxPoint c_ext = tr(center - size/2);
-  wxSize  s_ext = trSizeToBB(size);
+  IntPoint c_ext = tr(center - size/2);
+  IntSize  s_ext = trSizeToBB(size);
   canvas.drawEllipse(c_ext.x, c_ext.y, s_ext.x, s_ext.y);
 }
 void RotatedDC::DrawEllipticArc(const RealPoint& center, const RealSize& size, Radians start, Radians end) {
-  wxPoint c_ext = tr(center - size/2);
-  wxSize  s_ext = trSizeToBB(size);
+  IntPoint c_ext = tr(center - size/2);
+  IntSize  s_ext = trSizeToBB(size);
   canvas.drawEllipticArc(c_ext.x, c_ext.y, s_ext.x, s_ext.y, rad_to_deg(start + angle), rad_to_deg(end + angle));
 }
 void RotatedDC::DrawEllipticSpoke(const RealPoint& center, const RealSize& size, Radians angle) {
-  wxPoint c_ext = tr(center - size/2);
-  wxSize  s_ext = trSizeToBB(size);
+  IntPoint c_ext = tr(center - size/2);
+  IntSize  s_ext = trSizeToBB(size);
   Radians rot_angle = angle + this->angle;
   Radians sin_angle = sin(rot_angle), cos_angle = cos(rot_angle);
   // position of center and of point on the boundary can vary because of rounding errors,
@@ -380,6 +380,6 @@ void RotatedDC::DestroyClippingRegion() {
 // ----------------------------------------------------------------------------- : Other
 
 Image RotatedDC::GetBackground(const RealRect& r) {
-  wxRect wr = trRectToBB(r);
+  IntRect wr = trRectToBB(r);
   return canvas.readBack(wr.x, wr.y, wr.width, wr.height);
 }

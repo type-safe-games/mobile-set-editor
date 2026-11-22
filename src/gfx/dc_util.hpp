@@ -24,4 +24,4 @@ class Canvas;
 void draw_checker(RotatedDC& dc, const RealRect&);
 
 /// Draw a checkbox without the native renderer (as used on cards)
-void draw_checkbox_portable(Canvas& dc, const wxRect& rect, bool checked, bool enabled = true);
+void draw_checkbox_portable(Canvas& dc, const IntRect& rect, bool checked, bool enabled = true);

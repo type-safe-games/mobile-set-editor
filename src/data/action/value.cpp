@@ -12,7 +12,6 @@
 #include <data/field.hpp>
 #include <data/card.hpp>
 #include <data/set.hpp> // for ValueActionPerformer
-#include <wx/imaglist.h>
 
 // ----------------------------------------------------------------------------- : ValueAction
 

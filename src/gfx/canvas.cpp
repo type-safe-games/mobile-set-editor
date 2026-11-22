@@ -12,13 +12,13 @@
 
 // ----------------------------------------------------------------------------- : CanvasRegion
 
-CanvasRegion::CanvasRegion(const wxRect& rect) {
+CanvasRegion::CanvasRegion(const IntRect& rect) {
   Part p;
   p.rect = rect;
   parts.push_back(p);
 }
 
-CanvasRegion::CanvasRegion(vector<wxPoint> polygon) {
+CanvasRegion::CanvasRegion(vector<IntPoint> polygon) {
   Part p;
   p.is_rect = false;
   p.polygon = move(polygon);

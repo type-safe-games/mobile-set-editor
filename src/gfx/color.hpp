@@ -16,6 +16,8 @@
 #include <util/prec.hpp>
 #include <optional>
 
+class wxColour; // (only for the conversions below)
+
 // ----------------------------------------------------------------------------- : Colors
 
 // Colors.
@@ -31,9 +33,9 @@ struct Color {
 
   inline Color() : r(0), g(0), b(0), a(0) {}
   inline Color(unsigned char r, unsigned char g, unsigned char b, unsigned char a = 255) : r(r), g(g), b(b), a(a) {}
-  inline Color(wxColour color) : r(color.Red()), g(color.Green()), b(color.Blue()), a(color.Alpha()) {}
+  Color(const wxColour& color); ///< (defined by the wx backend, gfx/wx_conversions.cpp)
 
-  inline operator wxColour() const { return wxColour(r, g, b, a); }
+  operator wxColour() const;     ///< (defined by the wx backend)
 
   inline bool operator == (Color const& that) const {
     return packed == that.packed;
@@ -83,13 +85,11 @@ struct RGB {
   RGB(Byte x) : r(x), g(x), b(x) {}
   RGB(Byte r, Byte g, Byte b) : r(r), g(g), b(b) {}
   RGB(Color x) : r(x.Red()), g(x.Green()), b(x.Blue()) {}
-  RGB(wxColour const& x) : r(x.Red()), g(x.Green()), b(x.Blue()) {}
+  RGB(wxColour const& x);        ///< (defined by the wx backend)
   
   inline int total() { return r+g+b; }
   
-  inline operator wxColour() const {
-    return wxColour(r,g,b);
-  }
+  operator wxColour() const;     ///< (defined by the wx backend)
   
   inline bool operator == (RGB const& that) const {
     return r == that.r && g == that.g && b == that.b;

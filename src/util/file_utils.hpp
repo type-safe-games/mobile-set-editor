@@ -189,6 +189,9 @@ bool copy_file(const String& from, const String& to);
 /// Rename (move) a file or directory, if it fails try to copy + delete, retrying a few times.
 bool rename_file_or_dir(const String& old_name, const String& new_name);
 
+/// The message for the last system error (errno), for error reports (was wxSysErrorMsg)
+String last_system_error_message();
+
 /// Move files/dirs matching one of the given wildcard patterns from one directory to another
 /** Used when updating a package: files the package declares in read_only_files
  *  (see Package::isIgnoredOnSave) are not managed by the package, so they need to be

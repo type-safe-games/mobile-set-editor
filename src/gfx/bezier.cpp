@@ -61,7 +61,7 @@ void deCasteljau(const Vector2D& a1, Vector2D& a21, Vector2D& a34, const Vector2
 
 // ----------------------------------------------------------------------------- : Drawing
 
-void curve_subdivide(const BezierCurve& c, const Vector2D& p0, const Vector2D& p1, double t0, double t1, const Vector2D& origin, const Matrix2D& m, vector<wxPoint>& out, UInt level) {
+void curve_subdivide(const BezierCurve& c, const Vector2D& p0, const Vector2D& p1, double t0, double t1, const Vector2D& origin, const Matrix2D& m, vector<IntPoint>& out, UInt level) {
   if (level <= 0)  return;
   double midtime = (t0+t1) * 0.5f;
   Vector2D midpoint = c.pointAt(midtime);
@@ -81,7 +81,7 @@ void curve_subdivide(const BezierCurve& c, const Vector2D& p0, const Vector2D& p
   curve_subdivide(c, midpoint, p1, midtime, t1, origin, m, out, level - 1);
 }
 
-void segment_subdivide(const ControlPoint& p0, const ControlPoint& p1, const Vector2D& origin, const Matrix2D& m, vector<wxPoint>& out) {
+void segment_subdivide(const ControlPoint& p0, const ControlPoint& p1, const Vector2D& origin, const Matrix2D& m, vector<IntPoint>& out) {
   assert(p0.segment_after == p1.segment_before);
   // always the start
   out.push_back(origin + p0.pos * m);

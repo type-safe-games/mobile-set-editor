@@ -23,18 +23,23 @@
 
 // ----------------------------------------------------------------------------- : Includes
 
-// Wx headers
-#include <wx/setup.h>
-#include <wx/wxprec.h>
-#include <wx/wx.h>
-#include <wx/datetime.h>
-
-#if defined(__WXMSW__)
-  // MSW uses the RGB define, fix it before it's undefined 
-  #include <wx/msw/private.h>
+// Wx headers: only for the desktop program and the wx backends (MSE_WX); the core is wx-free (#43)
+#ifdef MSE_WX
+  #include <wx/setup.h>
+  #include <wx/wxprec.h>
+  #include <wx/wx.h>
+  #include <wx/datetime.h>
+  #if defined(__WXMSW__)
+    // MSW uses the RGB define, fix it before it's undefined
+    #include <wx/msw/private.h>
+  #endif
 #endif
 
 // Std headers
+#include <cmath>
+#include <cstdlib>
+#include <cstring>
+#include <functional>
 #include <vector>
 #include <map>
 #include <set>
@@ -42,6 +47,8 @@
 using namespace std;
 
 #undef RGB
+
+#ifdef MSE_WX
 
 // ----------------------------------------------------------------------------- : Wx Aliasses
 
@@ -72,6 +79,8 @@ typedef wxWindow Window;
   #define wxAutoBufferedPaintDC wxBufferedPaintDC
 #endif
 
+#endif
+
 // ----------------------------------------------------------------------------- : Other aliasses
 
 typedef unsigned char Byte;
@@ -82,6 +91,7 @@ typedef unsigned int  UInt;
 // MSE utility headers (ones unlikely to change and used everywhere)
 #include "for_each.hpp"
 #include "string.hpp"
+#include "geometry.hpp"
 #include <gfx/image.hpp>
 #include "date_time.hpp"
 #include "smart_ptr.hpp"

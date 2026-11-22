@@ -16,6 +16,9 @@
 #include "prec.hpp"
 #include "for_each.hpp"
 #include <ctype.h>
+#include <cassert>
+#include <cwctype>
+#include <algorithm>
 #include <string>
 #include <type_traits>
 #include <boost/preprocessor/cat.hpp>
@@ -27,12 +30,8 @@ typedef std::wstring String;
 
 // ----------------------------------------------------------------------------- : Unicode
 
-/// u if UNICODE is defined, a otherwise
-#ifdef UNICODE
-#  define IF_UNICODE(u,a) u
-#else
-#  define IF_UNICODE(u,a) a
-#endif
+/// u: strings are always wide (ADR 0002); kept for the code that still spells out both forms
+#define IF_UNICODE(u,a) u
 
 #undef _
 /// A string/character constant, correctly handled in unicode builds
@@ -48,7 +47,6 @@ typedef wchar_t Char;
 const wchar_t BYTE_ORDER_MARK[] = L"\xFEFF";
 
 /// Some constants we like to use
-#ifdef UNICODE
   #define  LEFT_ANGLE_BRACKET _("\x2039")
   #define RIGHT_ANGLE_BRACKET _("\x203A")
   #define  LEFT_SINGLE_QUOTE  _('\x2018')
@@ -58,17 +56,6 @@ const wchar_t BYTE_ORDER_MARK[] = L"\xFEFF";
   #define EN_DASH             _('\x2013')
   #define EM_DASH             _('\x2014')
   #define CONNECTION_SPACE    _('\xEB00') // in private use area, untags to ' '
-#else
-  #define  LEFT_ANGLE_BRACKET _("<")
-  #define RIGHT_ANGLE_BRACKET _(">")
-  #define  LEFT_SINGLE_QUOTE  _('\'')
-  #define RIGHT_SINGLE_QUOTE  _('\'')
-  #define  LEFT_DOUBLE_QUOTE  _('\"')
-  #define RIGHT_DOUBLE_QUOTE  _('\"')
-  #define EN_DASH             _('-') // 150?
-  #define EM_DASH             _('-') // 151?
-  #define CONNECTION_SPACE    _(' ') // too bad
-#endif
 
 // ----------------------------------------------------------------------------- : Char functions
 
