@@ -1,3 +1,27 @@
 [submodule "third_party/minizip-ng"]
 	path = third_party/minizip-ng
 	url = https://github.com/zlib-ng/minizip-ng
+[submodule "third_party/skia"]
+	path = third_party/skia
+	url = https://skia.googlesource.com/skia
+	branch = chrome/m159
+	shallow = true
+[submodule "third_party/gn"]
+	path = third_party/gn
+	url = https://gn.googlesource.com/gn
+[submodule "third_party/skia-deps/zlib"]
+	path = third_party/skia-deps/zlib
+	url = https://chromium.googlesource.com/chromium/src/third_party/zlib
+	shallow = true
+[submodule "third_party/skia-deps/libpng"]
+	path = third_party/skia-deps/libpng
+	url = https://skia.googlesource.com/third_party/libpng.git
+	shallow = true
+[submodule "third_party/skia-deps/libjpeg-turbo"]
+	path = third_party/skia-deps/libjpeg-turbo
+	url = https://chromium.googlesource.com/chromium/deps/libjpeg_turbo.git
+	shallow = true
+[submodule "third_party/skia-deps/freetype"]
+	path = third_party/skia-deps/freetype
+	url = https://chromium.googlesource.com/chromium/src/third_party/freetype2.git
+	shallow = true

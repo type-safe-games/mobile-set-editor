@@ -27,6 +27,15 @@ Third-party components
 ----------------------
 
 - third_party/minizip-ng: minizip-ng, under the zlib license (see its LICENSE).
+- third_party/skia: Skia, under the BSD 3-Clause license (see its LICENSE).
+- third_party/skia-deps: Skia's dependencies, each with its licence file:
+  zlib (zlib license, LICENSE), libpng (libpng license, LICENSE),
+  libjpeg-turbo (IJG, BSD 3-Clause and zlib licenses, LICENSE.md) and
+  FreeType (used under the FreeType License, LICENSE.TXT and docs/FTL.TXT).
+  Portions of this software are copyright (C) The FreeType Project
+  (www.freetype.org). All rights reserved.
+- third_party/gn: GN, under the BSD 3-Clause license (see its LICENSE). A build
+  tool only; nothing from it is shipped.
 - test/fixture/fonts: DejaVu fonts, under the DejaVu fonts license (see
   test/fixture/fonts/LICENSE-DejaVu.txt). Used by the tests only; never shipped.
 

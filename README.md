@@ -71,6 +71,8 @@ checks the private Tier 1 and Tier 2 corpora
 Planned. The app will be Jetpack Compose over the same C++ facade through JNI
 ([ADR 0006](docs/adr/0006-compose-jni-over-cpp-facade.md)), with Skia built from source
 ([ADR 0011](docs/adr/0011-skia-official-gn-build-from-source.md)).
+Skia already builds, for the host and both Android ABIs, from pinned submodules with no network
+access: see [`tools/skia/README.md`](tools/skia/README.md).
 
 ## Documentation
 
