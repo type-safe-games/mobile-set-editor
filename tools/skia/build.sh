@@ -138,7 +138,9 @@ target_args() {
     android-arm64-v8a|android-x86_64)
       [[ -n ${ANDROID_NDK_HOME:-} && -d $ANDROID_NDK_HOME ]] || die "ANDROID_NDK_HOME is not set to an NDK"
       local cpu=arm64; [[ $1 == android-x86_64 ]] && cpu=x64
-      printf 'target_os = "android"\ntarget_cpu = "%s"\nndk = "%s"\nndk_api = %s\n' "$cpu" "$ANDROID_NDK_HOME" "$SKIA_NDK_API" ;;
+      printf 'target_os = "android"\ntarget_cpu = "%s"\nndk = "%s"\nndk_api = %s\n' "$cpu" "$ANDROID_NDK_HOME" "$SKIA_NDK_API"
+      # the same objects wherever the checkout is (#77): no paths of it in them
+      printf 'extra_cflags = [ "-ffile-prefix-map=%s=." ]\n' "$ROOT" ;;
     *) die "unknown target '$1' (linux-x64, android-arm64-v8a, android-x86_64)" ;;
   esac
 }

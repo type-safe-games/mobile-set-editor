@@ -275,7 +275,7 @@ private fun CardPage(
 /** The sheet below the Card: the field's name, ‹ › to the Card's other editable fields, and its editor */
 @Composable
 fun FieldSheet(model: SetViewModel, target: EditTarget, revision: Int, onField: (String) -> Unit, onClose: () -> Unit) {
-    val session = model.state.value.session
+    val session = model.state.collectAsState().value.session
     var fields by remember(target.uid, target.kind) { mutableStateOf<List<FieldInfo>?>(null) }
     LaunchedEffect(target.uid, target.kind, revision) { fields = Core.listFields(session, target.kind, target.uid).fields }
     // the fields this Card shows, from its render
