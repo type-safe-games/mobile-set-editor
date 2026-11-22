@@ -68,10 +68,19 @@ checks the private Tier 1 and Tier 2 corpora
 
 ## Building the Android app
 
-Planned. The app will be Jetpack Compose over the same C++ facade through JNI
-([ADR 0006](docs/adr/0006-compose-jni-over-cpp-facade.md)).
+The app is Jetpack Compose over the same C++ facade through JNI
+([ADR 0006](docs/adr/0006-compose-jni-over-cpp-facade.md)), in `android/`. It is a skeleton so
+far: the JNI layer renders Cards, the UI comes later. You need the Android SDK (platform 36,
+build-tools 36.1.0, NDK 29.0.14206865), a JDK that Gradle supports, and CMake and ninja on `PATH`:
 
-The core and facade already build for Android, from pinned submodules only (Skia, Boost,
+```sh
+git submodule update --init third_party
+cd android
+./gradlew assembleDebug             # builds Skia (tools/skia/build.sh) and libmse.so for arm64-v8a and x86_64
+./gradlew connectedAndroidTest      # renders the Test fixture on a running emulator or device
+```
+
+The core and facade also build for Android on their own, from pinned submodules only (Skia, Boost,
 Hunspell: [`third_party/README.md`](third_party/README.md)), into `libmse.so` with the Skia image
 codec and Canvas. With an NDK (`ANDROID_NDK_HOME`):
 
