@@ -25,6 +25,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.mobileseteditor.core.ActionResult
 import org.mobileseteditor.core.CardLink
+import org.mobileseteditor.core.CardListResult
 import org.mobileseteditor.core.Core
 import org.mobileseteditor.core.CoreMessage
 import org.mobileseteditor.core.CoreResult
@@ -57,6 +58,8 @@ data class SetState(
     val cardNames: List<String> = emptyList(),
     /** each Card's links, in the order of [cardUids] */
     val cardLinks: List<List<CardLink>> = emptyList(),
+    /** each Card's Style (package name), whether it is the Card's own, whether it has its own style options */
+    val cardStyles: List<CardStyleState> = emptyList(),
     val index: Int = 0,
     /** width / height of the Set's Cards (of its first Card's Style), for thumbnail placeholders */
     val aspect: Float = 0.716f,
@@ -70,6 +73,9 @@ data class SetState(
     val undoName: String = "",
     val redoName: String = "",
 )
+
+/** A Card's Style: [stylesheet] (package name), [own] if it isn't the Set's, [ownStyling] if it has its own style options */
+data class CardStyleState(val stylesheet: String, val own: Boolean, val ownStyling: Boolean)
 
 /** What to do with unsaved changes when a Set is closed */
 enum class CloseChoice {
@@ -221,6 +227,7 @@ class SetViewModel(app: Application) : AndroidViewModel(app) {
             cardUids = cards.uids.toList(),
             cardNames = cards.names.toList(),
             cardLinks = cards.links,
+            cardStyles = cardStyles(cards),
             messages = messageLines(open.result) + messageLines(cards.result),
         )
         show()
@@ -282,7 +289,7 @@ class SetViewModel(app: Application) : AndroidViewModel(app) {
         val cards = Core.listCards(session)
         val s = _state.value
         if (!cards.result.ok || s.session != session || cards.uids.toList() != s.cardUids) return
-        _state.value = s.copy(cardNames = cards.names.toList(), cardLinks = cards.links)
+        _state.value = s.copy(cardNames = cards.names.toList(), cardLinks = cards.links, cardStyles = cardStyles(cards))
         nameAfterTitle()
     }
 
@@ -297,6 +304,31 @@ class SetViewModel(app: Application) : AndroidViewModel(app) {
         val renamed = copy.copy(name = name)
         WorkingCopies.write(renamed)
         _state.value = _state.value.copy(workingCopy = renamed)
+    }
+
+    private fun cardStyles(cards: CardListResult) =
+        cards.uids.indices.map { CardStyleState(cards.stylesheets[it], cards.ownStylesheet[it], cards.ownStyling[it]) }
+
+    // ------------------------------------------------------------------- Styles
+
+    /** The Set's Game (package name) */
+    suspend fun game(): String {
+        val session = _state.value.session.takeIf { it != 0L } ?: return ""
+        return Core.sessionInfo(session).game
+    }
+
+    /** Give a Card a Style of its own, or ("") make it follow the Set's again; one undo step */
+    suspend fun setCardStyle(uid: String, stylesheet: String) {
+        val session = _state.value.session.takeIf { it != 0L } ?: return
+        edited(Core.setCardStyle(session, uid, stylesheet))
+        refreshCards()
+    }
+
+    /** Switch a Card's own style options on or off; one undo step */
+    suspend fun setOwnStyling(uid: String, own: Boolean) {
+        val session = _state.value.session.takeIf { it != 0L } ?: return
+        edited(Core.setCardOwnStyling(session, uid, own))
+        refreshCards()
     }
 
     // ------------------------------------------------------------------- Linked cards

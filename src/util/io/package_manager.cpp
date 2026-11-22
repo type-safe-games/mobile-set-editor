@@ -111,17 +111,25 @@ PackagedP PackageManager::openAny(const String& name_, bool just_header) {
   return p;
 }
 
+/// A package's name in its directory, from its full path. openAny() takes names: it strips a
+/// leading '/', so a full Unix path would not open (on Windows the drive letter hid this).
+static String name_in(const String& directory, const String& file) {
+  String prefix = directory;
+  if (!ends_with(prefix, String(1, path_separator()))) prefix += path_separator();
+  return starts_with(file, prefix) ? file.substr(prefix.size()) : file;
+}
+
 void PackageManager::findMatching(const String& pattern, vector<PackagedP>& out) {
   // first find local packages
   for (const String& file : local.findMatching(pattern)) {
     if (local.checkForPackageFile(file)) {
-      out.push_back(openAny(file, true));
+      out.push_back(openAny(name_in(local.getDirectory(), file), true));
     }
   }
   // then global packages not already in the list
   for (const String& file : global.findMatching(pattern)) {
     if (global.checkForPackageFile(file)) {
-      PackagedP p = openAny(file, true);
+      PackagedP p = openAny(name_in(global.getDirectory(), file), true);
       if (find(out.begin(), out.end(), p) == out.end()) {
         out.push_back(p);
       }

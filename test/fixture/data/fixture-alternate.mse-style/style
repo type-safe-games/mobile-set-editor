@@ -41,6 +41,10 @@ styling field:
 styling field:
 	type: text
 	name: footer
+styling field:
+	type: package choice
+	name: symbols
+	match: fixture-*.mse-symbol-font
 
 card style:
 	frame:
@@ -63,18 +67,6 @@ card style:
 			size: 12
 			weight: bold
 			color: { if styling.accent == "blue" then rgb(0,0,160) else rgb(160,0,0) }
-	level:
-		left: 214
-		top: 14
-		width: 50
-		height: 24
-		alignment: middle right
-		render style: text
-		font:
-			name: DejaVu Sans
-			size: 12
-			weight: bold
-			color: black
 	picture:
 		left: 16
 		top: 44

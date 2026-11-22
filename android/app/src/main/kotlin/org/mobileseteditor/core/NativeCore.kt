@@ -35,6 +35,9 @@ internal object NativeCore {
     external fun getText(session: Long, kind: Int, cardUid: String, field: String): TextResult
     /** Replace [start, end) of a text field's visible text (code points), as typing does */
     external fun replaceRange(session: Long, kind: Int, cardUid: String, field: String, start: Int, end: Int, text: String, asSymbol: Boolean): TextResult
+    external fun setCardStyle(session: Long, cardUid: String, stylesheet: String): ActionResult
+    external fun setSetStyle(session: Long, stylesheet: String): ActionResult
+    external fun setCardOwnStyling(session: Long, cardUid: String, own: Boolean): ActionResult
     external fun listLinkTypes(session: Long): LinkTypeListResult
     external fun link(session: Long, cardUid: String, otherUid: String, relation: String, otherRelation: String): ActionResult
     external fun unlink(session: Long, cardUid: String, otherUid: String): ActionResult

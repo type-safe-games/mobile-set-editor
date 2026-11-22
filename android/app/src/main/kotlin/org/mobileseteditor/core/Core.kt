@@ -71,6 +71,17 @@ object Core {
         session: Long, kind: TargetKind, cardUid: String, field: String, start: Int, end: Int, text: String, asSymbol: Boolean = false,
     ): TextResult = withContext(dispatcher) { NativeCore.replaceRange(session, kind.ordinal, cardUid, field, start, end, text, asSymbol) }
 
+    /** Give a Card a Style of its own ("" or the Set's: follow the Set's again), one undo step */
+    suspend fun setCardStyle(session: Long, cardUid: String, stylesheet: String): ActionResult =
+        withContext(dispatcher) { NativeCore.setCardStyle(session, cardUid, stylesheet) }
+
+    /** Change the Set's Style, one undo step */
+    suspend fun setSetStyle(session: Long, stylesheet: String): ActionResult = withContext(dispatcher) { NativeCore.setSetStyle(session, stylesheet) }
+
+    /** Switch a Card's own style options on or off, one undo step */
+    suspend fun setCardOwnStyling(session: Long, cardUid: String, own: Boolean): ActionResult =
+        withContext(dispatcher) { NativeCore.setCardOwnStyling(session, cardUid, own) }
+
     /** The Game's card link types, each a pair of relations (the card's own, the linked card's) */
     suspend fun listLinkTypes(session: Long): LinkTypeListResult = withContext(dispatcher) { NativeCore.listLinkTypes(session) }
 

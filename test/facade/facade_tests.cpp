@@ -1519,6 +1519,13 @@ TEST(field_details_and_extra_card_fields) {
   CHECK_EQ(border->colors[1].name, std::string("white"));
   CHECK_EQ(border->colors[1].color, std::string("rgb(255,255,255)"));
   CHECK(border->allow_custom);
+  // a package choice style option lists the installed packages that match
+  F::FieldList options = F::listFields(s, F::Target::cardStyle("fixture-wrap"));
+  REQUIRE_OK(options);
+  const F::FieldInfo* symbols = find_field_info(options, "symbols");
+  REQUIRE(symbols);
+  CHECK_EQ(symbols->type, std::string("package choice"));
+  CHECK(symbols->choices == (std::vector<std::string>{"fixture-symbols.mse-symbol-font"}));
   CHECK_EQ(F::getValue(s, F::Target::card("fixture-wrap"), "chapters").value, std::string("2"));
   F::ActionResult set = F::setValue(s, F::Target::card("fixture-wrap"), "chapters", "3");
   REQUIRE_OK(set);
@@ -1553,7 +1560,7 @@ TEST(change_set_style) {
   // the Set's style options are those of its Style
   F::FieldList options = F::listFields(s, F::Target::setStyle());
   REQUIRE_OK(options);
-  CHECK_EQ(options.fields.size(), (size_t)2);
+  CHECK_EQ(options.fields.size(), (size_t)3); // accent, footer, symbols
   CHECK_EQ(F::getValue(s, F::Target::setStyle(), "accent").value, "red");
   // undo and redo
   F::ActionResult u = F::undo(s);

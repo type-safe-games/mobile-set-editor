@@ -70,8 +70,8 @@ import org.mobileseteditor.render.RenderKey
 /** A field's name (or an undo step's, which may contain one) as people read it: "card_color" is "card color" */
 fun displayName(name: String) = name.replace('_', ' ')
 
-/** The field being edited: which Card, which field */
-private data class EditTarget(val uid: String, val field: String)
+/** The field being edited: which Card, which field, of the Card itself or of its style options */
+data class EditTarget(val uid: String, val field: String, val kind: TargetKind = TargetKind.Card)
 
 /** Hold the re-render back this long after a keystroke, so typing doesn't queue a render per key */
 private const val TYPING_RENDER_DELAY = 300L
@@ -88,6 +88,8 @@ fun CardEditorScreen(model: SetViewModel, onBack: () -> Unit) {
     var editing by remember { mutableStateOf<EditTarget?>(null) }
     // bumped by Undo and Redo: the sheet reads its text again
     var revision by remember { mutableIntStateOf(0) }
+    // the Card details sheet, for this Card (#67)
+    var details by remember { mutableStateOf<String?>(null) }
     BackHandler { if (editing != null) editing = null else onBack() }
     val pager = rememberPagerState(initialPage = state.index.coerceIn(0, maxOf(0, state.cardUids.size - 1))) { state.cardUids.size }
 
@@ -116,7 +118,15 @@ fun CardEditorScreen(model: SetViewModel, onBack: () -> Unit) {
             ) { Text(if (state.redoName.isEmpty()) "Redo" else "Redo ${displayName(state.redoName).lowercase()}", maxLines = 1) }
         }
         if (state.cardUids.isNotEmpty()) {
-            LinkBar(model, state, pager.currentPage) { target -> scope.launch { pager.animateScrollToPage(target) } }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                TextButton(
+                    onClick = { details = state.cardUids.getOrNull(pager.currentPage) },
+                    modifier = Modifier.padding(start = 8.dp).testTag("details"),
+                ) { Text("Details") }
+                Box(Modifier.weight(1f)) {
+                    LinkBar(model, state, pager.currentPage) { target -> scope.launch { pager.animateScrollToPage(target) } }
+                }
+            }
         }
         if (state.cardUids.isEmpty()) {
             Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
@@ -143,8 +153,9 @@ fun CardEditorScreen(model: SetViewModel, onBack: () -> Unit) {
                     val uid = state.cardUids.getOrNull(page) ?: return@HorizontalPager
                     CardPage(
                         model, RenderKey(uid, width), state.cardNames.getOrElse(page) { "" }, state.aspect, viewport,
-                        selected = editing?.takeIf { it.uid == uid }?.field,
+                        selected = editing?.takeIf { it.uid == uid && it.kind == TargetKind.Card }?.field,
                         onTap = { editing = EditTarget(uid, it) },
+                        onLongPress = { details = uid },
                     )
                 }
             }
@@ -160,6 +171,13 @@ fun CardEditorScreen(model: SetViewModel, onBack: () -> Unit) {
             }
         }
     }
+    details?.let { uid ->
+        CardDetailsSheet(
+            model, uid, revision,
+            onEdit = { target -> details = null; editing = target },
+            onDismiss = { details = null },
+        )
+    }
 }
 
 /** One Card at the screen's width, scrolling when taller than the space; its fields can be tapped */
@@ -172,6 +190,7 @@ private fun CardPage(
     viewport: Int,
     selected: String?,
     onTap: (String) -> Unit,
+    onLongPress: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
     val flow = remember(key) { model.observe(key) }
@@ -209,7 +228,7 @@ private fun CardPage(
                 .fillMaxWidth()
                 .aspectRatio(image.width.toFloat() / image.height)
                 .pointerInput(rendered) {
-                    detectTapGestures { at ->
+                    detectTapGestures(onLongPress = { onLongPress() }) { at ->
                         // the core picks the field, as the desktop does (masks included)
                         val s = image.width / size.width.toDouble()
                         scope.launch {
@@ -238,24 +257,24 @@ private fun CardPage(
 @Composable
 private fun FieldSheet(model: SetViewModel, target: EditTarget, revision: Int, onField: (String) -> Unit, onClose: () -> Unit) {
     val session = model.state.value.session
-    var fields by remember(target.uid) { mutableStateOf<List<FieldInfo>?>(null) }
-    LaunchedEffect(target.uid) { fields = Core.listFields(session, TargetKind.Card, target.uid).fields }
+    var fields by remember(target.uid, target.kind) { mutableStateOf<List<FieldInfo>?>(null) }
+    LaunchedEffect(target.uid, target.kind, revision) { fields = Core.listFields(session, target.kind, target.uid).fields }
     // the fields this Card shows, from its render
     val regions = model.observe(RenderKey(target.uid, model.renderWidth))?.collectAsState()?.value?.regions
     val onCard = regions?.map { it.field }?.toSet()
     val aspect = regions?.firstOrNull { it.field == target.field }?.let { (it.width / it.height).toFloat() } ?: 1f
     val all = fields
     val info = all?.firstOrNull { it.name == target.field }
-    val textFields = all.orEmpty()
-        .filter { it.editable && (it.type == "text" || it.type in VALUE_EDITOR_TYPES) && (onCard == null || it.name in onCard) }
-        .map { it.name }
+    // ‹ › steps through the fields on the Card when one was tapped there, else through all of them
+    val editable = all.orEmpty().filter { it.editable && (it.type == "text" || it.type in VALUE_EDITOR_TYPES) }.map { it.name }
+    val textFields = if (target.kind == TargetKind.Card && onCard != null && target.field in onCard) editable.filter { it in onCard } else editable
     val at = textFields.indexOf(target.field)
     Surface(tonalElevation = 3.dp, modifier = Modifier.fillMaxWidth().testTag("field-sheet")) {
         Column(Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 TextButton(onClick = { onField(textFields[at - 1]) }, enabled = at > 0, modifier = Modifier.testTag("previous-field")) { Text("‹") }
                 Text(
-                    displayName(target.field).replaceFirstChar { it.uppercase() },
+                    (if (target.kind == TargetKind.CardStyle) "Style option: " else "") + displayName(target.field).replaceFirstChar { it.uppercase() },
                     style = MaterialTheme.typography.titleSmall,
                     modifier = Modifier.weight(1f).testTag("editing-field"),
                     maxLines = 1,
@@ -265,7 +284,7 @@ private fun FieldSheet(model: SetViewModel, target: EditTarget, revision: Int, o
             }
             when {
                 info == null -> CircularProgressIndicator(Modifier.padding(8.dp))
-                info.editable && info.type in VALUE_EDITOR_TYPES -> ValueEditor(model, session, target.uid, info, aspect, revision)
+                info.editable && info.type in VALUE_EDITOR_TYPES -> ValueEditor(model, session, target.uid, info, aspect, revision, target.kind)
                 info.type != "text" || !info.editable -> Text(
                     if (!info.editable) "This field can't be edited." else "This is a ${info.type} field: editing it here comes later.",
                     style = MaterialTheme.typography.bodyMedium,
@@ -294,12 +313,12 @@ private fun TextEditor(model: SetViewModel, session: Long, target: EditTarget, m
         value = TextFieldValue(t.text, TextRange(CodePoints.toUtf16(t.text, t.selectionStart), CodePoints.toUtf16(t.text, t.selectionEnd)))
     }
     LaunchedEffect(target, revision) {
-        show(Core.getText(session, TargetKind.Card, target.uid, target.field))
+        show(Core.getText(session, target.kind, target.uid, target.field))
     }
     // the field's symbol font, if any: a symbol bar, and typing in symbols (#64)
     var symbols by remember(target) { mutableStateOf<SymbolMenuResult?>(null) }
     var symbolMode by remember(target) { mutableStateOf(false) }
-    LaunchedEffect(target) { symbols = Core.symbolMenu(session, TargetKind.Card, target.uid, target.field) }
+    LaunchedEffect(target) { symbols = Core.symbolMenu(session, target.kind, target.uid, target.field) }
     /** Insert a symbol's code at the caret (over the selection), as a symbol */
     fun insertSymbol(code: String) = scope.launch {
         holder.mutex.withLock {
@@ -308,9 +327,9 @@ private fun TextEditor(model: SetViewModel, session: Long, target: EditTarget, m
             val start = CodePoints.fromUtf16(shown.text, shown.selection.min)
             val end = CodePoints.fromUtf16(shown.text, shown.selection.max)
             val atomic = LockedSpans.adjust(holder.sync.toCore(TextChange(start, end, code)), holder.locked)
-            val r = Core.replaceRange(session, TargetKind.Card, target.uid, target.field, atomic.start, atomic.end, code, asSymbol = true)
+            val r = Core.replaceRange(session, target.kind, target.uid, target.field, atomic.start, atomic.end, code, asSymbol = true)
             model.edited(r.action)
-            show(if (r.action.result.ok) r else Core.getText(session, TargetKind.Card, target.uid, target.field))
+            show(if (r.action.result.ok) r else Core.getText(session, target.kind, target.uid, target.field))
         }
         focus.requestFocus()
     }
@@ -339,9 +358,9 @@ private fun TextEditor(model: SetViewModel, session: Long, target: EditTarget, m
                     var end = atomic.end
                     var r: TextResult? = null
                     for (key in Keystrokes.of(atomic.text)) {
-                        val step = Core.replaceRange(session, TargetKind.Card, target.uid, target.field, start, end, key, asSymbol)
+                        val step = Core.replaceRange(session, target.kind, target.uid, target.field, start, end, key, asSymbol)
                         model.edited(step.action, renderDelayMillis = TYPING_RENDER_DELAY)
-                        if (!step.action.result.ok) return@withLock show(Core.getText(session, TargetKind.Card, target.uid, target.field))
+                        if (!step.action.result.ok) return@withLock show(Core.getText(session, target.kind, target.uid, target.field))
                         r = step
                         start = step.selectionEnd
                         end = start
@@ -361,7 +380,7 @@ private fun TextEditor(model: SetViewModel, session: Long, target: EditTarget, m
     )
     symbols?.takeIf { it.hasSymbols }?.let { menu ->
         SymbolBar(
-            menu, session, target.uid, target.field,
+            menu, session, target.uid, target.field, target.kind,
             symbolMode = symbolMode,
             onSymbolMode = { symbolMode = it; focus.requestFocus() },
             onInsert = { insertSymbol(it) },

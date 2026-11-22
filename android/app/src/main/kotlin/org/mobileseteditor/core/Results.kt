@@ -33,6 +33,12 @@ class CardListResult(
     val names: Array<String>,
     linkUids: Array<Array<String>>,
     linkRelations: Array<Array<String>>,
+    /** the Style each Card renders with (package names) */
+    val stylesheets: Array<String>,
+    /** has the Card a Style of its own (else it follows the Set's)? */
+    val ownStylesheet: BooleanArray,
+    /** has the Card its own style options (else it uses the Set's for its Style)? */
+    val ownStyling: BooleanArray,
 ) {
     /** Each Card's links, in the order of [uids] */
     val links: List<List<CardLink>> = uids.indices.map { i -> linkUids[i].indices.map { CardLink(linkUids[i][it], linkRelations[i][it]) } }

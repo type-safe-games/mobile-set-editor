@@ -53,6 +53,7 @@ fun SymbolBar(
     session: Long,
     uid: String,
     field: String,
+    kind: TargetKind,
     symbolMode: Boolean,
     onSymbolMode: (Boolean) -> Unit,
     onInsert: (String) -> Unit,
@@ -78,9 +79,9 @@ fun SymbolBar(
             items(menu.items) { item ->
                 when (item.type) {
                     SymbolMenuItem.Type.Line -> VerticalDivider(Modifier.height(28.dp).padding(horizontal = 2.dp))
-                    SymbolMenuItem.Type.Submenu -> Submenu(item, session, uid, field, pick)
+                    SymbolMenuItem.Type.Submenu -> Submenu(item, session, uid, field, kind, pick)
                     else -> TextButton(onClick = { pick(item) }, modifier = Modifier.testTag("symbol-${item.label}")) {
-                        SymbolLabel(item, session, uid, field)
+                        SymbolLabel(item, session, uid, field, kind)
                     }
                 }
             }
@@ -101,7 +102,7 @@ fun SymbolBar(
 }
 
 @Composable
-private fun Submenu(item: SymbolMenuItem, session: Long, uid: String, field: String, pick: (SymbolMenuItem) -> Unit) {
+private fun Submenu(item: SymbolMenuItem, session: Long, uid: String, field: String, kind: TargetKind, pick: (SymbolMenuItem) -> Unit) {
     var open by remember { mutableStateOf(false) }
     Box {
         TextButton(onClick = { open = true }, modifier = Modifier.testTag("symbol-menu-${item.label}")) { Text("${item.label} ▾") }
@@ -113,13 +114,13 @@ private fun Submenu(item: SymbolMenuItem, session: Long, uid: String, field: Str
                     SymbolMenuItem.Type.Submenu -> for (deeper in sub.items.filter { it.type != SymbolMenuItem.Type.Line && it.type != SymbolMenuItem.Type.Submenu }) {
                         DropdownMenuItem(
                             text = { Text("${sub.label}: ${deeper.label}") },
-                            leadingIcon = { SymbolPreview(deeper, session, uid, field) },
+                            leadingIcon = { SymbolPreview(deeper, session, uid, field, kind) },
                             onClick = { open = false; pick(deeper) },
                         )
                     }
                     else -> DropdownMenuItem(
                         text = { Text(sub.label) },
-                        leadingIcon = { SymbolPreview(sub, session, uid, field) },
+                        leadingIcon = { SymbolPreview(sub, session, uid, field, kind) },
                         onClick = { open = false; pick(sub) },
                         modifier = Modifier.testTag("symbol-${sub.label}"),
                     )
@@ -131,8 +132,8 @@ private fun Submenu(item: SymbolMenuItem, session: Long, uid: String, field: Str
 
 /** An item as the bar shows it: its symbol, or its label if it has none */
 @Composable
-private fun SymbolLabel(item: SymbolMenuItem, session: Long, uid: String, field: String) {
-    val preview = rememberPreview(item, session, uid, field)
+private fun SymbolLabel(item: SymbolMenuItem, session: Long, uid: String, field: String, kind: TargetKind) {
+    val preview = rememberPreview(item, session, uid, field, kind)
     if (preview != null) {
         Image(preview.asImageBitmap(), contentDescription = item.label, modifier = Modifier.size(28.dp))
     } else {
@@ -141,18 +142,18 @@ private fun SymbolLabel(item: SymbolMenuItem, session: Long, uid: String, field:
 }
 
 @Composable
-private fun SymbolPreview(item: SymbolMenuItem, session: Long, uid: String, field: String) {
-    val preview = rememberPreview(item, session, uid, field)
+private fun SymbolPreview(item: SymbolMenuItem, session: Long, uid: String, field: String, kind: TargetKind) {
+    val preview = rememberPreview(item, session, uid, field, kind)
     if (preview != null) Image(preview.asImageBitmap(), contentDescription = null, modifier = Modifier.size(24.dp))
     else Box(Modifier.width(24.dp))
 }
 
 @Composable
-private fun rememberPreview(item: SymbolMenuItem, session: Long, uid: String, field: String): Bitmap? {
+private fun rememberPreview(item: SymbolMenuItem, session: Long, uid: String, field: String, kind: TargetKind): Bitmap? {
     val px = with(LocalDensity.current) { 28.dp.roundToPx() }
     val state by produceState<Bitmap?>(null, item.id, uid, field, px) {
         if (item.id < 0) return@produceState
-        val r = Core.symbolPreview(session, TargetKind.Card, uid, field, item.id, px)
+        val r = Core.symbolPreview(session, kind, uid, field, item.id, px)
         if (r.result.ok && r.width > 0) value = Bitmap.createBitmap(r.pixels, r.width, r.height, Bitmap.Config.ARGB_8888)
     }
     return state

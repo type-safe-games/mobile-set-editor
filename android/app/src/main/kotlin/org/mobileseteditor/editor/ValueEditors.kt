@@ -29,6 +29,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Slider
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -55,7 +56,7 @@ import org.mobileseteditor.core.FieldInfo
 import org.mobileseteditor.core.TargetKind
 
 /** Field types the sheet edits with [ValueEditor] */
-val VALUE_EDITOR_TYPES = setOf("choice", "package choice", "multiple choice", "slider", "color", "image")
+val VALUE_EDITOR_TYPES = setOf("choice", "package choice", "multiple choice", "slider", "boolean", "color", "image")
 
 /**
  * How the image editor asks for an image: by default the system photo picker. Tests provide one
@@ -73,17 +74,17 @@ val LocalImagePicker = compositionLocalOf<ImagePicker?> { null }
  * height on the Card (for cropping images). [revision] changes after Undo and Redo.
  */
 @Composable
-fun ValueEditor(model: SetViewModel, session: Long, uid: String, info: FieldInfo, aspect: Float, revision: Int) {
+fun ValueEditor(model: SetViewModel, session: Long, uid: String, info: FieldInfo, aspect: Float, revision: Int, kind: TargetKind = TargetKind.Card) {
     val scope = rememberCoroutineScope()
-    var value by remember(uid, info.name) { mutableStateOf<String?>(null) }
-    LaunchedEffect(uid, info.name, revision) {
-        value = Core.getValue(session, TargetKind.Card, uid, info.name).value
+    var value by remember(uid, info.name, kind) { mutableStateOf<String?>(null) }
+    LaunchedEffect(uid, info.name, kind, revision) {
+        value = Core.getValue(session, kind, uid, info.name).value
     }
     val apply: suspend (String) -> Unit = { new ->
         value = new
-        val result: ActionResult = Core.setValue(session, TargetKind.Card, uid, info.name, new)
+        val result: ActionResult = Core.setValue(session, kind, uid, info.name, new)
         model.edited(result)
-        value = Core.getValue(session, TargetKind.Card, uid, info.name).value
+        value = Core.getValue(session, kind, uid, info.name).value
     }
     val set: (String) -> Unit = { new -> scope.launch { apply(new) } }
     val current = value ?: return
@@ -91,6 +92,7 @@ fun ValueEditor(model: SetViewModel, session: Long, uid: String, info: FieldInfo
         "choice", "package choice" -> ChoiceEditor(info, current, set)
         "multiple choice" -> MultipleChoiceEditor(info, current, set)
         "slider" -> SliderEditor(info, current, set)
+        "boolean" -> BooleanEditor(info, current, set)
         "color" -> ColorEditor(info, current, set)
         "image" -> ImageEditor(current, aspect, apply)
     }
@@ -138,6 +140,17 @@ private fun MultipleChoiceEditor(info: FieldInfo, value: String, set: (String) -
                 Text(choice, style = MaterialTheme.typography.bodyMedium)
             }
         }
+    }
+}
+
+/** A yes/no field: a switch (its choices are its two values, "yes" first, as the core lists them) */
+@Composable
+private fun BooleanEditor(info: FieldInfo, value: String, set: (String) -> Unit) {
+    val yes = info.choices.getOrElse(0) { "yes" }
+    val no = info.choices.getOrElse(1) { "no" }
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Switch(checked = value == yes, onCheckedChange = { set(if (it) yes else no) }, modifier = Modifier.testTag("boolean"))
+        Text(value, style = MaterialTheme.typography.bodyLarge)
     }
 }
 
