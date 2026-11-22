@@ -96,7 +96,8 @@ jobs:
 
       - name: Upload the report
         if: always()
-        uses: actions/upload-artifact@v4
+        # (v3: Gitea Actions does not support the v4 artifact protocol)
+        uses: actions/upload-artifact@v3
         with:
           name: goldens-android-report
           path: ${{ runner.temp }}/goldens/report-check-android.md
