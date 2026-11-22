@@ -36,13 +36,13 @@ constexpr const char* PKG = "org/mobileseteditor/core/";
 struct Classes {
   jclass string, message, result, open_result, card_list_result, card_size_result, field_region, render_result;
   jclass scanned_package, scan_result, imported_package, import_result, template_info, template_list_result, progress_listener;
-  jclass action_result, session_info, value_result;
+  jclass action_result, session_info, value_result, field_at_result, field_list_result, text_result;
   jmethodID string_from_bytes, string_get_bytes;
   jmethodID message_init, result_init, open_result_init, card_list_result_init, card_size_result_init,
             field_region_init, render_result_init;
   jmethodID scanned_package_init, scan_result_init, imported_package_init, import_result_init,
             template_info_init, template_list_result_init, progress_on_progress;
-  jmethodID action_result_init, session_info_init, value_result_init;
+  jmethodID action_result_init, session_info_init, value_result_init, field_at_result_init, field_list_result_init, text_result_init;
   jstring utf8;
 } cls;
 
@@ -73,6 +73,9 @@ bool load_classes(JNIEnv* env) {
   cls.action_result        = global_class(env, p + "ActionResult");
   cls.session_info         = global_class(env, p + "SessionInfo");
   cls.value_result         = global_class(env, p + "ValueResult");
+  cls.field_at_result      = global_class(env, p + "FieldAtResult");
+  cls.field_list_result    = global_class(env, p + "FieldListResult");
+  cls.text_result          = global_class(env, p + "TextResult");
   if (env->ExceptionCheck()) return false;
   std::string result_sig = "L" + p + "CoreResult;";
   cls.string_from_bytes     = env->GetMethodID(cls.string, "<init>", "([BLjava/lang/String;)V");
@@ -97,7 +100,12 @@ bool load_classes(JNIEnv* env) {
     ("(" + result_sig + "Z[Ljava/lang/String;ZZZZLjava/lang/String;Ljava/lang/String;)V").c_str());
   cls.session_info_init     = env->GetMethodID(cls.session_info, "<init>",
     ("(" + result_sig + "Ljava/lang/String;Ljava/lang/String;ZZZ)V").c_str());
+  cls.field_at_result_init  = env->GetMethodID(cls.field_at_result, "<init>", ("(" + result_sig + "Ljava/lang/String;)V").c_str());
   cls.value_result_init     = env->GetMethodID(cls.value_result, "<init>", ("(" + result_sig + "Ljava/lang/String;Ljava/lang/String;)V").c_str());
+  cls.field_list_result_init = env->GetMethodID(cls.field_list_result, "<init>",
+    ("(" + result_sig + "[Ljava/lang/String;[Ljava/lang/String;[Z[Z[[Ljava/lang/String;)V").c_str());
+  cls.text_result_init      = env->GetMethodID(cls.text_result, "<init>",
+    ("(L" + p + "ActionResult;Ljava/lang/String;II[I[I)V").c_str());
   jstring utf8 = env->NewStringUTF("UTF-8");
   cls.utf8 = (jstring)env->NewGlobalRef(utf8);
   env->DeleteLocalRef(utf8);
@@ -185,6 +193,21 @@ jobject to_java(JNIEnv* env, const F::ActionResult& r) {
                                (jboolean)r.stale.card_list, (jboolean)r.dirty, (jboolean)r.can_undo, (jboolean)r.can_redo,
                                undo, redo);
   for (jobject o : {result, (jobject)uids, (jobject)undo, (jobject)redo}) env->DeleteLocalRef(o);
+  return out;
+}
+
+jobject to_java(JNIEnv* env, const F::TextResult& r) {
+  jobject action = to_java(env, static_cast<const F::ActionResult&>(r));
+  jstring text = to_java(env, r.text);
+  jsize n = (jsize)r.locked.size();
+  std::vector<jint> starts(n), ends(n);
+  for (jsize i = 0 ; i < n ; ++i) { starts[i] = r.locked[i].start; ends[i] = r.locked[i].end; }
+  jintArray js = env->NewIntArray(n), je = env->NewIntArray(n);
+  env->SetIntArrayRegion(js, 0, n, starts.data());
+  env->SetIntArrayRegion(je, 0, n, ends.data());
+  jobject out = env->NewObject(cls.text_result, cls.text_result_init, action, text, (jint)r.selection_start,
+                               (jint)r.selection_end, js, je);
+  for (jobject o : {action, (jobject)text, (jobject)js, (jobject)je}) env->DeleteLocalRef(o);
   return out;
 }
 
@@ -328,6 +351,60 @@ Java_org_mobileseteditor_core_NativeCore_setValue(JNIEnv* env, jobject, jlong se
 }
 
 JNIEXPORT jobject JNICALL
+Java_org_mobileseteditor_core_NativeCore_listFields(JNIEnv* env, jobject, jlong session, jint kind, jstring card_uid) {
+  F::Target target = target_from(env, kind, card_uid);
+  F::FieldList r = guarded<F::FieldList>([&] { return F::listFields(session, target); });
+  std::vector<std::string> names, types;
+  jsize n = (jsize)r.fields.size();
+  jbooleanArray editable = env->NewBooleanArray(n), multi = env->NewBooleanArray(n);
+  jclass string_array = env->FindClass("[Ljava/lang/String;");
+  jobjectArray choices = env->NewObjectArray(n, string_array, nullptr);
+  for (jsize i = 0 ; i < n ; ++i) {
+    const F::FieldInfo& f = r.fields[i];
+    names.push_back(f.name);
+    types.push_back(f.type);
+    jboolean e = f.editable, m = f.multi_line;
+    env->SetBooleanArrayRegion(editable, i, 1, &e);
+    env->SetBooleanArrayRegion(multi, i, 1, &m);
+    jobjectArray c = to_java(env, f.choices);
+    env->SetObjectArrayElement(choices, i, c);
+    env->DeleteLocalRef(c);
+  }
+  jobject result = to_java(env, r);
+  jobjectArray jn = to_java(env, names), jt = to_java(env, types);
+  jobject out = env->NewObject(cls.field_list_result, cls.field_list_result_init, result, jn, jt, editable, multi, choices);
+  for (jobject o : {result, (jobject)jn, (jobject)jt, (jobject)editable, (jobject)multi, (jobject)choices, (jobject)string_array}) env->DeleteLocalRef(o);
+  return out;
+}
+
+JNIEXPORT jobject JNICALL
+Java_org_mobileseteditor_core_NativeCore_getText(JNIEnv* env, jobject, jlong session, jint kind, jstring card_uid, jstring field) {
+  F::Target target = target_from(env, kind, card_uid);
+  std::string f = from_java(env, field);
+  return to_java(env, guarded<F::TextResult>([&] { return F::getText(session, target, f); }));
+}
+
+JNIEXPORT jobject JNICALL
+Java_org_mobileseteditor_core_NativeCore_replaceRange(JNIEnv* env, jobject, jlong session, jint kind, jstring card_uid,
+                                                     jstring field, jint start, jint end, jstring text, jboolean as_symbol) {
+  F::Target target = target_from(env, kind, card_uid);
+  std::string f = from_java(env, field), t = from_java(env, text);
+  return to_java(env, guarded<F::TextResult>([&] {
+    return F::replaceRange(session, target, f, (int)start, (int)end, t, as_symbol == JNI_TRUE);
+  }));
+}
+
+JNIEXPORT jobject JNICALL
+Java_org_mobileseteditor_core_NativeCore_undo(JNIEnv* env, jobject, jlong session) {
+  return to_java(env, guarded<F::ActionResult>([&] { return F::undo(session); }));
+}
+
+JNIEXPORT jobject JNICALL
+Java_org_mobileseteditor_core_NativeCore_redo(JNIEnv* env, jobject, jlong session) {
+  return to_java(env, guarded<F::ActionResult>([&] { return F::redo(session); }));
+}
+
+JNIEXPORT jobject JNICALL
 Java_org_mobileseteditor_core_NativeCore_closeSession(JNIEnv* env, jobject, jlong session) {
   return to_java(env, guarded<F::Result>([&] { return F::closeSession(session); }));
 }
@@ -356,6 +433,17 @@ Java_org_mobileseteditor_core_NativeCore_cardSize(JNIEnv* env, jobject, jlong se
   jobject result = to_java(env, r);
   jobject out = env->NewObject(cls.card_size_result, cls.card_size_result_init, result, (jdouble)r.width, (jdouble)r.height);
   env->DeleteLocalRef(result);
+  return out;
+}
+
+JNIEXPORT jobject JNICALL
+Java_org_mobileseteditor_core_NativeCore_fieldAt(JNIEnv* env, jobject, jlong session, jstring card_uid, jdouble x, jdouble y, jint width) {
+  std::string uid = from_java(env, card_uid);
+  F::FieldAt r = guarded<F::FieldAt>([&] { return F::fieldAt(session, uid, x, y, (int)width); });
+  jobject result = to_java(env, r);
+  jstring field = to_java(env, r.field);
+  jobject out = env->NewObject(cls.field_at_result, cls.field_at_result_init, result, field);
+  for (jobject o : {result, (jobject)field}) env->DeleteLocalRef(o);
   return out;
 }
 

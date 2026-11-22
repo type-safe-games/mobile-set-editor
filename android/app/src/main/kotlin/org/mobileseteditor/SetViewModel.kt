@@ -60,6 +60,11 @@ data class SetState(
     val card: RenderedCard? = null,
     /** what the core said, newest last (errors, warnings) */
     val messages: List<String> = emptyList(),
+    val canUndo: Boolean = false,
+    val canRedo: Boolean = false,
+    /** what Undo and Redo would undo and redo, e.g. "Typing" */
+    val undoName: String = "",
+    val redoName: String = "",
 )
 
 /** What to do with unsaved changes when a Set is closed */
@@ -96,7 +101,13 @@ class SetViewModel(app: Application) : AndroidViewModel(app) {
     private var rendersScope: CoroutineScope? = null
     private var observeJob: Job? = null
     private var autosaveJob: Job? = null
+    private var renderJob: Job? = null
+    private var staleAll = false
+    private val staleUids = mutableSetOf<String>()
     private var width = 0
+
+    /** The width in pixels the viewer renders Cards at (0 until it is known) */
+    val renderWidth get() = width
 
     private val context get() = getApplication<Application>()
 
@@ -175,6 +186,8 @@ class SetViewModel(app: Application) : AndroidViewModel(app) {
             session = open.session,
             workingCopy = copy,
             dirty = info.dirty,
+            canUndo = info.canUndo,
+            canRedo = info.canRedo,
             aspect = size?.takeIf { it.result.ok && it.height > 0 }?.let { (it.width / it.height).toFloat() } ?: 0.716f,
             cardUids = cards.uids.toList(),
             cardNames = cards.names.toList(),
@@ -191,21 +204,54 @@ class SetViewModel(app: Application) : AndroidViewModel(app) {
 
     // ------------------------------------------------------------------- Editing and autosave
 
-    /** Apply an edit's result: mark the Set unsaved, re-render what it made stale, autosave soon */
-    fun edited(result: ActionResult) {
+    /**
+     * Apply an edit's result: mark the Set unsaved, re-render what it made stale, autosave soon.
+     * While typing, [renderDelayMillis] holds the re-render back until the typing pauses (the stale
+     * render stays on screen meanwhile).
+     */
+    fun edited(result: ActionResult, renderDelayMillis: Long = 0) {
         val s = _state.value
         val copy = s.workingCopy ?: return
         addMessages(result.result.messages.toList())
         if (!result.result.ok) return
-        renders?.invalidate(result.stale.all, result.stale.cardUids)
+        staleAll = staleAll || result.stale.all
+        staleUids += result.stale.cardUids
+        renderJob?.cancel()
+        if (renderDelayMillis <= 0) invalidateStale() else renderJob = viewModelScope.launch {
+            delay(renderDelayMillis)
+            invalidateStale()
+        }
         val updated = copy.copy(lastEdited = System.currentTimeMillis(), unsaved = result.dirty)
         WorkingCopies.write(updated)
-        _state.value = s.copy(dirty = result.dirty, workingCopy = updated)
+        _state.value = _state.value.copy(
+            dirty = result.dirty,
+            workingCopy = updated,
+            canUndo = result.canUndo,
+            canRedo = result.canRedo,
+            undoName = result.undoName,
+            redoName = result.redoName,
+        )
         autosaveJob?.cancel()
         autosaveJob = viewModelScope.launch {
             delay(autosaveDelayMillis)
             flushNow()
         }
+    }
+
+    private fun invalidateStale() {
+        renders?.invalidate(staleAll, staleUids.toList())
+        staleAll = false
+        staleUids.clear()
+    }
+
+    /** Undo the last edit (one undo step); the result, for an editor to refresh its text */
+    suspend fun undo(): ActionResult? = undoOrRedo(Core::undo)
+
+    suspend fun redo(): ActionResult? = undoOrRedo(Core::redo)
+
+    private suspend fun undoOrRedo(call: suspend (Long) -> ActionResult): ActionResult? {
+        val session = _state.value.session.takeIf { it != 0L } ?: return null
+        return call(session).also { edited(it) }
     }
 
     /** A test-only edit (debug builds): add " (edited)" to the Set's title */
@@ -301,6 +347,9 @@ class SetViewModel(app: Application) : AndroidViewModel(app) {
     private suspend fun closeQuietly() {
         observeJob?.cancel()
         autosaveJob?.cancel()
+        renderJob?.cancel()
+        staleAll = false
+        staleUids.clear()
         rendersScope?.cancel()
         rendersScope = null
         renders = null

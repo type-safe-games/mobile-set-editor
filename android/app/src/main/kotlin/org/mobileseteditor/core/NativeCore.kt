@@ -30,9 +30,16 @@ internal object NativeCore {
     external fun sessionInfo(session: Long): SessionInfo
     external fun getValue(session: Long, kind: Int, cardUid: String, field: String): ValueResult
     external fun setValue(session: Long, kind: Int, cardUid: String, field: String, value: String): ActionResult
+    external fun listFields(session: Long, kind: Int, cardUid: String): FieldListResult
+    external fun getText(session: Long, kind: Int, cardUid: String, field: String): TextResult
+    /** Replace [start, end) of a text field's visible text (code points), as typing does */
+    external fun replaceRange(session: Long, kind: Int, cardUid: String, field: String, start: Int, end: Int, text: String, asSymbol: Boolean): TextResult
+    external fun undo(session: Long): ActionResult
+    external fun redo(session: Long): ActionResult
     external fun listCards(session: Long): CardListResult
     external fun cardSize(session: Long, cardUid: String): CardSizeResult
     /** Draw a card into an ARGB_8888 bitmap, scaled to its width */
+    external fun fieldAt(session: Long, cardUid: String, x: Double, y: Double, width: Int): FieldAtResult
     external fun renderCard(session: Long, cardUid: String, bitmap: Bitmap): RenderResult
 
     external fun listTemplates(): TemplateListResult

@@ -37,6 +37,9 @@ class FieldRegion(
     val editable: Boolean,
 )
 
+/** The field under a tap; empty if none */
+class FieldAtResult(val result: CoreResult, val field: String)
+
 class RenderResult(val result: CoreResult, val regions: Array<FieldRegion>)
 
 // ----------------------------------------------------------------------------- Templates
@@ -141,3 +144,34 @@ class ValueResult(val result: CoreResult, val type: String, val value: String)
 
 /** What a value belongs to; mirrors the facade's Target::Kind, in its order */
 enum class TargetKind { Card, Set, CardStyle, SetStyle, Keyword }
+
+// ----------------------------------------------------------------------------- Fields and text editing (ADR 0009)
+
+/** A field of a Card, the Set info or a Style's options */
+class FieldInfo(val name: String, val type: String, val editable: Boolean, val multiLine: Boolean, val choices: List<String>)
+
+class FieldListResult(
+    val result: CoreResult,
+    names: Array<String>,
+    types: Array<String>,
+    editable: BooleanArray,
+    multiLine: BooleanArray,
+    choices: Array<Array<String>>,
+) {
+    val fields: List<FieldInfo> = names.indices.map { FieldInfo(names[it], types[it], editable[it], multiLine[it], choices[it].toList()) }
+}
+
+/**
+ * A text field's state for an editor: its visible text, the selection after the call and the locked
+ * spans (each replaced or removed as a whole). Positions count Unicode code points, not UTF-16 units.
+ */
+class TextResult(
+    val action: ActionResult,
+    val text: String,
+    val selectionStart: Int,
+    val selectionEnd: Int,
+    lockedStarts: IntArray,
+    lockedEnds: IntArray,
+) {
+    val locked: List<IntRange> = lockedStarts.indices.map { lockedStarts[it] until lockedEnds[it] }
+}

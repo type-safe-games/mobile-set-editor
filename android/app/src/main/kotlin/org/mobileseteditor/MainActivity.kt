@@ -49,6 +49,7 @@ import kotlinx.coroutines.launch
 import org.mobileseteditor.core.Outcome
 import org.mobileseteditor.core.TemplateInfo
 import org.mobileseteditor.core.Verdict
+import org.mobileseteditor.editor.CardEditorScreen
 
 /** For now two screens: the Templates, and an open Set's Cards; the real UI comes with M4 */
 class MainActivity : ComponentActivity() {
@@ -114,7 +115,7 @@ fun App(setModel: SetViewModel) {
             onSaveAs = { saveAs.launch((state.workingCopy?.name ?: "set").removeSuffix(".mse-set") + ".mse-set") },
             onClosed = { screen = Screen.Start },
         )
-        Screen.Card -> SetScreen(setModel, onBack = { screen = Screen.Set })
+        Screen.Card -> CardEditorScreen(setModel, onBack = { screen = Screen.Set })
         Screen.Templates -> {
             BackHandler { screen = Screen.Start }
             TemplatesScreen(

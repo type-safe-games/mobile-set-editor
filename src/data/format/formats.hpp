@@ -127,6 +127,11 @@ RealSize card_render_size(const SetP& set, const CardP& card);
 /// exactly like export_image without bleed, and report the visible fields' regions from the same pass.
 void render_card(const SetP& set, const CardP& card, Canvas& canvas, double zoom, vector<CardFieldRegion>* regions = nullptr);
 
+/// The editable field at a point of a card drawn by render_card (in its pixels at zoom 1), as the
+/// desktop's card editor picks it: the topmost visible one whose mask (if any) is opaque there.
+/// Empty if there is none.
+String card_field_at(const SetP& set, const CardP& card, const RealPoint& point);
+
 /// Write the metadata for a card
 // Assuming first the zoom is applied, then the rotation, then the offset.
 // This means that width and height need to be already scaled by a factor of zoom, but not already rotated

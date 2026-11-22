@@ -24,6 +24,7 @@ import org.junit.BeforeClass
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.mobileseteditor.editor.CardEditorScreen
 
 @RunWith(AndroidJUnit4::class)
 class SetHomeTest {
@@ -45,7 +46,7 @@ class SetHomeTest {
             if (card == null) {
                 SetHomeScreen(model, grid, onOpenCard = { model.go(it); model.showCard(); card = it }, onSaveAs = {}, onClosed = {})
             } else {
-                SetScreen(model, onBack = { card = null })
+                CardEditorScreen(model, onBack = { card = null })
             }
         }
         model.open(Uri.fromFile(TestFixture.zip("home.mse-set", TestFixture.assetFiles("sets/fixture-cards.mse-set"))))
@@ -66,7 +67,8 @@ class SetHomeTest {
         // tapping the third opens it
         compose.onNodeWithTag("thumbnail-${uids[2]}").performClick()
         compose.waitUntil(30_000) { model.state.value.card?.index == 2 }
-        compose.onNodeWithTag("card").assertIsDisplayed()
+        compose.waitUntil(30_000) { compose.onAllNodesWithTag("card-${uids[2]}").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("card-${uids[2]}").assertIsDisplayed()
         compose.onNodeWithTag("card-position").assertTextContains("3 / 3", substring = true)
         // and back to the grid
         compose.onNodeWithTag("back-to-cards").performClick()

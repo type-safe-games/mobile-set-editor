@@ -1,4 +1,4 @@
-// Mobile Set Editor - open the Test fixture's Set and see its Cards on screen (#48)
+// Mobile Set Editor - open the Test fixture's Set and see its Cards on screen (#48), swiping between them (#62)
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 package org.mobileseteditor
@@ -9,7 +9,8 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeLeft
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -17,6 +18,7 @@ import org.junit.BeforeClass
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.mobileseteditor.editor.CardEditorScreen
 
 @RunWith(AndroidJUnit4::class)
 class SetScreenTest {
@@ -31,7 +33,7 @@ class SetScreenTest {
 
     private fun showSet(name: String, files: Map<String, ByteArray>): SetViewModel {
         val model = SetViewModel(TestFixture.app.applicationContext as Application)
-        compose.setContent { SetScreen(model, onBack = {}) }
+        compose.setContent { CardEditorScreen(model, onBack = {}) }
         model.open(Uri.fromFile(TestFixture.zip(name, files)))
         return model
     }
@@ -43,8 +45,8 @@ class SetScreenTest {
     @Test
     fun showsTheCards() {
         val model = showSet("screen-cards.mse-set", TestFixture.assetFiles("sets/fixture-cards.mse-set"))
-        waitForTag("card")
-        compose.onNodeWithTag("card").assertIsDisplayed()
+        waitForTag("card-fixture-wrap")
+        compose.onNodeWithTag("card-fixture-wrap").assertIsDisplayed()
         var state = model.state.value
         assertEquals(3, state.cardUids.size)
         val first = state.card!!
@@ -54,10 +56,11 @@ class SetScreenTest {
         first.bitmap.getPixels(pixels, 0, first.bitmap.width, 0, 0, first.bitmap.width, first.bitmap.height)
         assertTrue("the card is blank", pixels.distinct().size > 50)
 
-        // the next Card, rendered in its turn
-        compose.onNodeWithTag("next").performClick()
+        // swipe to the next Card, rendered in its turn
+        compose.onNodeWithTag("card-pager").performTouchInput { swipeLeft() }
         compose.waitUntil(30_000) { model.state.value.card?.index == 1 }
-        compose.onNodeWithTag("card").assertIsDisplayed()
+        waitForTag("card-fixture-front")
+        compose.onNodeWithTag("card-fixture-front").assertIsDisplayed()
         state = model.state.value
         assertEquals(state.cardUids[1], state.card!!.uid)
     }

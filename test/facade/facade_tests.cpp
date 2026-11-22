@@ -239,6 +239,24 @@ TEST(render_matches_export_layout_and_goldens) {
 
 // ----------------------------------------------------------------------------- : Text editing
 
+TEST(field_at_picks_the_topmost_editable_field) {
+  F::SessionHandle s = open_fixture();
+  // the fixture's Style is 300 wide: the name's box is at (20, 18) 200x26, the rules' at (26, 246)
+  F::FieldAt name = F::fieldAt(s, "fixture-wrap", 60, 30, 300);
+  REQUIRE_OK(name);
+  CHECK_EQ(name.field, std::string("name"));
+  // at another width, the same place
+  CHECK_EQ(F::fieldAt(s, "fixture-wrap", 120, 60, 600).field, std::string("name"));
+  CHECK_EQ(F::fieldAt(s, "fixture-wrap", 100, 300, 300).field, std::string("rules"));
+  // outside the card: nothing
+  F::FieldAt outside = F::fieldAt(s, "fixture-wrap", -5, 500, 300);
+  REQUIRE_OK(outside);
+  CHECK_EQ(outside.field, std::string());
+  CHECK_EQ(F::fieldAt(s, "fixture-wrap", 1, 1, 0).status, F::Status::InvalidArgument);
+  CHECK_EQ(F::fieldAt(s, "no-such-card", 1, 1, 300).status, F::Status::NotFound);
+  CHECK_OK(F::closeSession(s));
+}
+
 TEST(replace_range_typing_merges_into_one_undo_step) {
   F::SessionHandle s = open_fixture();
   F::Target card = F::Target::card("fixture-wrap");

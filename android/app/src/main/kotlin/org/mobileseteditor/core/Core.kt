@@ -56,12 +56,30 @@ object Core {
     suspend fun setValue(session: Long, kind: TargetKind, cardUid: String, field: String, value: String): ActionResult =
         withContext(dispatcher) { NativeCore.setValue(session, kind.ordinal, cardUid, field, value) }
 
+    suspend fun listFields(session: Long, kind: TargetKind, cardUid: String): FieldListResult =
+        withContext(dispatcher) { NativeCore.listFields(session, kind.ordinal, cardUid) }
+
+    suspend fun getText(session: Long, kind: TargetKind, cardUid: String, field: String): TextResult =
+        withContext(dispatcher) { NativeCore.getText(session, kind.ordinal, cardUid, field) }
+
+    /** Replace [start, end) of a text field's visible text, positions in code points, as typing does */
+    suspend fun replaceRange(
+        session: Long, kind: TargetKind, cardUid: String, field: String, start: Int, end: Int, text: String, asSymbol: Boolean = false,
+    ): TextResult = withContext(dispatcher) { NativeCore.replaceRange(session, kind.ordinal, cardUid, field, start, end, text, asSymbol) }
+
+    suspend fun undo(session: Long): ActionResult = withContext(dispatcher) { NativeCore.undo(session) }
+    suspend fun redo(session: Long): ActionResult = withContext(dispatcher) { NativeCore.redo(session) }
+
     suspend fun listCards(session: Long): CardListResult = withContext(dispatcher) { NativeCore.listCards(session) }
 
     suspend fun cardSize(session: Long, cardUid: String): CardSizeResult =
         withContext(dispatcher) { NativeCore.cardSize(session, cardUid) }
 
     /** Draw a card into [bitmap] (ARGB_8888, the card's aspect ratio), returning its field regions */
+    /** The field a tap at (x, y) on a render [width] pixels wide picks, as the desktop picks it ("" for none) */
+    suspend fun fieldAt(session: Long, cardUid: String, x: Double, y: Double, width: Int): FieldAtResult =
+        withContext(dispatcher) { NativeCore.fieldAt(session, cardUid, x, y, width) }
+
     suspend fun renderCard(session: Long, cardUid: String, bitmap: Bitmap): RenderResult =
         withContext(dispatcher) { NativeCore.renderCard(session, cardUid, bitmap) }
 

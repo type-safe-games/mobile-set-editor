@@ -1300,6 +1300,18 @@ RenderResult renderCard(SessionHandle h, const std::string& card_uid, std::uint8
   });
 }
 
+FieldAt fieldAt(SessionHandle h, const std::string& card_uid, double x, double y, int width) {
+  return guarded<FieldAt>(card_uid, "", [&](FieldAt& r) {
+    Session& s = get_session(h);
+    if (width <= 0) fail(Status::InvalidArgument, "invalid width");
+    CardP card = find_card(*s.set, card_uid);
+    RealSize size = card_render_size(s.set, card);
+    if (size.width <= 0) fail(Status::Failed, "the card has no size");
+    double to_card = size.width / width;
+    r.field = to_utf8(card_field_at(s.set, card, RealPoint(x * to_card, y * to_card)));
+  });
+}
+
 TextOutput layoutDump(SessionHandle h, const std::string& card_uid) {
   return guarded<TextOutput>(card_uid, "", [&](TextOutput& r) {
     Session& s = get_session(h);

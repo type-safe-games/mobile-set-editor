@@ -238,6 +238,30 @@ void render_card(const SetP& set, const CardP& card, Canvas& canvas, double zoom
   }
 }
 
+String card_field_at(const SetP& set, const CardP& card, const RealPoint& point) {
+  if (!set) throw Error(_("no set"));
+  if (!card) throw Error(_("no card"));
+  // lay the card out as a drawing pass does (this loads the styles' masks), small to be quick
+  const double zoom = 0.25;
+  RegionDataViewer viewer(zoom);
+  viewer.setSet(set);
+  viewer.setCard(card);
+  RealSize size = viewer.getRotation().getExternalSize();
+  OffscreenCanvasP canvas = new_canvas(max(1, (int)ceil(size.width)), max(1, (int)ceil(size.height)), CanvasFormat::RGB);
+  viewer.draw(*canvas);
+  // as the desktop's card editor finds the field under the mouse: high z first, editable and
+  // visible fields only, and only where the field's mask (if any) is opaque
+  const vector<ValueViewerP>& viewers = viewer.getViewers();
+  for (auto it = viewers.rbegin() ; it != viewers.rend() ; ++it) {
+    const ValueViewerP& v = *it;
+    if (!v->getField()->editable || !v->isVisible()) continue;
+    Rotation rot = viewer.getRotation();
+    Rotater r(rot, v->getRotation());
+    if (v->containsPoint(rot.trInv(RealPoint(point.x * zoom, point.y * zoom)))) return v->getField()->name;
+  }
+  return String();
+}
+
 // ----------------------------------------------------------------------------- : Stitching faces
 
 /// Paste images side by side onto one transparent canvas, and report the x offset of each.

@@ -457,6 +457,15 @@ struct RenderResult : Result {
 RenderResult renderCard(SessionHandle session, const std::string& card_uid,
                         std::uint8_t* rgba, int width, int height, int stride);
 
+/// The field a tap on a rendered card picks, as the desktop's card editor picks it under the mouse
+struct FieldAt : Result {
+  std::string field; ///< empty if the point is on no editable field
+};
+/** (x, y) are pixels of a render `width` pixels wide (as renderCard draws it). The topmost visible
+ *  editable field wins, and a field with a mask (e.g. a frame's corners) only where it is opaque,
+ *  so this can differ from testing the boxes in RenderResult::regions. */
+FieldAt fieldAt(SessionHandle session, const std::string& card_uid, double x, double y, int width);
+
 /// The core's Layout dump of a card (ADR 0010): the same JSON as `write_layout_file` in --cli mode
 struct TextOutput : Result {
   std::string text;
