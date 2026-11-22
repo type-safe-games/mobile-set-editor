@@ -10,8 +10,11 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -23,6 +26,9 @@ import org.mobileseteditor.core.FieldRegion
 import org.mobileseteditor.core.Severity
 import org.mobileseteditor.core.Status
 import org.mobileseteditor.core.Stores
+import org.mobileseteditor.render.CoreCardRenderer
+import org.mobileseteditor.render.RenderKey
+import org.mobileseteditor.render.RenderService
 
 /** A Card as rendered for the screen */
 class RenderedCard(val index: Int, val uid: String, val name: String, val bitmap: Bitmap, val regions: List<FieldRegion>)
@@ -41,15 +47,23 @@ data class SetState(
 )
 
 /**
- * Opens a Set (read-only for now: the Working copy, autosave and Save as come with M4) and renders
- * its Cards one at a time, on the core thread, at the width the screen asks for (ADR 0009).
+ * Opens a Set (read-only for now: the Working copy, autosave and Save as come with M4) and shows
+ * its Cards one at a time. Renders go through a [RenderService] (#59): the current Card first,
+ * its neighbours ahead of time, all cached within a memory budget.
  */
 class SetViewModel(app: Application) : AndroidViewModel(app) {
     private val _state = MutableStateFlow(SetState())
     val state: StateFlow<SetState> = _state
 
+    /** How many Cards on each side of the current one are rendered ahead */
+    var lookAhead = 2
+
+    /** The open Set's render queue and cache (null while none is open) */
+    var renders: RenderService<Bitmap>? = null
+        private set
+    private var rendersScope: CoroutineScope? = null
+    private var observeJob: Job? = null
     private var width = 0
-    private var renderJob: Job? = null
     private var sessionCounter = 0
 
     /** Open the Set the user picked; any open one is closed */
@@ -72,13 +86,22 @@ class SetViewModel(app: Application) : AndroidViewModel(app) {
             val open = fd.use { Core.openSession(it, work) }
             if (!open.result.ok) return@launch report(open.result, "The Set could not be opened")
             val cards = Core.listCards(open.session)
+            // (the worker off the core thread: each render is then its own dispatch onto it, so
+            // calls made meanwhile, such as edits, run between renders)
+            val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+            rendersScope = scope
+            renders = RenderService(
+                CoreCardRenderer(open.session) { addMessages(it) },
+                CoreCardRenderer.defaultBudget(),
+                scope,
+            )
             _state.value = SetState(
                 session = open.session,
                 cardUids = cards.uids.toList(),
                 cardNames = cards.names.toList(),
                 messages = messageLines(open.result) + messageLines(cards.result),
             )
-            render()
+            show()
         }
     }
 
@@ -86,40 +109,47 @@ class SetViewModel(app: Application) : AndroidViewModel(app) {
     fun setWidth(pixels: Int) {
         if (pixels > 0 && pixels != width) {
             width = pixels
-            render()
+            show()
         }
     }
 
     fun previous() = go(_state.value.index - 1)
     fun next() = go(_state.value.index + 1)
 
-    private fun go(index: Int) {
+    fun go(index: Int) {
         val s = _state.value
         if (index !in s.cardUids.indices || index == s.index) return
         _state.value = s.copy(index = index, card = null)
-        render()
+        show()
     }
 
-    private fun render() {
+    /** Want the current Card and its neighbours, and show the current one's render */
+    private fun show() {
         val s = _state.value
-        if (s.session == 0L || s.cardUids.isEmpty() || width <= 0) return
-        renderJob?.cancel()
+        val service = renders ?: return
+        if (s.cardUids.isEmpty() || width <= 0) return
         val index = s.index
-        val uid = s.cardUids[index]
-        val w = width
-        renderJob = viewModelScope.launch {
-            val size = Core.cardSize(s.session, uid)
-            if (!size.result.ok || size.width <= 0) return@launch report(size.result, "The Card has no size")
-            val h = (w * size.height / size.width).toInt().coerceAtLeast(1)
-            val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-            val r = Core.renderCard(s.session, uid, bitmap)
-            val current = _state.value
-            if (current.session != s.session || current.index != index) return@launch
-            _state.value = current.copy(
-                card = RenderedCard(index, uid, current.cardNames.getOrElse(index) { "" }, bitmap, r.regions.toList()),
-                messages = current.messages + messageLines(r.result),
-            )
+        val key = RenderKey(s.cardUids[index], width)
+        val ahead = (1..lookAhead).flatMap { listOf(index + it, index - it) }
+            .filter { it in s.cardUids.indices }
+            .map { RenderKey(s.cardUids[it], width) }
+        service.want(listOf(key), ahead)
+        observeJob?.cancel()
+        observeJob = viewModelScope.launch {
+            service.observe(key).collect { r ->
+                val current = _state.value
+                if (r != null && current.index == index) {
+                    _state.value = current.copy(
+                        card = RenderedCard(index, key.uid, current.cardNames.getOrElse(index) { "" }, r.image, r.regions),
+                    )
+                }
+            }
         }
+    }
+
+    private fun addMessages(messages: List<CoreMessage>) {
+        val lines = messages.filter { it.severity != Severity.Info }.map(CoreMessage::toString)
+        if (lines.isNotEmpty()) _state.value = _state.value.copy(messages = _state.value.messages + lines)
     }
 
     private fun report(result: CoreResult, what: String) {
@@ -134,12 +164,16 @@ class SetViewModel(app: Application) : AndroidViewModel(app) {
         result.messages.filter { it.severity != Severity.Info }.map(CoreMessage::toString)
 
     private suspend fun closeSession() {
-        renderJob?.cancel()
+        observeJob?.cancel()
+        rendersScope?.cancel()
+        rendersScope = null
+        renders = null
         val session = _state.value.session
         if (session != 0L) withContext(NonCancellable) { Core.closeSession(session) }
     }
 
     override fun onCleared() {
+        rendersScope?.cancel()
         // (viewModelScope is gone by now; the core thread closes it on its own)
         val session = _state.value.session
         if (session != 0L) CoroutineScope(Core.dispatcher).launch { Core.closeSession(session) }
