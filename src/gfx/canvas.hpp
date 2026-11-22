@@ -24,7 +24,8 @@
  *  Coordinates are device pixels. Geometry still uses wx's plain value types
  *  (wxPoint, wxSize, wxRect); replacing those is a separate, mechanical cleanup.
  *
- *  Implementations: gfx/wx_canvas.hpp (the desktop, over a wxDC); Android will add a Skia one.
+ *  Implementations: gfx/wx_canvas.hpp (the desktop, over a wxDC) and gfx/skia/skia_canvas.hpp
+ *  (CPU-only Skia, for Android; on the desktop with the CMake option MSE_SKIA_CANVAS).
  *  Offscreen canvases come from the installed CanvasFactory, like images come from the
  *  installed ImageCodec.
  */

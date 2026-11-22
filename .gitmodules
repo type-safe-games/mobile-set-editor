@@ -25,3 +25,7 @@
 	path = third_party/skia-deps/freetype
 	url = https://chromium.googlesource.com/chromium/src/third_party/freetype2.git
 	shallow = true
+[submodule "third_party/skia-deps/harfbuzz"]
+	path = third_party/skia-deps/harfbuzz
+	url = https://chromium.googlesource.com/external/github.com/harfbuzz/harfbuzz.git
+	shallow = true

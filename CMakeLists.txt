@@ -89,29 +89,40 @@ add_library(mse_core OBJECT ${core_sources})
 target_link_libraries(mse_core PUBLIC wxWidgets::wxWidgets Boost::regex Boost::json MINIZIP::minizip ${HUNSPELL_LIBRARIES})
 target_precompile_headers(mse_core PRIVATE src/util/prec.hpp)
 
-# The Skia backends (ADR 0004), built from the pinned submodules by tools/skia/build.sh. Skia's
-# headers need C++20, so the files that include them are a separate C++20 library. With
-# MSE_SKIA_CODEC the desktop decodes and encodes images through Skia instead of wx (#41).
+# The Skia backends (ADR 0004), built from the pinned submodules by tools/skia/build.sh. With
+# MSE_SKIA_CODEC the desktop decodes and encodes images through Skia instead of wx (#41); with
+# MSE_SKIA_CANVAS it renders on Skia canvases instead of wx ones (#42; headless only, the GUI
+# still needs wx canvases).
 option(MSE_SKIA_CODEC "Decode and encode images with Skia (needs tools/skia/build.sh linux-x64)" OFF)
+option(MSE_SKIA_CANVAS "Render with the Skia Canvas, headless only (needs tools/skia/build.sh linux-x64)" OFF)
 set(MSE_SKIA_LIB_DIR "${PROJECT_SOURCE_DIR}/out/skia/linux-x64" CACHE PATH "Skia build output (tools/skia/build.sh)")
-if(MSE_SKIA_CODEC)
-  if(NOT EXISTS "${MSE_SKIA_LIB_DIR}/libskia.a")
+if(MSE_SKIA_CODEC OR MSE_SKIA_CANVAS)
+  if(NOT EXISTS "${MSE_SKIA_LIB_DIR}/libskia.a" OR NOT EXISTS "${MSE_SKIA_LIB_DIR}/libharfbuzz.a")
     message(FATAL_ERROR "No Skia build in ${MSE_SKIA_LIB_DIR}: run tools/skia/build.sh linux-x64")
   endif()
-  # Only std and Skia headers in here, no MSE ones (gfx/skia/skia_codec.hpp)
-  add_library(mse_skia STATIC src/gfx/skia/skia_codec.cpp)
+  # Skia's headers need C++20, and C++20's std::format_string clashes with the core's under
+  # `using namespace std`. So only these files include Skia (and HarfBuzz) headers, and they
+  # include no MSE ones; they are built with -fno-rtti like Skia (they subclass Skia classes).
+  add_library(mse_skia STATIC src/gfx/skia/skia_codec.cpp src/gfx/skia/skia_surface.cpp)
   set_target_properties(mse_skia PROPERTIES CXX_STANDARD 20 CXX_STANDARD_REQUIRED ON)
-  target_compile_options(mse_skia PRIVATE -fno-rtti) # as Skia itself (it subclasses SkWStream)
-  target_include_directories(mse_skia PRIVATE "${PROJECT_SOURCE_DIR}/third_party/skia")
-  foreach(lib skia png jpeg freetype2 zlib skcms)
+  target_compile_options(mse_skia PRIVATE -fno-rtti)
+  target_include_directories(mse_skia PRIVATE "${PROJECT_SOURCE_DIR}/third_party/skia"
+                                              "${PROJECT_SOURCE_DIR}/third_party/skia-deps/harfbuzz/src")
+  foreach(lib skia harfbuzz png jpeg freetype2 zlib skcms)
     target_link_libraries(mse_skia PUBLIC "${MSE_SKIA_LIB_DIR}/lib${lib}.a")
   endforeach()
-  # Keep Skia's libpng/libjpeg/zlib symbols out of the dynamic symbol table, so wx's shared
-  # libraries keep using the system's
+  # Keep Skia's libpng/libjpeg/zlib/HarfBuzz symbols out of the dynamic symbol table, so wx's
+  # shared libraries (and Pango) keep using the system's
   target_link_options(mse_skia INTERFACE "LINKER:--exclude-libs,ALL")
-  target_sources(mse_core PRIVATE src/gfx/skia/skia_image_codec.cpp)
   target_link_libraries(mse_core PUBLIC mse_skia)
-  target_compile_definitions(mse_core PUBLIC MSE_SKIA_CODEC)
+  if(MSE_SKIA_CODEC)
+    target_sources(mse_core PRIVATE src/gfx/skia/skia_image_codec.cpp)
+    target_compile_definitions(mse_core PUBLIC MSE_SKIA_CODEC)
+  endif()
+  if(MSE_SKIA_CANVAS)
+    target_sources(mse_core PRIVATE src/gfx/skia/skia_canvas.cpp)
+    target_compile_definitions(mse_core PUBLIC MSE_SKIA_CANVAS)
+  endif()
 endif()
 
 # On wxGTK the shared font store's files are given to fontconfig with wxFont::AddPrivateFont, and

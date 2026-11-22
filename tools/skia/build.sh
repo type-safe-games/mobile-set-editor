@@ -4,7 +4,7 @@
 #   tools/skia/build.sh <target> [<target>...]
 #
 # Targets: linux-x64, android-arm64-v8a, android-x86_64. Output goes to
-# out/skia/<target>/ (libskia.a plus the vendored deps' static libraries).
+# out/skia/<target>/ (libskia.a plus the vendored deps' static libraries, HarfBuzz's among them).
 # gn is built from third_party/gn into out/skia/gn/ on first use.
 #
 # Nothing is fetched: tools/git-sync-deps is never run. The dependencies Skia's
@@ -22,7 +22,7 @@ ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 SKIA=$ROOT/third_party/skia
 DEPS_DIR=$ROOT/third_party/skia-deps
 OUT=$ROOT/out/skia
-DEPS_NAMES=(zlib libpng libjpeg-turbo freetype)
+DEPS_NAMES=(zlib libpng libjpeg-turbo freetype harfbuzz)
 
 : "${CC:=clang}" "${CXX:=clang++}" "${AR:=ar}" "${SKIA_NDK_API:=26}"
 
@@ -81,14 +81,16 @@ skia_enable_pdf = false
 skia_enable_svg = false
 skia_use_xps = false
 
-# No modules, tools or text shaping: MSE lays out text itself.
+# No modules or tools. HarfBuzz is built (libharfbuzz.a) but Skia doesn't use it: the Skia
+# Canvas shapes text with it directly, as Pango does on the desktop, so that glyph advances match
+# the Golden images (#42). MSE lays out lines itself, so no SkShaper or SkParagraph.
 skia_enable_skottie = false
 skia_enable_skshaper = false
 skia_enable_skparagraph = false
 skia_enable_skunicode = false
 skia_enable_tools = false
 skia_enable_android_utils = false
-skia_use_harfbuzz = false
+skia_use_harfbuzz = true
 skia_use_icu = false
 skia_use_expat = false
 
@@ -140,15 +142,30 @@ target_args() {
   esac
 }
 
+# Write args.gn into a build directory, only when it changes (so ninja doesn't regenerate needlessly)
+write_args() {
+  local dir=$1; shift
+  mkdir -p "$dir"
+  printf '%s\n' "$@" > "$dir/args.gn.new"
+  if cmp -s "$dir/args.gn.new" "$dir/args.gn"; then rm "$dir/args.gn.new"; else mv "$dir/args.gn.new" "$dir/args.gn"; fi
+}
+
 link_deps
 build_gn
 for target in "$@"; do
   dir=$OUT/$target
-  mkdir -p "$dir"
-  { common_args; echo; target_args "$target"; } > "$dir/args.gn.new"
-  # Only rewrite args.gn when it changes, so ninja doesn't regenerate needlessly.
-  if cmp -s "$dir/args.gn.new" "$dir/args.gn"; then rm "$dir/args.gn.new"; else mv "$dir/args.gn.new" "$dir/args.gn"; fi
+  args=$(common_args; echo; target_args "$target")
+  write_args "$dir" "$args"
   (cd "$SKIA" && "$GN" gen "$dir")
   ninja -C "$dir" ${JOBS:+-j "$JOBS"} skia
+  # Nothing in Skia's own graph depends on HarfBuzz once SkShaper is off, and gn only loads the
+  # build files the root target reaches. So HarfBuzz gets its own build directory, rooted at it.
+  write_args "$dir/harfbuzz" "$args" "skia_use_system_harfbuzz = false"
+  # (quietly: most arguments have no effect in that smaller graph, and gn warns about each)
+  if ! (cd "$SKIA" && "$GN" gen "$dir/harfbuzz" --root-target=//third_party/harfbuzz > "$dir/harfbuzz/gn.log" 2>&1); then
+    cat "$dir/harfbuzz/gn.log" >&2; die "gn gen failed for HarfBuzz"
+  fi
+  ninja -C "$dir/harfbuzz" ${JOBS:+-j "$JOBS"} harfbuzz
+  cp -p "$dir/harfbuzz/libharfbuzz.a" "$dir/libharfbuzz.a"
   echo "skia/build.sh: $target -> ${dir#"$ROOT"/}"
 done

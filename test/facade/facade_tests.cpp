@@ -203,7 +203,16 @@ TEST(render_matches_export_layout_and_goldens) {
       std::string golden_png = read_text(goldens_dir / (n + ".png"));
       Image golden;
       CHECK(image_codec().decode(golden_png.data(), golden_png.size(), golden));
-      if (golden.GetWidth() == w && golden.GetHeight() == h) {
+      #ifdef MSE_SKIA_CANVAS
+        // the Golden images were drawn by wx: another canvas must match their Layout dump (above),
+        // its pixels are only compared, advisorily, by tools/goldens (ADR 0004, ADR 0010)
+        const bool exact_pixels = false;
+      #else
+        const bool exact_pixels = true;
+      #endif
+      if (!exact_pixels) {
+        CHECK_EQ(golden.GetWidth(), w);
+      } else if (golden.GetWidth() == w && golden.GetHeight() == h) {
         size_t differ = 0;
         for (int y = 0 ; y < h ; ++y) for (int x = 0 ; x < w ; ++x) {
           const Byte* g = golden.GetData() + 3 * ((size_t)y * w + x);

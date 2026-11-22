@@ -34,6 +34,7 @@ public:
   int    index = 0;      ///< index of the face in a font collection (.ttc), 0 otherwise
   String family;         ///< family name (name id 1, preferably in English)
   String full_name;      ///< full name (name id 4, preferably in English)
+  String primary_family; ///< the family name fontconfig lists first: the typographic family (name id 16) if there is one, else the family (name id 1), preferably in English
   vector<String> family_names; ///< all family names (name ids 1 and 16, in all languages)
   vector<String> full_names;   ///< all full names (name id 4, in all languages)
   String style_name;     ///< subfamily name (name id 2), e.g. "Bold Italic"
@@ -52,6 +53,7 @@ vector<FontFace> read_font_faces(const String& path);
 enum class FontSource {
   FONT_STORE, ///< the shared font store
   TEMPLATE,   ///< inside an installed Template
+  SYSTEM,     ///< the system's fonts (only the desktop test host adds these, to match its Golden images)
 };
 
 class FontRegistry {
@@ -64,10 +66,15 @@ public:
   void addTemplateDirectory(const String& dir);
 
   /// The face for a family name, bold and italic.
-  /** Families match case-insensitively on the family and typographic family names (in any
-   *  language), never on the full name, as fontconfig does for the desktop reference (ADR 0004).
-   *  An unknown family gets fallback_family; null if that isn't registered either.
-   *  Among the faces of the family, the one with the requested slant and the closest weight is used.
+  /** This copies how Pango and fontconfig choose a font for the desktop reference (ADR 0004):
+   *   - A family is known only if it is some face's primary family (the name fontconfig lists
+   *     first), compared case-insensitively. A secondary family name, like "Gotham Pro Black"
+   *     next to "Gotham Pro", or a full name like "Arsenal Regular", is not enough.
+   *   - The faces of a known family are all faces with the name among their family names (in
+   *     any language); of those, the one with the requested slant and the closest weight is used.
+   *   - An unknown family gets the regular, upright face of fallback_family, whatever the
+   *     requested weight and slant (Pango then emboldens or slants it synthetically); null if
+   *     that family isn't registered either.
    */
   FontFaceP resolve(const String& family, bool bold, bool italic);
 
@@ -92,6 +99,7 @@ private:
   set<String>                   known_files;
   vector<Entry>                 entries;
   map<String, vector<size_t>>   by_family;    ///< lower case family name -> entries
+  set<String>                   primary_families; ///< lower case primary family names
   map<String, FontFaceP>        cache;        ///< resolved requests
 
   void scanPending();
@@ -101,6 +109,13 @@ private:
 
 /// The font registry of the application
 FontRegistry& font_registry();
+
+/// Add the system's font directories to the font registry (FontSource::SYSTEM).
+/** Only for the desktop test host with the Skia canvas: its Golden images were rendered with the
+ *  system's fonts as well as the Template pack's (e.g. Noto Sans, the fallback, and DejaVu). The
+ *  directories are those in MSE_SYSTEM_FONT_DIRS (separated by ':') if it is set, otherwise the
+ *  usual ones on Linux. */
+void add_system_fonts_to_registry();
 
 /// Is this the name of a font file (.ttf, .otf, .ttc)?
 bool is_font_file_name(const String& name);

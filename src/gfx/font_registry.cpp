@@ -131,6 +131,9 @@ bool read_face(FontFile& file, size_t offset, FontFace& face) {
     if (start + length > names.size()) continue;
     String value = utf16 ? decode_utf16be(names, start, length) : decode_latin1(names, start, length);
     if (value.empty()) continue;
+    // (fontconfig drops trailing spaces from names, as in "Helvetica Now Text ")
+    while (!value.empty() && value.back() == L' ') value.pop_back();
+    if (value.empty()) continue;
     if (name_id == 1 || name_id == 16) add_name(face.family_names, value);
     if (name_id == 4)                   add_name(face.full_names, value);
     if (preference <= found[name_id].preference) continue;
@@ -138,6 +141,7 @@ bool read_face(FontFile& file, size_t offset, FontFace& face) {
     found[name_id].value = value;
   }
   face.family     = found[1].value;
+  face.primary_family = found[16].value.empty() ? found[1].value : found[16].value;
   face.style_name = found[2].value;
   face.full_name  = found[4].value;
   if (face.family.empty()) return false;
@@ -267,6 +271,7 @@ void FontRegistry::scanFile(const String& path, FontSource source) {
     set<String> families;
     for (const String& n : face.family_names) families.insert(to_lower(n));
     for (const String& n : families) by_family[n].push_back(i);
+    primary_families.insert(to_lower(face.primary_family));
   }
 }
 
@@ -280,12 +285,13 @@ FontFaceP FontRegistry::resolve(const String& family, bool bold, bool italic) {
   String key = name + (bold ? _("|b") : _("|")) + (italic ? _("i") : _(""));
   auto cached = cache.find(key);
   if (cached != cache.end()) return cached->second;
-  // candidates
-  // Like the fontconfig-based desktop reference: family names only (a full name such as
-  // "Arsenal Regular" does not match), and an unknown family gets the fallback family.
+  // candidates: a known family's faces, or else the fallback family's regular face (see the header)
   const vector<size_t>* candidates = nullptr;
-  auto it = by_family.find(name);
-  if (it == by_family.end()) it = by_family.find(to_lower(fallback_family));
+  auto it = primary_families.count(name) ? by_family.find(name) : by_family.end();
+  if (it == by_family.end()) {
+    it = by_family.find(to_lower(fallback_family));
+    bold = italic = false;
+  }
   if (it != by_family.end()) candidates = &it->second;
   FontFaceP best;
   if (candidates) {
@@ -298,9 +304,9 @@ FontFaceP FontRegistry::resolve(const String& family, bool bold, bool italic) {
       int distance = abs(face.weight - target);
       bool heavier = face.weight > target;
       long score = (face.italic != italic ? 1000000L : 0L)
-                 + distance * 4L
-                 + (distance > 0 && heavier != (target >= 400) ? 2 : 0)
-                 + (entries[i].source == FontSource::FONT_STORE ? 0 : 1);
+                 + distance * 8L
+                 + (distance > 0 && heavier != (target >= 400) ? 4 : 0)
+                 + (int)entries[i].source; // (0 to 2)
       if (!best || score < best_score) {
         best = entries[i].face;
         best_score = score;
@@ -322,4 +328,29 @@ vector<FontFaceP> FontRegistry::faces() {
 FontRegistry& font_registry() {
   static FontRegistry registry;
   return registry;
+}
+
+void add_system_fonts_to_registry() {
+  vector<String> dirs;
+  if (const char* env = getenv("MSE_SYSTEM_FONT_DIRS")) {
+    String list = decode_utf8_or_latin1(env, strlen(env));
+    size_t start = 0;
+    while (start <= list.size()) {
+      size_t end = list.find(L':', start);
+      if (end == String::npos) end = list.size();
+      if (end > start) dirs.push_back(list.substr(start, end - start));
+      start = end + 1;
+    }
+  } else {
+    #if defined(__linux__) && !defined(__ANDROID__)
+      dirs.push_back(_("/usr/share/fonts"));
+      dirs.push_back(_("/usr/local/share/fonts"));
+      if (const char* home = getenv("HOME")) {
+        String h = decode_utf8_or_latin1(home, strlen(home));
+        dirs.push_back(h + _("/.local/share/fonts"));
+        dirs.push_back(h + _("/.fonts"));
+      }
+    #endif
+  }
+  for (const String& dir : dirs) font_registry().addDirectory(dir, FontSource::SYSTEM);
 }

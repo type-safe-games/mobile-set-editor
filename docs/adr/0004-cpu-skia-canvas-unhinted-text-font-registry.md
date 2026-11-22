@@ -28,3 +28,33 @@ Building the registry (#32) showed that the fontconfig-based desktop reference m
 ## Amendment (2026-11-20): raster ops copy the Linux reference, not Windows
 
 The golden images come from wxGTK, which draws through cairo. There, `AND`, `OR` and `AND_INVERT` draw and blit nothing, and `XOR` is cairo's XOR compositing, not a bitwise op. This affects symbol SUBTRACT, INTERSECTION and DIFFERENCE. The golden images are the fidelity bar, so the Skia `Canvas` copies the reference's behaviour for each raster op, not Windows semantics. The wx `Canvas` declares only `COPY` as supported on GTK (#32). The core already branches on that capability, so on Android the core takes the same code paths as on the Linux reference. The Skia `Canvas` copies wxGTK's results for any op it still receives. Windows/Wine remains a spot check only.
+
+## Amendment (2026-11-22): text measures as Pango does, with HarfBuzz
+
+Building the Skia `Canvas` (#42) showed that an identical Layout dump needs Pango's exact
+integer text widths, not just unhinted advances. The reference measures text like this, and the
+Skia `Canvas` now does the same:
+
+- **Shaping.** HarfBuzz shapes each line with its default features (kerning, ligatures), at the
+  point size at 96 dpi, in 1/1024 pixel units. HarfBuzz is vendored with Skia and built from
+  source like Skia's other dependencies (ADR 0011). Skia's SkShaper and SkParagraph stay off,
+  because MSE lays out lines itself.
+- **Rounding.** Each glyph's advance and offset is rounded to a whole pixel (Pango's
+  `round_glyph_positions`), and a width is the sum. A line is ceil(ascender) + ceil(descender)
+  pixels high. This replaces "unhinted with linear advances" above for measurement, while
+  glyphs are still drawn unhinted and aliased.
+- **Font fallback.** Characters the face lacks are shaped with the fallback family. Spaces take
+  the face of the character before them (or, at the start, after them), as in Pango's itemizer.
+  The line is as high as the faces it uses.
+- **Family matching** (replacing the first two rules of the amendment above). A family is known
+  only if it is some face's *first* family name in fontconfig's order: the typographic family
+  (name ID 16) if there is one, else name ID 1, with trailing spaces dropped. A secondary name
+  like "Gotham Pro Black" (next to "Gotham Pro") is not enough. An unknown family resolves to the
+  fallback family's regular, upright face, whatever weight and slant were asked for. Pango then
+  emboldens or slants it synthetically, which doesn't change advances.
+
+Checked against all 75,000 text measurements the wx reference makes on the Golden corpus: these
+rules reproduce 99.99% of widths and all line heights, and the Skia `Canvas` passes the Layout
+dump gate on the whole corpus. The desktop test host also registers the system's font
+directories (FontSource::SYSTEM), because the reference rendered with them (Noto Sans, DejaVu).
+

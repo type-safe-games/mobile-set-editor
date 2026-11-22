@@ -74,7 +74,8 @@ Planned. The app will be Jetpack Compose over the same C++ facade through JNI
 Skia already builds, for the host and both Android ABIs, from pinned submodules with no network
 access: see [`tools/skia/README.md`](tools/skia/README.md). With a host Skia build, `cmake -DMSE_SKIA_CODEC=ON` makes
 the desktop decode and encode images through Skia instead of wx, and adds the `image-codec` test,
-which checks that both codecs decode alike.
+which checks that both codecs decode alike. `-DMSE_SKIA_CANVAS=ON` renders cards with the Skia
+Canvas the app will use (headless only), which `tools/goldens` checks against the Golden images.
 
 ## Documentation
 

@@ -21,6 +21,10 @@
 #ifdef MSE_SKIA_CODEC
 #include <gfx/skia/skia_image_codec.hpp>
 #endif
+#ifdef MSE_SKIA_CANVAS
+#include <gfx/skia/skia_canvas.hpp>
+#include <gfx/font_registry.hpp>
+#endif
 #include <gfx/wx_canvas.hpp>
 #include <gfx/font_registry.hpp>
 #include <util/file_utils.hpp>
@@ -181,7 +185,14 @@ void install_desktop_hooks() {
 #else
   set_image_codec(make_wx_image_codec()); // (needs wxInitAllImageHandlers)
 #endif
+#ifdef MSE_SKIA_CANVAS
+  // (CMake option MSE_SKIA_CANVAS, #42) The desktop reference renders with the system's fonts as
+  // well as the pack's, so the font registry gets them too
+  set_canvas_factory(make_unique<SkiaCanvasFactory>());
+  add_system_fonts_to_registry();
+#else
   set_canvas_factory(make_unique<WxCanvasFactory>());
+#endif
   error_sink = [](MessageType type, String const& msg) {
     if (cli.haveConsole()) {
       // always write to stderr if possible

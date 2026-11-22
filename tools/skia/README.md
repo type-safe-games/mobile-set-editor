@@ -12,26 +12,42 @@ tools/skia/smoke.sh                                  # draws text from a font fi
 ```
 
 Each target ends up in `out/skia/<target>/`: `libskia.a` plus the static libraries of its
-dependencies (`libpng.a`, `libjpeg.a`, `libfreetype2.a`, `libzlib.a`, `libskcms.a`). Link all of
-them. Include Skia headers as `include/core/...` with `-Ithird_party/skia`. **Skia's public headers
+dependencies (`libharfbuzz.a`, `libpng.a`, `libjpeg.a`, `libfreetype2.a`, `libzlib.a`,
+`libskcms.a`). Link all of them. Include Skia headers as `include/core/...` with `-Ithird_party/skia`. **Skia's public headers
 need C++20**, so any file that includes them must be compiled as C++20.
 
 `build.sh` builds `gn` from `third_party/gn` into `out/skia/gn/` on first use, writes `args.gn`
-for the target and runs ninja. `args.gn` turns off every GPU, PDF, SVG and XPS backend, text
-shaping (HarfBuzz, ICU), and every codec except PNG and JPEG. The only font manager is the
+for the target and runs ninja. `args.gn` turns off every GPU, PDF, SVG and XPS backend, Skia's
+text modules (SkShaper, SkParagraph, ICU), and every codec except PNG and JPEG.
+
+HarfBuzz is built, but Skia doesn't use it: the Skia Canvas shapes text with it directly, the way
+Pango does in the desktop reference, so that text measures exactly as in the Golden images (#42).
+With SkShaper off nothing in Skia's gn graph depends on HarfBuzz, and gn only loads the build
+files its root target reaches, so `build.sh` runs a second `gn gen` into
+`out/skia/<target>/harfbuzz/` rooted at `//third_party/harfbuzz` (with the same arguments plus
+`skia_use_system_harfbuzz = false`) and copies `libharfbuzz.a` next to `libskia.a`. The only font manager is the
 custom-empty one, which loads only the font files it is given (`SkFontMgr_New_Custom_Empty()`,
 then `makeFromFile`/`makeFromData`); fontconfig and Android's system fonts are not used. Android
 targets compile against API 26, the app's minSdk (`SKIA_NDK_API` overrides it).
 
 ## Using it on the desktop
 
-`cmake -S . -B build-skia -DMSE_SKIA_CODEC=ON` (after `tools/skia/build.sh linux-x64`) builds the
-desktop with the Skia image codec (`src/gfx/skia/`) in place of the wx one. `MSE_SKIA_LIB_DIR`
-points at another Skia build. Only `src/gfx/skia/skia_codec.cpp` includes Skia headers; it uses no
-MSE headers, because the core is C++17 with `using namespace std`, which clashes with C++20's
-`std::format_string`, and it is built with `-fno-rtti` like Skia. The `image-codec` test decodes
-`test/image_codec/images` with both codecs; give it a pack directory as a second argument to
-compare every image in the pack.
+After `tools/skia/build.sh linux-x64`, two CMake options switch the desktop build to the Skia
+backends in `src/gfx/skia/`:
+
+- `-DMSE_SKIA_CODEC=ON`: images are decoded and encoded by Skia instead of wx. The
+  `image-codec` test decodes `test/image_codec/images` with both codecs; give it a pack directory
+  as a second argument to compare every image in the pack.
+- `-DMSE_SKIA_CANVAS=ON`: cards render on the Skia Canvas instead of wx's. This is for headless
+  rendering (the CLI, the facade tests, `tools/goldens`) only: the GUI still draws on wx canvases,
+  which can't blit from a Skia one. The desktop then also adds the system's font directories to
+  the font registry (`MSE_SYSTEM_FONT_DIRS` overrides them), because the Golden images were
+  rendered with the system's fonts as well as the pack's.
+
+`MSE_SKIA_LIB_DIR` points at another Skia build. Only `skia_codec.cpp` and `skia_surface.cpp`
+include Skia (and HarfBuzz) headers, and they use no MSE headers: the core is C++17 with
+`using namespace std`, which clashes with C++20's `std::format_string`. They are built with
+`-fno-rtti`, like Skia.
 
 ## What is pinned
 
@@ -43,9 +59,13 @@ compare every image in the pack.
 | `third_party/skia-deps/libpng` | the commit Skia's `DEPS` names | libpng (`LICENSE`) |
 | `third_party/skia-deps/libjpeg-turbo` | the commit Skia's `DEPS` names | IJG, BSD-3-Clause, Zlib (`LICENSE.md`) |
 | `third_party/skia-deps/freetype` | the commit Skia's `DEPS` names | FreeType License or GPL-2.0-or-later (`LICENSE.TXT`); we use the FTL |
+| `third_party/skia-deps/harfbuzz` | the commit Skia's `DEPS` names | MIT ("Old MIT", `COPYING`) |
 
 That is the whole dependency set this configuration needs: with the `args.gn` above, the
 generated ninja files reference no other `third_party/externals/` directory.
+
+HarfBuzz shapes the same as the system HarfBuzz 15.0 that Pango used for the Golden images: on the
+75,000 text measurements of the Golden corpus, both give the same widths.
 
 Skia's BUILD files expect its dependencies in `third_party/skia/third_party/externals/<name>`,
 inside the Skia checkout, where this repository cannot place submodules. So they live in
@@ -71,7 +91,7 @@ Only at a milestone bump, because every Skia change can move pixels in the Golde
 2. Re-pin each dependency to the commit the new `third_party/skia/DEPS` names (the URL may change
    too; if so, update it in `.gitmodules`):
    ```sh
-   for n in zlib libpng libjpeg-turbo freetype; do
+   for n in zlib libpng libjpeg-turbo freetype harfbuzz; do
      sha=$(sed -nE "s|.*\"third_party/externals/$n\" *: *\"[^@]*@([0-9a-f]{40})\".*|\1|p" third_party/skia/DEPS)
      git -C third_party/skia-deps/$n fetch --depth 1 origin "$sha"
      git -C third_party/skia-deps/$n checkout "$sha"
