@@ -21,14 +21,16 @@ object TemplateImport {
     suspend fun scan(zip: ParcelFileDescriptor): ScanResult =
         withContext(Dispatchers.IO) { NativeCore.scanTemplatesFd(zip.fd) }
 
-    /** Install these packages (and the ones in the zip they need), the loose fonts and dictionaries */
+    /** Install these packages (and the ones in the zip they need), and the loose fonts and dictionaries if asked */
     suspend fun install(
         zip: ParcelFileDescriptor,
         packages: List<String>,
+        fonts: Boolean = true,
+        dictionaries: Boolean = true,
         onProgress: (done: Long, total: Long) -> Unit = { _, _ -> },
     ): ImportResult = withContext(Dispatchers.IO) {
         val context = coroutineContext
-        NativeCore.installTemplatesFd(zip.fd, packages.toTypedArray()) { done, total ->
+        NativeCore.installTemplatesFd(zip.fd, packages.toTypedArray(), fonts, dictionaries) { done, total ->
             onProgress(done, total)
             context.isActiveOrFalse()
         }.also { context.ensureActive() }
@@ -39,7 +41,7 @@ object TemplateImport {
         zip: ParcelFileDescriptor,
         scan: ScanResult,
         onProgress: (done: Long, total: Long) -> Unit = { _, _ -> },
-    ): ImportResult = install(zip, scan.packages.filter { it.installable }.map { it.name }, onProgress)
+    ): ImportResult = install(zip, scan.packages.filter { it.installable }.map { it.name }, onProgress = onProgress)
 
     private fun kotlin.coroutines.CoroutineContext.isActiveOrFalse(): Boolean =
         this[kotlinx.coroutines.Job]?.isActive ?: true

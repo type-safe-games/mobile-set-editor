@@ -65,5 +65,7 @@ internal object NativeCore {
 
     // Template import: off the core thread (ADR 0009); see TemplateImport
     external fun scanTemplatesFd(fd: Int): ScanResult
-    external fun installTemplatesFd(fd: Int, packages: Array<String>, listener: ImportProgressListener?): ImportResult
+    external fun installTemplatesFd(
+        fd: Int, packages: Array<String>, fonts: Boolean, dictionaries: Boolean, listener: ImportProgressListener?,
+    ): ImportResult
 }

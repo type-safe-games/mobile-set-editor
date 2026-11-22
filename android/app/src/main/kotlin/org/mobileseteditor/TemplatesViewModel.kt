@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.mobileseteditor.core.Core
+import org.mobileseteditor.core.ImportChoice
 import org.mobileseteditor.core.ImportResult
 import org.mobileseteditor.core.ScanResult
 import org.mobileseteditor.core.Stores
@@ -26,8 +27,8 @@ import org.mobileseteditor.core.TemplateInfo
 sealed interface ImportState {
     data object Idle : ImportState
     data object Scanning : ImportState
-    /** Scanned: waiting for the user to confirm */
-    class Scanned(val scan: ScanResult) : ImportState
+    /** Scanned: the user picks what to install ([choice]), then confirms */
+    class Scanned(val scan: ScanResult, val choice: ImportChoice) : ImportState
     class Installing(val done: Long, val total: Long) : ImportState
     class Finished(val result: ImportResult) : ImportState
     data object Cancelled : ImportState
@@ -71,19 +72,26 @@ class TemplatesViewModel(app: Application) : AndroidViewModel(app) {
             }
             zip = fd
             val scan = TemplateImport.scan(fd)
-            _import.value = if (scan.result.ok) ImportState.Scanned(scan) else ImportState.Failed(scan.result.error)
+            _import.value = if (scan.result.ok) ImportState.Scanned(scan, ImportChoice.everything(scan)) else ImportState.Failed(scan.result.error)
         }
     }
 
-    /** Install everything installable from the scanned zip */
+    /** The user changed what to install */
+    fun choose(change: (ImportChoice) -> ImportChoice) {
+        val scanned = _import.value as? ImportState.Scanned ?: return
+        _import.value = ImportState.Scanned(scanned.scan, change(scanned.choice))
+    }
+
+    /** Install the chosen packages (and the ones they need) from the scanned zip */
     fun confirm() {
         val scanned = _import.value as? ImportState.Scanned ?: return
         val fd = zip ?: return
-        _import.value = ImportState.Installing(0, scanned.scan.installSize)
+        val choice = scanned.choice
+        _import.value = ImportState.Installing(0, choice.size)
         installJob = viewModelScope.launch {
             try {
                 var shown = -1L // (per mille, so a pack's tens of thousands of files don't each redraw)
-                val result = TemplateImport.installAll(fd, scanned.scan) { done, total ->
+                val result = TemplateImport.install(fd, choice.packages.toList(), choice.fonts, choice.fonts) { done, total ->
                     val permille = if (total > 0) done * 1000 / total else 0
                     if (permille != shown) {
                         shown = permille

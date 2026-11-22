@@ -50,7 +50,14 @@ class NewSetTest {
         compose.setContent {
             NewSetScreen(onCreate = { g, s -> created = g to s; model.newSet(g, s) }, onTemplates = {}, onBack = {})
         }
-        // one Game: straight to its Styles; the search narrows them
+        // with one Game, straight to its Styles (other tests may have installed more: then pick it)
+        compose.waitUntil(30_000) {
+            compose.onAllNodesWithTag("style-fixture-standard.mse-style").fetchSemanticsNodes().isNotEmpty() ||
+                compose.onAllNodesWithTag("game-fixture.mse-game").fetchSemanticsNodes().isNotEmpty()
+        }
+        if (compose.onAllNodesWithTag("game-fixture.mse-game").fetchSemanticsNodes().isNotEmpty()) {
+            compose.onNodeWithTag("game-fixture.mse-game").performClick()
+        }
         compose.waitUntil(30_000) { compose.onAllNodesWithTag("style-fixture-standard.mse-style").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("style-search").performTextInput("altern")
         compose.waitUntil(5_000) { compose.onAllNodesWithTag("style-fixture-standard.mse-style").fetchSemanticsNodes().isEmpty() }

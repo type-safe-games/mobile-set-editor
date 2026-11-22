@@ -137,6 +137,8 @@ class ScannedPackage(
     verdict: Int,
     /** why it is refused */
     val reason: String,
+    /** the packages it needs (names; "Magic Set Editor" is the program itself) */
+    val dependencies: Array<String> = emptyArray(),
 ) {
     val verdict: Verdict = Verdict.entries[verdict]
     val installable: Boolean get() = verdict == Verdict.Install || verdict == Verdict.Replace

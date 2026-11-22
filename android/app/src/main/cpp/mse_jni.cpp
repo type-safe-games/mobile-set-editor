@@ -95,7 +95,7 @@ bool load_classes(JNIEnv* env) {
   cls.field_region_init     = env->GetMethodID(cls.field_region, "<init>", "(Ljava/lang/String;DDDDDIZ)V");
   cls.render_result_init    = env->GetMethodID(cls.render_result, "<init>", ("(" + result_sig + "[L" + p + "FieldRegion;)V").c_str());
   cls.scanned_package_init  = env->GetMethodID(cls.scanned_package, "<init>",
-    "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;JILjava/lang/String;)V");
+    "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;JILjava/lang/String;[Ljava/lang/String;)V");
   cls.scan_result_init      = env->GetMethodID(cls.scan_result, "<init>", ("(" + result_sig + "[L" + p + "ScannedPackage;IJIJII)V").c_str());
   cls.imported_package_init = env->GetMethodID(cls.imported_package, "<init>", "(Ljava/lang/String;Ljava/lang/String;IZLjava/lang/String;)V");
   cls.import_result_init    = env->GetMethodID(cls.import_result, "<init>", ("(" + result_sig + "[L" + p + "ImportedPackage;IIZ)V").c_str());
@@ -788,11 +788,14 @@ Java_org_mobileseteditor_core_NativeCore_scanTemplatesFd(JNIEnv* env, jobject, j
     jstring name = to_java(env, p.name), type = to_java(env, p.type), full = to_java(env, p.full_name),
             version = to_java(env, p.version), installed = to_java(env, p.installed_version),
             group = to_java(env, p.installer_group), reason = to_java(env, p.reason);
+    std::vector<std::string> deps;
+    for (const F::ImportDependency& d : p.dependencies) deps.push_back(d.package);
+    jobjectArray jdeps = to_java(env, deps);
     jobject jp = env->NewObject(cls.scanned_package, cls.scanned_package_init, name, type, full, version, installed,
-                                group, (jlong)p.size, (jint)p.verdict, reason);
+                                group, (jlong)p.size, (jint)p.verdict, reason, jdeps);
     env->SetObjectArrayElement(packages, (jsize)i, jp);
     for (jobject o : {(jobject)name, (jobject)type, (jobject)full, (jobject)version, (jobject)installed,
-                      (jobject)group, (jobject)reason, jp}) env->DeleteLocalRef(o);
+                      (jobject)group, (jobject)reason, (jobject)jdeps, jp}) env->DeleteLocalRef(o);
   }
   jobject result = to_java(env, r);
   jobject out = env->NewObject(cls.scan_result, cls.scan_result_init, result, packages, (jint)r.fonts.size(),
@@ -804,8 +807,11 @@ Java_org_mobileseteditor_core_NativeCore_scanTemplatesFd(JNIEnv* env, jobject, j
 }
 
 JNIEXPORT jobject JNICALL
-Java_org_mobileseteditor_core_NativeCore_installTemplatesFd(JNIEnv* env, jobject, jint fd, jobjectArray names, jobject listener) {
+Java_org_mobileseteditor_core_NativeCore_installTemplatesFd(JNIEnv* env, jobject, jint fd, jobjectArray names,
+                                                           jboolean fonts, jboolean dictionaries, jobject listener) {
   F::ImportSelection selection;
+  selection.fonts = fonts == JNI_TRUE;
+  selection.dictionaries = dictionaries == JNI_TRUE;
   for (jsize i = 0, n = env->GetArrayLength(names) ; i < n ; ++i) {
     jstring name = (jstring)env->GetObjectArrayElement(names, i);
     selection.packages.push_back(from_java(env, name));
