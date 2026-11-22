@@ -1493,6 +1493,38 @@ static const F::FieldInfo* find_field_info(const F::FieldList& list, const std::
   return nullptr;
 }
 
+TEST(set_symbol_from_a_file) {
+  F::SessionHandle s = open_fixture();
+  F::FieldList fields = F::listFields(s, F::Target::set());
+  REQUIRE_OK(fields);
+  const F::FieldInfo* symbol = find_field_info(fields, "symbol");
+  REQUIRE(symbol);
+  CHECK_EQ(symbol->type, std::string("symbol"));
+  CHECK_EQ(F::getValue(s, F::Target::set(), "symbol").value, std::string());
+  // a Template's .mse-symbol file, copied into the Set
+  fs::path file = fixture_dir / "data" / "fixture-alternate.mse-style" / "triangle.mse-symbol";
+  F::ActionResult a = F::setValue(s, F::Target::set(), "symbol", file.string());
+  REQUIRE_OK(a);
+  CHECK(a.stale.all);
+  std::string stored = F::getValue(s, F::Target::set(), "symbol").value;
+  CHECK(!stored.empty());
+  // saved and opened again, it is still there
+  fs::path out = work_dir / "set-symbol.mse-set";
+  int fd = ::open(out.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
+  REQUIRE_OK(F::saveTo(s, fd));
+  ::close(fd);
+  F::OpenResult again = F::openSession(out.string(), "");
+  REQUIRE_OK(again);
+  CHECK_EQ(F::getValue(again.session, F::Target::set(), "symbol").value, stored);
+  CHECK_OK(F::closeSession(again.session));
+  // removing it is one undo step
+  REQUIRE_OK(F::setValue(s, F::Target::set(), "symbol", ""));
+  CHECK_EQ(F::getValue(s, F::Target::set(), "symbol").value, std::string());
+  CHECK_OK(F::undo(s));
+  CHECK_EQ(F::getValue(s, F::Target::set(), "symbol").value, stored);
+  CHECK_OK(F::closeSession(s));
+}
+
 TEST(field_details_and_extra_card_fields) {
   F::SessionHandle s = open_fixture();
   F::FieldList fields = F::listFields(s, F::Target::card("fixture-wrap"));

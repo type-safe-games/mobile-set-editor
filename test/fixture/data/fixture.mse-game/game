@@ -7,6 +7,9 @@ set field:
 	type: text
 	name: title
 	identifying: true
+set field:
+	type: symbol
+	name: symbol
 
 card link:
 	selected: Front Face

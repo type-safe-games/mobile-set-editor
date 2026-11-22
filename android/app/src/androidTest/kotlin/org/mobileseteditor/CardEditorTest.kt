@@ -93,7 +93,9 @@ class CardEditorTest {
         compose.waitUntil(10_000) { runBlocking { Core.getText(session, TargetKind.Card, uid, "name").text } == original }
         compose.waitUntil(10_000) { !model.state.value.canUndo }
         assertFalse(model.state.value.canUndo)
-        compose.onNodeWithTag("field-text").assertTextContains(original)
+        compose.waitUntil(10_000) {
+            runCatching { compose.onNodeWithTag("field-text").assertTextEquals(original, includeEditableText = true) }.isSuccess
+        }
         compose.onNodeWithTag("redo").assertIsDisplayed()
     }
 }

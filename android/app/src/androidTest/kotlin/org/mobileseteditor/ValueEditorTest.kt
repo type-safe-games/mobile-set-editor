@@ -112,6 +112,7 @@ class ValueEditorTest {
         // the frame: tap the Card's edge, away from the other fields
         tapCard(5.0, 5.0, 300.0)
         compose.onNodeWithTag("editing-field").assertExists()
+        waitForTag("choice-blue")
         compose.onNodeWithTag("choice-blue").performClick()
         waitForValue("frame", "blue")
         compose.waitUntil(30_000) { model.state.value.card?.let { pixel(5.0, 5.0, 300.0) != before } == true }
@@ -121,6 +122,7 @@ class ValueEditorTest {
         compose.onNodeWithTag("done").performClick()
         tapField("level")
         assertEquals("3", value("level"))
+        waitForTag("slider-plus")
         compose.onNodeWithTag("slider-plus").performClick()
         waitForValue("level", "4")
         compose.onNodeWithTag("slider-value").assertExists()
@@ -138,6 +140,7 @@ class ValueEditorTest {
         open("values-image.mse-set")
         val original = value("picture")
         tapField("picture")
+        waitForTag("pick-image")
         compose.onNodeWithTag("pick-image").performClick()
         waitForTag("crop-frame")
         compose.onNodeWithTag("crop-use").performClick()
@@ -160,12 +163,14 @@ class ValueEditorTest {
         open("values-color.mse-set", style = "alternate")
         assertEquals("rgb(0,0,0)", value("border"))
         tapCard(2.0, 200.0, 280.0)
+        waitForTag("color-white")
         compose.onNodeWithTag("color-white").performClick()
         waitForValue("border", "rgb(255,255,255)")
         compose.waitUntil(30_000) { model.state.value.card?.let { pixel(1.0, 200.0, 280.0) } == 0xFFFFFFFF.toInt() }
         undo("border", "rgb(0,0,0)")
         compose.onNodeWithTag("done").performClick()
         tapField("chapters")
+        waitForTag("slider-minus")
         compose.onNodeWithTag("slider-minus").performClick()
         waitForValue("chapters", "1")
         undo("chapters", "2")

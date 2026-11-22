@@ -209,7 +209,8 @@ private fun LazyListScope.section(title: String, rows: List<FieldRow>, onEdit: (
 }
 
 /** A value as one line of plain text (tags taken out) */
-private fun summary(value: String, type: String): String = when (type) {
-    "image", "symbol" -> if (value.isEmpty()) "(none)" else "an image"
+fun summary(value: String, type: String): String = when (type) {
+    "image" -> if (value.isEmpty()) "(none)" else "an image"
+    "symbol" -> if (value.isEmpty()) "(none)" else "a symbol"
     else -> value.replace(Regex("<[^>]*>"), "").replace('\n', ' ').trim()
 }

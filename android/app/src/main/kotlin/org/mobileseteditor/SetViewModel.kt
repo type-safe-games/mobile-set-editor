@@ -324,6 +324,13 @@ class SetViewModel(app: Application) : AndroidViewModel(app) {
         refreshCards()
     }
 
+    /** Change the Set's Style (every Card that follows it re-renders); one undo step */
+    suspend fun setSetStyle(stylesheet: String) {
+        val session = _state.value.session.takeIf { it != 0L } ?: return
+        edited(Core.setSetStyle(session, stylesheet))
+        refreshCards()
+    }
+
     /** Switch a Card's own style options on or off; one undo step */
     suspend fun setOwnStyling(uid: String, own: Boolean) {
         val session = _state.value.session.takeIf { it != 0L } ?: return
@@ -364,7 +371,8 @@ class SetViewModel(app: Application) : AndroidViewModel(app) {
         val session = _state.value.session.takeIf { it != 0L } ?: return null
         return call(session).also {
             edited(it)
-            refreshCards()
+            // (names, links and Styles: the caller doesn't wait for them)
+            viewModelScope.launch { refreshCards() }
         }
     }
 

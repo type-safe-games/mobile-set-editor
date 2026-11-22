@@ -4,6 +4,9 @@
 package org.mobileseteditor.editor
 
 import android.net.Uri
+import java.io.File
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -56,7 +59,7 @@ import org.mobileseteditor.core.FieldInfo
 import org.mobileseteditor.core.TargetKind
 
 /** Field types the sheet edits with [ValueEditor] */
-val VALUE_EDITOR_TYPES = setOf("choice", "package choice", "multiple choice", "slider", "boolean", "color", "image")
+val VALUE_EDITOR_TYPES = setOf("choice", "package choice", "multiple choice", "slider", "boolean", "color", "image", "symbol")
 
 /**
  * How the image editor asks for an image: by default the system photo picker. Tests provide one
@@ -95,6 +98,7 @@ fun ValueEditor(model: SetViewModel, session: Long, uid: String, info: FieldInfo
         "boolean" -> BooleanEditor(info, current, set)
         "color" -> ColorEditor(info, current, set)
         "image" -> ImageEditor(current, aspect, apply)
+        "symbol" -> SymbolFileEditor(current, apply)
     }
 }
 
@@ -279,6 +283,66 @@ private fun ImageEditor(value: String, aspect: Float, apply: suspend (String) ->
             },
             onCancel = { picked = null },
             cacheDir = context.cacheDir,
+        )
+    }
+}
+
+/** The .mse-symbol files inside the installed Templates (e.g. a Style's rarity symbols) */
+fun templateSymbols(templates: File): List<File> =
+    templates.walkTopDown().maxDepth(3).filter { it.isFile && it.name.endsWith(".mse-symbol") }.sortedBy { it.path }.toList()
+
+/**
+ * A symbol field (the Set symbol): a .mse-symbol file picked with the system picker, or one from
+ * the installed Templates, copied into the Set; or Remove. (Drawing symbols is post-MVP: the
+ * Cards show the result.)
+ */
+@Composable
+private fun SymbolFileEditor(value: String, apply: suspend (String) -> Unit) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var fromTemplates by remember { mutableStateOf(false) }
+    val pick = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) scope.launch {
+            // a file of ours to hand to the core, which copies it into the Set
+            val file = File(context.cacheDir, "picked-${System.nanoTime()}.mse-symbol")
+            val copied = withContext(Dispatchers.IO) {
+                runCatching { context.contentResolver.openInputStream(uri)?.use { i -> file.outputStream().use { i.copyTo(it) } } != null }.getOrDefault(false)
+            }
+            if (copied) apply(file.path)
+            file.delete()
+        }
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(if (value.isEmpty()) "No symbol" else "A symbol is set", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.testTag("symbol-state"))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = { pick.launch(arrayOf("*/*")) }, modifier = Modifier.testTag("symbol-file")) { Text("From a file…") }
+            OutlinedButton(onClick = { fromTemplates = true }, modifier = Modifier.testTag("symbol-templates")) { Text("From a Template…") }
+            TextButton(onClick = { scope.launch { apply("") } }, enabled = value.isNotEmpty(), modifier = Modifier.testTag("symbol-remove")) { Text("Remove") }
+        }
+    }
+    if (fromTemplates) {
+        val templates = remember { org.mobileseteditor.core.Stores.templates(context) }
+        val files by androidx.compose.runtime.produceState<List<File>?>(null) { this.value = withContext(Dispatchers.IO) { templateSymbols(templates) } }
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { fromTemplates = false },
+            title = { Text("A symbol from a Template") },
+            text = {
+                val list = files
+                if (list == null) androidx.compose.material3.CircularProgressIndicator()
+                else if (list.isEmpty()) Text("The installed Templates have no .mse-symbol files.")
+                else LazyColumn(Modifier.heightIn(max = 360.dp)) {
+                    items(list) { f ->
+                        Column(
+                            Modifier.fillMaxWidth().clickable { fromTemplates = false; scope.launch { apply(f.path) } }
+                                .padding(vertical = 6.dp).testTag("template-symbol-${f.name}"),
+                        ) {
+                            Text(f.nameWithoutExtension, style = MaterialTheme.typography.bodyLarge)
+                            Text(f.parentFile?.name.orEmpty(), style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { fromTemplates = false }) { Text("Cancel") } },
         )
     }
 }

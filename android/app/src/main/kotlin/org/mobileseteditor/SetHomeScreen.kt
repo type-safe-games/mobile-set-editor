@@ -8,6 +8,8 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -35,6 +37,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -51,6 +54,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
+import org.mobileseteditor.editor.EditTarget
+import org.mobileseteditor.editor.FieldSheet
 import org.mobileseteditor.render.RenderKey
 
 private enum class SetTab(val title: String) { Cards("Cards"), SetInfo("Set info"), Keywords("Keywords") }
@@ -74,8 +79,11 @@ fun SetHomeScreen(
     val debuggable = (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
     var tab by rememberSaveable { mutableStateOf(SetTab.Cards) }
     var askClose by remember { mutableStateOf(false) }
+    // a Set info field being edited (#68), and a count of undos and redos (the sheet reads its value again)
+    var editing by remember { mutableStateOf<EditTarget?>(null) }
+    var revision by remember { mutableIntStateOf(0) }
     val close: () -> Unit = { if (state.dirty) askClose = true else { model.close(CloseChoice.Keep, onClosed) } }
-    BackHandler { close() }
+    BackHandler { if (editing != null) editing = null else close() }
 
     Column(Modifier.fillMaxSize().safeDrawingPadding()) {
         // the top bar
@@ -88,7 +96,8 @@ fun SetHomeScreen(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.testTag("set-name"),
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            // (scrolls sideways when the buttons don't fit)
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(
                     onClick = { scope.launch { if (!model.save()) onSaveAs() } },
                     enabled = copy != null && !state.saving && (state.dirty || copy.uri == null),
@@ -96,6 +105,16 @@ fun SetHomeScreen(
                 ) { Text("Save") }
                 OutlinedButton(onClick = onSaveAs, enabled = copy != null && !state.saving) { Text("Save as…") }
                 OutlinedButton(onClick = close, enabled = !state.saving) { Text("Close") }
+                TextButton(
+                    onClick = { scope.launch { model.undo(); revision++ } },
+                    enabled = state.canUndo,
+                    modifier = Modifier.testTag("home-undo"),
+                ) { Text("Undo") }
+                TextButton(
+                    onClick = { scope.launch { model.redo(); revision++ } },
+                    enabled = state.canRedo,
+                    modifier = Modifier.testTag("home-redo"),
+                ) { Text("Redo") }
                 if (debuggable && copy != null) {
                     TextButton(onClick = { model.testEdit() }, modifier = Modifier.testTag("test-edit")) { Text("Test edit") }
                 }
@@ -106,8 +125,11 @@ fun SetHomeScreen(
         }
         when (tab) {
             SetTab.Cards -> CardsGrid(model, state, grid, onOpenCard)
-            SetTab.SetInfo -> Placeholder("Set info and the Set symbol come here.")
+            SetTab.SetInfo -> Box(Modifier.weight(1f)) { SetInfoTab(model, state, revision) { editing = it } }
             SetTab.Keywords -> Placeholder("The Set's keywords come here.")
+        }
+        editing?.let { target ->
+            FieldSheet(model, target, revision, onField = { editing = target.copy(field = it) }, onClose = { editing = null; revision++ })
         }
         if (state.messages.isNotEmpty()) {
             Column(Modifier.fillMaxWidth().padding(8.dp).testTag("messages")) {

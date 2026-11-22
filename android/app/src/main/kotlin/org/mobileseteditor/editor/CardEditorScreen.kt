@@ -255,12 +255,13 @@ private fun CardPage(
 
 /** The sheet below the Card: the field's name, ‹ › to the Card's other editable fields, and its editor */
 @Composable
-private fun FieldSheet(model: SetViewModel, target: EditTarget, revision: Int, onField: (String) -> Unit, onClose: () -> Unit) {
+fun FieldSheet(model: SetViewModel, target: EditTarget, revision: Int, onField: (String) -> Unit, onClose: () -> Unit) {
     val session = model.state.value.session
     var fields by remember(target.uid, target.kind) { mutableStateOf<List<FieldInfo>?>(null) }
     LaunchedEffect(target.uid, target.kind, revision) { fields = Core.listFields(session, target.kind, target.uid).fields }
     // the fields this Card shows, from its render
-    val regions = model.observe(RenderKey(target.uid, model.renderWidth))?.collectAsState()?.value?.regions
+    val regions = if (target.kind != TargetKind.Card) null
+    else model.observe(RenderKey(target.uid, model.renderWidth))?.collectAsState()?.value?.regions
     val onCard = regions?.map { it.field }?.toSet()
     val aspect = regions?.firstOrNull { it.field == target.field }?.let { (it.width / it.height).toFloat() } ?: 1f
     val all = fields
@@ -274,7 +275,7 @@ private fun FieldSheet(model: SetViewModel, target: EditTarget, revision: Int, o
             Row(verticalAlignment = Alignment.CenterVertically) {
                 TextButton(onClick = { onField(textFields[at - 1]) }, enabled = at > 0, modifier = Modifier.testTag("previous-field")) { Text("‹") }
                 Text(
-                    (if (target.kind == TargetKind.CardStyle) "Style option: " else "") + displayName(target.field).replaceFirstChar { it.uppercase() },
+                    (if (target.kind == TargetKind.CardStyle || target.kind == TargetKind.SetStyle) "Style option: " else "") + displayName(target.field).replaceFirstChar { it.uppercase() },
                     style = MaterialTheme.typography.titleSmall,
                     modifier = Modifier.weight(1f).testTag("editing-field"),
                     maxLines = 1,
