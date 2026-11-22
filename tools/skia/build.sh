@@ -56,7 +56,8 @@ build_gn() {
   local gn=$OUT/gn/gn
   if [[ ! -x $gn ]]; then
     # Setting CXX stops gen.py from downloading a pinned clang through cipd.
-    CXX=$CXX AR=$AR python3 "$ROOT/third_party/gn/build/gen.py" --out-path="$OUT/gn" >/dev/null
+    # (--allow-warnings: gn builds with -Werror, and GCC warns where clang does not)
+    CXX=$CXX AR=$AR python3 "$ROOT/third_party/gn/build/gen.py" --allow-warnings --out-path="$OUT/gn" >/dev/null
     ninja -C "$OUT/gn" ${JOBS:+-j "$JOBS"} gn
   fi
   GN=$gn
