@@ -31,7 +31,7 @@ class SetScreenTest {
 
     private fun showSet(name: String, files: Map<String, ByteArray>): SetViewModel {
         val model = SetViewModel(TestFixture.app.applicationContext as Application)
-        compose.setContent { SetScreen(model, onOpen = {}, onBack = {}) }
+        compose.setContent { SetScreen(model, onBack = {}) }
         model.open(Uri.fromFile(TestFixture.zip(name, files)))
         return model
     }

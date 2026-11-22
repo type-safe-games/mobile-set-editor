@@ -31,6 +31,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -73,13 +74,15 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private enum class Screen { Start, Set, Templates }
+private enum class Screen { Start, Set, Card, Templates }
 
 @Composable
 fun App(setModel: SetViewModel) {
     val state by setModel.state.collectAsState()
     var screen by rememberSaveable { mutableStateOf(Screen.Start) }
-    // an open Set (also one restored after process death) is shown
+    // the grid's scroll position outlives a visit to a Card
+    val grid = rememberLazyGridState()
+    // an open Set (also one restored after process death) shows its home
     LaunchedEffect(state.session, state.opening) {
         if ((state.session != 0L || state.opening) && screen == Screen.Start) screen = Screen.Set
     }
@@ -100,13 +103,18 @@ fun App(setModel: SetViewModel) {
             onOpenCopy = { setModel.openWorkingCopy(it); screen = Screen.Set },
             onTemplates = { screen = Screen.Templates },
         )
-        Screen.Set -> SetScreen(
+        Screen.Set -> SetHomeScreen(
             setModel,
-            onOpen = pickSet,
-            onBack = { screen = Screen.Start },
+            grid,
+            onOpenCard = { index ->
+                setModel.go(index)
+                setModel.showCard()
+                screen = Screen.Card
+            },
             onSaveAs = { saveAs.launch((state.workingCopy?.name ?: "set").removeSuffix(".mse-set") + ".mse-set") },
-            onClose = { screen = Screen.Start },
+            onClosed = { screen = Screen.Start },
         )
+        Screen.Card -> SetScreen(setModel, onBack = { screen = Screen.Set })
         Screen.Templates -> {
             BackHandler { screen = Screen.Start }
             TemplatesScreen(

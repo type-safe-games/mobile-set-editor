@@ -54,6 +54,8 @@ data class SetState(
     val cardUids: List<String> = emptyList(),
     val cardNames: List<String> = emptyList(),
     val index: Int = 0,
+    /** width / height of the Set's Cards (of its first Card's Style), for thumbnail placeholders */
+    val aspect: Float = 0.716f,
     /** null while the current Card renders */
     val card: RenderedCard? = null,
     /** what the core said, newest last (errors, warnings) */
@@ -163,6 +165,7 @@ class SetViewModel(app: Application) : AndroidViewModel(app) {
         WorkingCopies.setLastOpen(context, copy.id)
         val cards = Core.listCards(open.session)
         val info = Core.sessionInfo(open.session)
+        val size = cards.uids.firstOrNull()?.let { Core.cardSize(open.session, it) }
         // the worker off the core thread: each render is then its own dispatch onto it, so
         // calls made meanwhile, such as edits, run between renders
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -172,6 +175,7 @@ class SetViewModel(app: Application) : AndroidViewModel(app) {
             session = open.session,
             workingCopy = copy,
             dirty = info.dirty,
+            aspect = size?.takeIf { it.result.ok && it.height > 0 }?.let { (it.width / it.height).toFloat() } ?: 0.716f,
             cardUids = cards.uids.toList(),
             cardNames = cards.names.toList(),
             messages = messageLines(open.result) + messageLines(cards.result),
@@ -326,6 +330,26 @@ class SetViewModel(app: Application) : AndroidViewModel(app) {
         _state.value = s.copy(index = index, card = null)
         show()
     }
+
+    // ------------------------------------------------------------------- Thumbnails (the Set home grid)
+
+    /** The render of a Card at a width, as state, for the grid's cells */
+    fun observe(key: RenderKey) = renders?.observe(key)
+
+    /**
+     * The grid shows the Cards at [visible] (indices) and will soon show [ahead], thumbnails
+     * [width] pixels wide: render those, visible first; pending renders of others are dropped.
+     */
+    fun wantThumbnails(visible: List<Int>, ahead: List<Int>, width: Int) {
+        val s = _state.value
+        val service = renders ?: return
+        if (width <= 0) return
+        fun keys(indices: List<Int>) = indices.filter { it in s.cardUids.indices }.map { RenderKey(s.cardUids[it], width) }
+        service.want(keys(visible), keys(ahead))
+    }
+
+    /** The viewer is shown again: want its Card (and neighbours) again */
+    fun showCard() = show()
 
     /** Want the current Card and its neighbours, and show the current one's render */
     private fun show() {
