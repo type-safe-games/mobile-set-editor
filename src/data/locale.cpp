@@ -148,6 +148,6 @@ String const& LocalizedString::get(Locale const& locale) const {
 }
 
 String const& LocalizedString::get() const {
-  if (translations.empty()) return default_;
+  if (translations.empty() || !the_locale) return default_; // (no locale loaded: the facade without one)
   return get(the_locale->name());
 }

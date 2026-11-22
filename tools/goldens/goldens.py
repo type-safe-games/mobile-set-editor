@@ -10,6 +10,11 @@ without the private pack (ADR 0008). `--templates DIR --font-store DIR` renders 
 Sets with a Template store and shared font store made by Template import instead of the pack
 (fontconfig then has no pack fonts); its run and report get an `-imported` suffix.
 
+`--renderer PATH` renders with the native renderer (test/goldens/golden_render.cpp: the facade
+on the wx-free Skia host) instead of the desktop CLI, and `--android` runs that renderer on an
+Android device or emulator (#44, see native.py); their runs and reports get a `-native` or
+`-android` suffix.
+
 The Layout dump is the gate: `check` exits 1 if any card's dump differs from its golden (or a
 golden card no longer renders). The pixel comparison (SSIM) is advisory and only goes into the
 report. Both modes write <goldens>/report-<mode>.md and styles.tsv, the per-Style pass/fail list
@@ -224,6 +229,10 @@ def main() -> int:
     ap.add_argument("--fixture-only", action="store_true", help="only the public Test fixture (no pack needed)")
     ap.add_argument("--templates", type=Path, help="an imported Template store to use instead of the pack's data/")
     ap.add_argument("--font-store", type=Path, help="with --templates: its shared font store")
+    ap.add_argument("--renderer", type=Path, help="render with this native golden_render instead of --mse")
+    ap.add_argument("--android", action="store_true",
+                    help="run the renderer on an Android device (default renderer: build-android-x86_64/golden_render)")
+    ap.add_argument("--serial", help="with --android: the adb serial of the device")
     ap.add_argument("only", nargs="*", help="limit to these Sets, Styles or corpus/set keys")
     args = ap.parse_args()
     if args.templates and args.mode == "capture":
@@ -231,10 +240,22 @@ def main() -> int:
     if args.font_store and not args.templates:
         ap.error("--font-store needs --templates")
 
+    if (args.renderer or args.android) and args.mode == "capture":
+        ap.error("goldens are captured from the desktop reference; --renderer and --android are only for check")
+    if args.android and not args.renderer:
+        args.renderer = REPO / "build-android-x86_64" / "golden_render"
+    if args.renderer and not args.renderer.exists():
+        ap.error(f"no renderer at {args.renderer}: build the golden_render target first")
+
     sets = collect(args)
     images = args.goldens / "images"
     imported = "-imported" if args.templates else ""
+    imported += "-android" if args.android else "-native" if args.renderer else ""
     run_root = images if args.mode == "capture" else args.goldens / f"check-run{imported}"
+
+    if args.renderer:
+        results = render_native(args, sets, run_root, images)
+        return finish(args, results, imported)
 
     def work(gs: GoldenSet) -> SetResult:
         res = render(gs, run_root / gs.corpus / gs.name, args.mse, args.timeout)
@@ -249,7 +270,36 @@ def main() -> int:
             mark = "" if args.mode == "capture" else ("  dump ok" if res.dump_ok else "  DUMP DIFFERS")
             print(f"[{n}/{len(sets)}] {res.render_status:8} {res.gs.key}{mark}", flush=True)
 
-    suffix = "-fixture" if args.fixture_only else imported
+    return finish(args, results, imported)
+
+
+def render_native(args, sets: list[GoldenSet], run_root: Path, images: Path) -> list[SetResult]:
+    """Render with the native renderer, here or on Android, then compare (check only)."""
+    import native
+    profs = native.profiles(args.goldens, args.pack, args.templates, args.font_store)
+    jobs = [native.Job(profs["fixture" if gs.corpus == "fixture" else "pack"], gs.path, run_root / gs.corpus / gs.name)
+            for gs in sets]
+    for j in jobs:
+        if j.out_dir.exists():
+            shutil.rmtree(j.out_dir)
+        j.out_dir.mkdir(parents=True)
+    if args.android:
+        native.render_android(args.renderer, jobs, args.jobs, args.serial)
+    else:
+        native.render_local(args.renderer, jobs, args.jobs)
+    results = []
+    for n, (gs, j) in enumerate(zip(sets, jobs), 1):
+        status, output = native.read_result(j.out_dir)
+        cards = sorted((p.stem for p in j.out_dir.glob("*.json")), key=int)
+        res = SetResult(gs, status, output, cards)
+        compare(res, images / gs.corpus / gs.name, j.out_dir)
+        results.append(res)
+        print(f"[{n}/{len(sets)}] {res.render_status:8} {gs.key}{'  dump ok' if res.dump_ok else '  DUMP DIFFERS'}", flush=True)
+    return results
+
+
+def finish(args, results: list[SetResult], imported: str) -> int:
+    suffix = ("-fixture" if args.fixture_only else "") + imported
     write_report(args.goldens / f"report-{args.mode}{suffix}.md", results, args.mode)
     write_styles(args.goldens / f"styles{suffix}.tsv", results, args.mode)
     print(f"report: {args.goldens / f'report-{args.mode}{suffix}.md'}")

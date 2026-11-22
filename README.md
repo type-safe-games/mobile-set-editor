@@ -82,6 +82,7 @@ cmake -S . -B build-android-x86_64 -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_HOME/buil
       -DANDROID_ABI=x86_64 -DANDROID_PLATFORM=android-26 -DCMAKE_BUILD_TYPE=Release
 cmake --build build-android-x86_64
 tools/android/run-facade-tests.sh build-android-x86_64   # the facade tests, on a running emulator
+python3 tools/goldens/goldens.py check --android [--fixture-only]  # the Golden images, on it too
 ```
 
 On the desktop, `cmake -DMSE_SKIA_CODEC=ON -DMSE_SKIA_CANVAS=ON` (after `tools/skia/build.sh
