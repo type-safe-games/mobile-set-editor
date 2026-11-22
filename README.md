@@ -69,13 +69,25 @@ checks the private Tier 1 and Tier 2 corpora
 ## Building the Android app
 
 Planned. The app will be Jetpack Compose over the same C++ facade through JNI
-([ADR 0006](docs/adr/0006-compose-jni-over-cpp-facade.md)), with Skia built from source
-([ADR 0011](docs/adr/0011-skia-official-gn-build-from-source.md)).
-Skia already builds, for the host and both Android ABIs, from pinned submodules with no network
-access: see [`tools/skia/README.md`](tools/skia/README.md). With a host Skia build, `cmake -DMSE_SKIA_CODEC=ON` makes
-the desktop decode and encode images through Skia instead of wx, and adds the `image-codec` test,
-which checks that both codecs decode alike. `-DMSE_SKIA_CANVAS=ON` renders cards with the Skia
-Canvas the app will use (headless only), which `tools/goldens` checks against the Golden images.
+([ADR 0006](docs/adr/0006-compose-jni-over-cpp-facade.md)).
+
+The core and facade already build for Android, from pinned submodules only (Skia, Boost,
+Hunspell: [`third_party/README.md`](third_party/README.md)), into `libmse.so` with the Skia image
+codec and Canvas. With an NDK (`ANDROID_NDK_HOME`):
+
+```sh
+git submodule update --init third_party
+tools/skia/build.sh android-x86_64          # or android-arm64-v8a
+cmake -S . -B build-android-x86_64 -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake \
+      -DANDROID_ABI=x86_64 -DANDROID_PLATFORM=android-26 -DCMAKE_BUILD_TYPE=Release
+cmake --build build-android-x86_64
+tools/android/run-facade-tests.sh build-android-x86_64   # the facade tests, on a running emulator
+```
+
+On the desktop, `cmake -DMSE_SKIA_CODEC=ON -DMSE_SKIA_CANVAS=ON` (after `tools/skia/build.sh
+linux-x64`) renders with the same Skia backends, which `tools/goldens` checks against the Golden
+images, and adds the `facade-skia` test: the facade tests on the wx-free host Android uses.
+See [`tools/skia/README.md`](tools/skia/README.md).
 
 ## Documentation
 

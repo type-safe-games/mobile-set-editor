@@ -27,6 +27,10 @@ Third-party components
 ----------------------
 
 - third_party/minizip-ng: minizip-ng, under the zlib license (see its LICENSE).
+- third_party/boost: Boost libraries, under the Boost Software License 1.0
+  (see LICENSE_1_0.txt in each).
+- third_party/hunspell: Hunspell, under MPL 1.1 / GPL 2.0 or later / LGPL 2.1 or
+  later, used under the GPL (see its COPYING files and license.hunspell).
 - third_party/skia: Skia, under the BSD 3-Clause license (see its LICENSE).
 - third_party/skia-deps: Skia's dependencies, each with its licence file:
   zlib (zlib license, LICENSE), libpng (libpng license, LICENSE),

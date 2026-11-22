@@ -10,15 +10,6 @@ add_test(
   COMMAND perl "${test_dir}/locale/validate_locale.pl" "${PROJECT_SOURCE_DIR}/src" ${locales}
 )
 
-# Scripting language tests
-add_test(
-  NAME script-functions
-  COMMAND magicseteditor ${test_dir}/script/script-functions.mse-script
-)
-
-# Rendering tests
-# TODO
-
 # Test fixture (ADR 0008): a tiny free Game and Style that public CI can render.
 # Tests see only the fixture's bundled fonts and template packages.
 set(FIXTURE_FONTS_DIR "${test_dir}/fixture/fonts")
@@ -30,53 +21,76 @@ set(fixture_env
 )
 set(fixture_set "${test_dir}/fixture/sets/fixture-cards.mse-set")
 
-add_test(
-  NAME fixture-render
-  COMMAND ${CMAKE_COMMAND} -DMSE=$<TARGET_FILE:magicseteditor> -DSET=${fixture_set}
-          -DCOMMANDS=${test_dir}/fixture/render-all.mse-cli -DWORKDIR=${PROJECT_BINARY_DIR}/test-output
-          -P ${test_dir}/run_cli.cmake
-)
-set_tests_properties(fixture-render PROPERTIES ENVIRONMENT "${fixture_env}")
-
-# Layout dump (ADR 0010): deterministic, and read from the drawing pass
-add_test(
-  NAME layout-dump
-  COMMAND ${CMAKE_COMMAND} -DMSE=$<TARGET_FILE:magicseteditor> -DSET=${fixture_set}
-          -DCOMMANDS=${test_dir}/layout/layout-dump.mse-cli -DWORKDIR=${PROJECT_BINARY_DIR}/test-output
-          -P ${test_dir}/run_cli.cmake
-)
-set_tests_properties(layout-dump PROPERTIES ENVIRONMENT "${fixture_env}")
-
-# The facade (ADR 0009), headless on the desktop host, against the fixture. Renders are also compared
-# with the fixture's Golden images when the private goldens are there (ADR 0008, ADR 0010).
+# Golden images of the Test fixture (optional; the private goldens, ADR 0008, ADR 0010)
 set(FIXTURE_GOLDENS_DIR "${PROJECT_SOURCE_DIR}/templates/goldens/images/fixture/fixture-cards"
     CACHE PATH "Golden images of the Test fixture (optional)")
-add_test(
-  NAME facade
-  COMMAND facade_tests ${test_dir}/fixture ${PROJECT_BINARY_DIR}/test-output/facade ${FIXTURE_GOLDENS_DIR}
-)
-set_tests_properties(facade PROPERTIES ENVIRONMENT "${fixture_env}" FIXTURES_SETUP facade-output)
 
-# A Set whose card list the facade edited and saved opens in the desktop build with the same cards
-set(facade_output "${PROJECT_BINARY_DIR}/test-output/facade")
-add_test(
-  NAME facade-card-list-desktop
-  COMMAND ${CMAKE_COMMAND} -DMSE=$<TARGET_FILE:magicseteditor> -DSET=${facade_output}/card-list-edits.mse-set
-          -DCOMMANDS=${facade_output}/card-list-edits.mse-cli -DWORKDIR=${PROJECT_BINARY_DIR}/test-output
-          -P ${test_dir}/run_cli.cmake
-)
-set_tests_properties(facade-card-list-desktop PROPERTIES ENVIRONMENT "${fixture_env}" FIXTURES_REQUIRED facade-output)
+# The desktop program's tests (wx)
+if(MSE_DESKTOP)
+  # Scripting language tests
+  add_test(
+    NAME script-functions
+    COMMAND magicseteditor ${test_dir}/script/script-functions.mse-script
+  )
 
-# A Set the facade created, edited (with a second Style) and saved opens in the desktop build
-add_test(
-  NAME facade-new-set-desktop
-  COMMAND ${CMAKE_COMMAND} -DMSE=$<TARGET_FILE:magicseteditor> -DSET=${facade_output}/new-set.mse-set
-          -DCOMMANDS=${facade_output}/new-set.mse-cli -DWORKDIR=${PROJECT_BINARY_DIR}/test-output
-          -P ${test_dir}/run_cli.cmake
-)
-set_tests_properties(facade-new-set-desktop PROPERTIES ENVIRONMENT "${fixture_env}" FIXTURES_REQUIRED facade-output)
+  # Rendering tests
+  # TODO
 
-# The Skia image codec decodes like the wx one and round-trips (#41). Only in builds with MSE_SKIA_CODEC.
-if(TARGET image_codec_tests)
-  add_test(NAME image-codec COMMAND image_codec_tests ${test_dir}/image_codec/images)
+  add_test(
+    NAME fixture-render
+    COMMAND ${CMAKE_COMMAND} -DMSE=$<TARGET_FILE:magicseteditor> -DSET=${fixture_set}
+            -DCOMMANDS=${test_dir}/fixture/render-all.mse-cli -DWORKDIR=${PROJECT_BINARY_DIR}/test-output
+            -P ${test_dir}/run_cli.cmake
+  )
+  set_tests_properties(fixture-render PROPERTIES ENVIRONMENT "${fixture_env}")
+
+  # Layout dump (ADR 0010): deterministic, and read from the drawing pass
+  add_test(
+    NAME layout-dump
+    COMMAND ${CMAKE_COMMAND} -DMSE=$<TARGET_FILE:magicseteditor> -DSET=${fixture_set}
+            -DCOMMANDS=${test_dir}/layout/layout-dump.mse-cli -DWORKDIR=${PROJECT_BINARY_DIR}/test-output
+            -P ${test_dir}/run_cli.cmake
+  )
+  set_tests_properties(layout-dump PROPERTIES ENVIRONMENT "${fixture_env}")
+
+  # The facade (ADR 0009), headless on the desktop host, against the fixture. Renders are also compared
+  # with the fixture's Golden images when the private goldens are there (ADR 0008, ADR 0010).
+  add_test(
+    NAME facade
+    COMMAND facade_tests ${test_dir}/fixture ${PROJECT_BINARY_DIR}/test-output/facade ${FIXTURE_GOLDENS_DIR}
+  )
+  set_tests_properties(facade PROPERTIES ENVIRONMENT "${fixture_env}" FIXTURES_SETUP facade-output)
+
+  # A Set whose card list the facade edited and saved opens in the desktop build with the same cards
+  set(facade_output "${PROJECT_BINARY_DIR}/test-output/facade")
+  add_test(
+    NAME facade-card-list-desktop
+    COMMAND ${CMAKE_COMMAND} -DMSE=$<TARGET_FILE:magicseteditor> -DSET=${facade_output}/card-list-edits.mse-set
+            -DCOMMANDS=${facade_output}/card-list-edits.mse-cli -DWORKDIR=${PROJECT_BINARY_DIR}/test-output
+            -P ${test_dir}/run_cli.cmake
+  )
+  set_tests_properties(facade-card-list-desktop PROPERTIES ENVIRONMENT "${fixture_env}" FIXTURES_REQUIRED facade-output)
+
+  # A Set the facade created, edited (with a second Style) and saved opens in the desktop build
+  add_test(
+    NAME facade-new-set-desktop
+    COMMAND ${CMAKE_COMMAND} -DMSE=$<TARGET_FILE:magicseteditor> -DSET=${facade_output}/new-set.mse-set
+            -DCOMMANDS=${facade_output}/new-set.mse-cli -DWORKDIR=${PROJECT_BINARY_DIR}/test-output
+            -P ${test_dir}/run_cli.cmake
+  )
+  set_tests_properties(facade-new-set-desktop PROPERTIES ENVIRONMENT "${fixture_env}" FIXTURES_REQUIRED facade-output)
+
+  # The Skia image codec decodes like the wx one and round-trips (#41). Only in builds with MSE_SKIA_CODEC.
+  if(TARGET image_codec_tests)
+    add_test(NAME image-codec COMMAND image_codec_tests ${test_dir}/image_codec/images)
+  endif()
+endif()
+
+# The facade tests on the wx-free Skia host, as on Android, headless (#43). Only with both Skia options.
+if(TARGET facade_tests_skia)
+  add_test(
+    NAME facade-skia
+    COMMAND facade_tests_skia ${test_dir}/fixture ${PROJECT_BINARY_DIR}/test-output/facade-skia ${FIXTURE_GOLDENS_DIR}
+  )
+  set_tests_properties(facade-skia PROPERTIES ENVIRONMENT "MSE_SYSTEM_FONT_DIRS=${FIXTURE_FONTS_DIR}")
 endif()

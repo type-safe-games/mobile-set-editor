@@ -25,7 +25,6 @@
 #include <script/functions/construction_helper.hpp>
 #include <wx/statline.h>
 #include <boost/json.hpp>
-#include <boost/json/src.hpp>
 
 // ----------------------------------------------------------------------------- : AddJSON
 

@@ -7,18 +7,49 @@ add_definitions(-DUNOFFICIAL_BUILD)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
-# Upstream 2.6 wants wx >= 3.3.3. This fork's desktop build is only a test host
-# (ADR 0007), so it accepts the system wx 3.2 and bridges the gap in
-# src/util/wx_compat.hpp.
-find_package(wxWidgets 3.2 CONFIG QUIET COMPONENTS core base net)
-if(NOT wxWidgets_FOUND)
-  find_package(wxWidgets 3.2 MODULE REQUIRED COMPONENTS core base net)
+# What to build. On Android (the NDK toolchain sets ANDROID) only the wx-free core and facade with
+# the Skia backends, and everything from source (F-Droid, ADR 0011, #43); on the desktop also the
+# wx program and its tests, with Boost and Hunspell from the system unless MSE_VENDORED_DEPS.
+if(ANDROID)
+  set(CMAKE_POSITION_INDEPENDENT_CODE ON) # everything ends up in the app's shared library
+  set(MSE_DESKTOP OFF)
+  set(MSE_VENDORED_DEPS ON)
+  set(MSE_SKIA_CODEC ON)
+  set(MSE_SKIA_CANVAS ON)
+else()
+  option(MSE_DESKTOP "Build the wx desktop program and its tests" ON)
+  option(MSE_VENDORED_DEPS "Use Boost and Hunspell from third_party/ instead of the system's" OFF)
 endif()
-# Boost >= 1.70 ships BoostConfig.cmake; CMake 4 deprecates the FindBoost module (CMP0167).
-if(POLICY CMP0167)
-  cmake_policy(SET CMP0167 NEW)
+
+if(MSE_DESKTOP)
+  # Upstream 2.6 wants wx >= 3.3.3. This fork's desktop build is only a test host
+  # (ADR 0007), so it accepts the system wx 3.2 and bridges the gap in
+  # src/util/wx_compat.hpp.
+  find_package(wxWidgets 3.2 CONFIG QUIET COMPONENTS core base net)
+  if(NOT wxWidgets_FOUND)
+    find_package(wxWidgets 3.2 MODULE REQUIRED COMPONENTS core base net)
+  endif()
 endif()
-find_package(Boost REQUIRED COMPONENTS regex json)
+
+# Boost: header-only (Boost.Regex is, and Boost.JSON is compiled into the core by util/boost_json.cpp).
+# Vendored: the 26 Boost libraries the core uses, each a submodule in third_party/boost/ at the
+# commit the Boost 1.92.0 release pins (see third_party/README.md).
+add_library(mse_boost INTERFACE)
+if(MSE_VENDORED_DEPS)
+  file(GLOB boost_include_dirs LIST_DIRECTORIES true "${PROJECT_SOURCE_DIR}/third_party/boost/*/include")
+  if(NOT EXISTS "${PROJECT_SOURCE_DIR}/third_party/boost/json/include/boost/json.hpp")
+    message(FATAL_ERROR "third_party/boost is empty: run git submodule update --init third_party/boost")
+  endif()
+  target_include_directories(mse_boost SYSTEM INTERFACE ${boost_include_dirs})
+else()
+  # Boost >= 1.70 ships BoostConfig.cmake; CMake 4 deprecates the FindBoost module (CMP0167).
+  if(POLICY CMP0167)
+    cmake_policy(SET CMP0167 NEW)
+  endif()
+  find_package(Boost 1.76 REQUIRED)
+  target_link_libraries(mse_boost INTERFACE Boost::headers)
+endif()
+target_compile_definitions(mse_boost INTERFACE BOOST_JSON_NO_LIB BOOST_CONTAINER_NO_LIB)
 
 # minizip-ng (third_party/minizip-ng, a submodule pinned to 4.2.2) reads and writes
 # the zip packages (src/util/io/zip.cpp). Deflate through the system zlib only: no
@@ -53,28 +84,43 @@ add_subdirectory(third_party/minizip-ng EXCLUDE_FROM_ALL)
 
 find_package(PkgConfig)
 
-# find hunspell
-pkg_check_modules(HUNSPELL hunspell)
-if( NOT HUNSPELL_FOUND )
-	message("-- Cannot find Hunspell via pkg-config, checking directly...")
-	find_path(HUNSPELL_INCLUDE_DIRS hunspell.hxx)
-	message("-- HUNSPELL_INCLUDE_DIRS = ${HUNSPELL_INCLUDE_DIRS}")
-	find_library(HUNSPELL_LIBRARIES NAMES hunspell libhunspell)
-	message("-- HUNSPELL_LIBRARIES = ${HUNSPELL_LIBRARIES}")
-	if ( ${HUNSPELL_INCLUDE_DIRS} STREQUAL "HUNSPELL_INCLUDE_DIRS-NOTFOUND" )
-		message(FATAL_ERROR "Hunspell cannot be found")
-	else()
-		message("-- Found Hunspell at ${HUNSPELL_LIBRARIES}")
-	endif()
+# Hunspell. Vendored: libhunspell built from third_party/hunspell (a submodule at the release the
+# desktop's system package has), from its library sources: upstream has only autotools.
+if(MSE_VENDORED_DEPS)
+  set(hunspell_dir "${PROJECT_SOURCE_DIR}/third_party/hunspell/src/hunspell")
+  if(NOT EXISTS "${hunspell_dir}/hunspell.cxx")
+    message(FATAL_ERROR "third_party/hunspell is empty: run git submodule update --init third_party/hunspell")
+  endif()
+  add_library(mse_hunspell STATIC
+    ${hunspell_dir}/affentry.cxx ${hunspell_dir}/affixmgr.cxx ${hunspell_dir}/csutil.cxx
+    ${hunspell_dir}/filemgr.cxx ${hunspell_dir}/hashmgr.cxx ${hunspell_dir}/hunspell.cxx ${hunspell_dir}/hunspelltrace.cxx
+    ${hunspell_dir}/hunzip.cxx ${hunspell_dir}/phonet.cxx ${hunspell_dir}/replist.cxx
+    ${hunspell_dir}/suggestmgr.cxx)
+  target_compile_definitions(mse_hunspell PUBLIC HUNSPELL_STATIC PRIVATE BUILDING_LIBHUNSPELL)
+  target_include_directories(mse_hunspell SYSTEM PUBLIC "${hunspell_dir}")
+  set(HUNSPELL_LIBRARIES mse_hunspell)
+  set(HUNSPELL_INCLUDE_DIRS "")
+else()
+  pkg_check_modules(HUNSPELL hunspell)
+  if( NOT HUNSPELL_FOUND )
+  	message("-- Cannot find Hunspell via pkg-config, checking directly...")
+  	find_path(HUNSPELL_INCLUDE_DIRS hunspell.hxx)
+  	message("-- HUNSPELL_INCLUDE_DIRS = ${HUNSPELL_INCLUDE_DIRS}")
+  	find_library(HUNSPELL_LIBRARIES NAMES hunspell libhunspell)
+  	message("-- HUNSPELL_LIBRARIES = ${HUNSPELL_LIBRARIES}")
+  	if ( ${HUNSPELL_INCLUDE_DIRS} STREQUAL "HUNSPELL_INCLUDE_DIRS-NOTFOUND" )
+  		message(FATAL_ERROR "Hunspell cannot be found")
+  	else()
+  		message("-- Found Hunspell at ${HUNSPELL_LIBRARIES}")
+  	endif()
+  endif()
+  # You will most likely get a message about being unable to open hunspell-1.7.lib because pkgconf forgets to add the actual path to HUNSPELL_LIBRARIES.
+  # If so, uncomment the below line and point it to the correct vcpkg root folder/library. (For debug builds, add "debug\\" just before "lib\\")
+  #set(HUNSPELL_LIBRARIES "C:\\PATH\\TO\\ROOT\\vcpkg\\installed\\${VCPKG_TARGET_TRIPLET}\\lib\\hunspell-1.7.lib")
 endif()
-
-# You will most likely get a message about being unable to open hunspell-1.7.lib because pkgconf forgets to add the actual path to HUNSPELL_LIBRARIES.
-# If so, uncomment the below line and point it to the correct vcpkg root folder/library. (For debug builds, add "debug\\" just before "lib\\")
-#set(HUNSPELL_LIBRARIES "C:\\PATH\\TO\\ROOT\\vcpkg\\installed\\${VCPKG_TARGET_TRIPLET}\\lib\\hunspell-1.7.lib")
 
 include_directories("${PROJECT_BINARY_DIR}/src")
 include_directories("${PROJECT_SOURCE_DIR}/src")
-include_directories(${Boost_INCLUDE_DIRS})
 include_directories(${HUNSPELL_INCLUDE_DIRS})
 
 # The core: everything under src/ except the desktop program (gui/, cli/, main.cpp), the facade
@@ -87,17 +133,19 @@ list(FILTER core_sources EXCLUDE REGEX "/src/(gui|cli|facade)/")
 list(FILTER core_sources EXCLUDE REGEX "/src/main\\.cpp$")
 list(FILTER core_sources EXCLUDE REGEX "/src/gfx/(skia/|wx_)")
 add_library(mse_core OBJECT ${core_sources})
-target_link_libraries(mse_core PUBLIC Boost::regex Boost::json MINIZIP::minizip ${HUNSPELL_LIBRARIES})
+target_link_libraries(mse_core PUBLIC mse_boost MINIZIP::minizip ${HUNSPELL_LIBRARIES})
 target_precompile_headers(mse_core PRIVATE src/util/prec.hpp)
 
 # The wx backends of the core (gfx/wx_*: Canvas, image codec, conversions), for the desktop.
 # Everything that uses wx is compiled with MSE_WX, and gets its own precompiled header.
 
-file(GLOB wx_backend_sources src/gfx/wx_*.cpp)
-add_library(mse_wx OBJECT ${wx_backend_sources})
-target_compile_definitions(mse_wx PUBLIC MSE_WX)
-target_link_libraries(mse_wx PUBLIC mse_core wxWidgets::wxWidgets)
-target_precompile_headers(mse_wx PRIVATE src/util/prec.hpp)
+if(MSE_DESKTOP)
+  file(GLOB wx_backend_sources src/gfx/wx_*.cpp)
+  add_library(mse_wx OBJECT ${wx_backend_sources})
+  target_compile_definitions(mse_wx PUBLIC MSE_WX)
+  target_link_libraries(mse_wx PUBLIC mse_core wxWidgets::wxWidgets)
+  target_precompile_headers(mse_wx PRIVATE src/util/prec.hpp)
+endif()
 
 # The Skia backends (ADR 0004), built from the pinned submodules by tools/skia/build.sh. With
 # MSE_SKIA_CODEC the desktop decodes and encodes images through Skia instead of wx (#41); with
@@ -105,10 +153,15 @@ target_precompile_headers(mse_wx PRIVATE src/util/prec.hpp)
 # still needs wx canvases).
 option(MSE_SKIA_CODEC "Decode and encode images with Skia (needs tools/skia/build.sh linux-x64)" OFF)
 option(MSE_SKIA_CANVAS "Render with the Skia Canvas, headless only (needs tools/skia/build.sh linux-x64)" OFF)
-set(MSE_SKIA_LIB_DIR "${PROJECT_SOURCE_DIR}/out/skia/linux-x64" CACHE PATH "Skia build output (tools/skia/build.sh)")
+if(ANDROID)
+  set(skia_target "android-${ANDROID_ABI}")
+else()
+  set(skia_target "linux-x64")
+endif()
+set(MSE_SKIA_LIB_DIR "${PROJECT_SOURCE_DIR}/out/skia/${skia_target}" CACHE PATH "Skia build output (tools/skia/build.sh)")
 if(MSE_SKIA_CODEC OR MSE_SKIA_CANVAS)
   if(NOT EXISTS "${MSE_SKIA_LIB_DIR}/libskia.a" OR NOT EXISTS "${MSE_SKIA_LIB_DIR}/libharfbuzz.a")
-    message(FATAL_ERROR "No Skia build in ${MSE_SKIA_LIB_DIR}: run tools/skia/build.sh linux-x64")
+    message(FATAL_ERROR "No Skia build in ${MSE_SKIA_LIB_DIR}: run tools/skia/build.sh ${skia_target}")
   endif()
   # Skia's headers need C++20, and C++20's std::format_string clashes with the core's under
   # `using namespace std`. So only these files include Skia (and HarfBuzz) headers, and they
@@ -124,6 +177,9 @@ if(MSE_SKIA_CODEC OR MSE_SKIA_CANVAS)
   # Keep Skia's libpng/libjpeg/zlib/HarfBuzz symbols out of the dynamic symbol table, so wx's
   # shared libraries (and Pango) keep using the system's
   target_link_options(mse_skia INTERFACE "LINKER:--exclude-libs,ALL")
+  if(ANDROID)
+    target_link_libraries(mse_skia PUBLIC log) # Skia's SkDebugf goes to logcat
+  endif()
   target_link_libraries(mse_core PUBLIC mse_skia)
   if(MSE_SKIA_CODEC)
     target_sources(mse_core PRIVATE src/gfx/skia/skia_image_codec.cpp)
@@ -137,7 +193,7 @@ endif()
 
 # On wxGTK the shared font store's files are given to fontconfig with wxFont::AddPrivateFont, and
 # Pango has to be told to reread the configuration afterwards (gfx/wx_canvas.cpp)
-if(UNIX AND NOT APPLE AND PkgConfig_FOUND)
+if(MSE_DESKTOP AND UNIX AND NOT APPLE AND PkgConfig_FOUND)
   pkg_check_modules(PANGOFC IMPORTED_TARGET pangocairo pangofc)
   if(PANGOFC_FOUND)
     set_source_files_properties(src/gfx/wx_canvas.cpp PROPERTIES
@@ -154,109 +210,130 @@ add_library(mse_facade OBJECT ${facade_sources})
 target_link_libraries(mse_facade PUBLIC mse_core)
 target_precompile_headers(mse_facade REUSE_FROM mse_core)
 
-# Magic Set Editor executable
+# The core and the facade as one shared library: on Android libmse.so, which the app's JNI layer
+# joins (ADR 0006). Object libraries, so every object and static initialiser goes in.
+if(ANDROID)
+  add_library(mse SHARED $<TARGET_OBJECTS:mse_core> $<TARGET_OBJECTS:mse_facade>)
+  target_link_libraries(mse PUBLIC mse_core)
+endif()
 
-add_executable(magicseteditor WIN32)
-target_link_libraries(${PROJECT_NAME} PRIVATE mse_wx mse_core)
+# Headless tests of the facade on a wx-free host with the Skia backends: what Android runs
+# (tools/android/run-facade-tests.sh), and on the desktop with both Skia options (test/tests.cmake)
+if(MSE_SKIA_CODEC AND MSE_SKIA_CANVAS)
+  add_executable(facade_tests_skia test/facade/facade_tests.cpp test/facade/skia_host.cpp)
+  target_link_libraries(facade_tests_skia PRIVATE mse_facade mse_core)
+  target_precompile_headers(facade_tests_skia PRIVATE src/util/prec.hpp) # (its own: an executable is -fPIE)
+endif()
 
-file(GLOB_RECURSE sources src/gui/*.cpp src/cli/*.cpp)
-list(FILTER sources EXCLUDE REGEX win32_cli_wrapper.cpp)
-target_sources(magicseteditor PRIVATE ${sources} src/main.cpp)
-target_precompile_headers(magicseteditor REUSE_FROM mse_wx)
+if(MSE_DESKTOP)
+  # Magic Set Editor executable
 
-# Headless tests of the facade, on a desktop host that installs the wx backends (test/tests.cmake)
+  add_executable(magicseteditor WIN32)
+  target_link_libraries(${PROJECT_NAME} PRIVATE mse_wx mse_core)
 
-add_executable(facade_tests test/facade/facade_tests.cpp src/facade/desktop/desktop_host.cpp)
-target_link_libraries(facade_tests PRIVATE mse_facade mse_wx mse_core)
-target_precompile_headers(facade_tests REUSE_FROM mse_wx)
+  file(GLOB_RECURSE sources src/gui/*.cpp src/cli/*.cpp)
+  list(FILTER sources EXCLUDE REGEX win32_cli_wrapper.cpp)
+  target_sources(magicseteditor PRIVATE ${sources} src/main.cpp)
+  target_precompile_headers(magicseteditor REUSE_FROM mse_wx)
 
-# The Skia image codec against the wx one (#41)
-if(MSE_SKIA_CODEC)
-  add_executable(image_codec_tests test/image_codec/image_codec_tests.cpp)
-  target_link_libraries(image_codec_tests PRIVATE mse_wx mse_core)
-  target_precompile_headers(image_codec_tests REUSE_FROM mse_wx)
+  # Headless tests of the facade, on a desktop host that installs the wx backends (test/tests.cmake)
+
+  add_executable(facade_tests test/facade/facade_tests.cpp test/facade/wx_host.cpp src/facade/desktop/desktop_host.cpp)
+  target_link_libraries(facade_tests PRIVATE mse_facade mse_wx mse_core)
+  target_precompile_headers(facade_tests REUSE_FROM mse_wx)
+
+  # The Skia image codec against the wx one (#41)
+  if(MSE_SKIA_CODEC)
+    add_executable(image_codec_tests test/image_codec/image_codec_tests.cpp)
+    target_link_libraries(image_codec_tests PRIVATE mse_wx mse_core)
+    target_precompile_headers(image_codec_tests REUSE_FROM mse_wx)
+  endif()
 endif()
 
 configure_file(src/config.hpp.in src/config.hpp)
 
-# resource file
+if(MSE_DESKTOP)
 
-target_sources(magicseteditor PRIVATE resource/win32_res.rc)
+  # resource file
 
-# Halian trying Mac stuff
+  target_sources(magicseteditor PRIVATE resource/win32_res.rc)
 
-if(BUILD_APPLE_BUNDLE)
-  set(CMAKE_LIBRARY_OUTPUT_DIRECTORY
-    "${CMAKE_BINARY_DIR}/magicseteditor.app/Contents/PlugIns")
-  set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}")
-  set_target_properties(
-  "magicseteditor"
-    PROPERTIES
-    MACOSX_BUNDLE_NAME                             "magicseteditor"
-    MACOSX_BUNDLE_VERSION                          "${PROJECT_VERSION}"
-    MACOSX_BUNDLE_GUI_IDENTIFIER                   "org.magicseteditor.gui"
-    MACOSX_BUNDLE_ICON_FILE                        "mse.icns"
-    MACOSX_BUNDLE_INFO_PLIST                       "MacOSXBundleInfo.plist.in"
-    MACOSX_BUNDLE                                  "TRUE"
-    # MACHO_COMPATIBILITY_VERSION                  "12.0.0"
-    RESOURCE                                       "${RESOURCE_FILES}"
-    XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY             ""
-    XCODE_ATTRIBUTE_CODE_SIGNING_REQUIRED          NO
-    XCODE_ATTRIBUTE_DEBUG_INFORMATION_FORMAT       dwarf
-    XCODE_ATTRIBUTE_GCC_INLINES_ARE_PRIVATE_EXTERN YES
-    XCODE_ATTRIBUTE_CLANG_LINK_OBJC_RUNTIME        NO
-  )
-  add_custom_command(
-    TARGET "magicseteditor"
-    POST_BUILD
-    COMMAND dylibbundler ARGS -od -ns -b -x "${CMAKE_BINARY_DIR}/magicseteditor.app/Contents/MacOS/magicseteditor" -d "${CMAKE_BINARY_DIR}/magicseteditor.app/Contents/libs"
-    WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
-    COMMENT "Changing library search path from absolute to relative…"
-  )
-  add_custom_command(
-    TARGET "magicseteditor"
-    POST_BUILD
-    COMMAND "${CMAKE_COMMAND}" -E make_directory "${CMAKE_BINARY_DIR}/magicseteditor.app/Contents/Resources"
-    COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${PROJECT_SOURCE_DIR}/mse.icns" "${CMAKE_BINARY_DIR}/magicseteditor.app/Contents/Resources/mse.icns"
-    COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${PROJECT_SOURCE_DIR}/mse-set.icns" "${CMAKE_BINARY_DIR}/magicseteditor.app/Contents/Resources/mse-set.icns"
-    WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
-    COMMENT "Copying icons…"
-  )
-  add_custom_command(
-    TARGET "magicseteditor"
-    POST_BUILD
-    COMMAND "${CMAKE_COMMAND}" -E make_directory "${CMAKE_BINARY_DIR}/magicseteditor.app/Contents/SharedSupport"
-    COMMAND "${CMAKE_COMMAND}" -E copy_directory "${PROJECT_SOURCE_DIR}/resource" "${CMAKE_BINARY_DIR}/magicseteditor.app/Contents/SharedSupport/resource"
-    WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
-    COMMENT "Copying application resources…"
-  )
-  add_custom_command(
-    TARGET "magicseteditor"
-    POST_BUILD
-    COMMAND "${CMAKE_COMMAND}" -DBUNDLE_PATH="${CMAKE_BINARY_DIR}/magicseteditor.app" -P "${PROJECT_SOURCE_DIR}/cmake/SignAppleBundle.cmake"
-    WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
-    COMMENT "Ad-hoc signing application bundle…"
-  )
-endif()
+  # Halian trying Mac stuff
 
-# magicseteditor.com: wrapper to enable command line executable on windows
+  if(BUILD_APPLE_BUNDLE)
+    set(CMAKE_LIBRARY_OUTPUT_DIRECTORY
+      "${CMAKE_BINARY_DIR}/magicseteditor.app/Contents/PlugIns")
+    set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}")
+    set_target_properties(
+    "magicseteditor"
+      PROPERTIES
+      MACOSX_BUNDLE_NAME                             "magicseteditor"
+      MACOSX_BUNDLE_VERSION                          "${PROJECT_VERSION}"
+      MACOSX_BUNDLE_GUI_IDENTIFIER                   "org.magicseteditor.gui"
+      MACOSX_BUNDLE_ICON_FILE                        "mse.icns"
+      MACOSX_BUNDLE_INFO_PLIST                       "MacOSXBundleInfo.plist.in"
+      MACOSX_BUNDLE                                  "TRUE"
+      # MACHO_COMPATIBILITY_VERSION                  "12.0.0"
+      RESOURCE                                       "${RESOURCE_FILES}"
+      XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY             ""
+      XCODE_ATTRIBUTE_CODE_SIGNING_REQUIRED          NO
+      XCODE_ATTRIBUTE_DEBUG_INFORMATION_FORMAT       dwarf
+      XCODE_ATTRIBUTE_GCC_INLINES_ARE_PRIVATE_EXTERN YES
+      XCODE_ATTRIBUTE_CLANG_LINK_OBJC_RUNTIME        NO
+    )
+    add_custom_command(
+      TARGET "magicseteditor"
+      POST_BUILD
+      COMMAND dylibbundler ARGS -od -ns -b -x "${CMAKE_BINARY_DIR}/magicseteditor.app/Contents/MacOS/magicseteditor" -d "${CMAKE_BINARY_DIR}/magicseteditor.app/Contents/libs"
+      WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
+      COMMENT "Changing library search path from absolute to relative…"
+    )
+    add_custom_command(
+      TARGET "magicseteditor"
+      POST_BUILD
+      COMMAND "${CMAKE_COMMAND}" -E make_directory "${CMAKE_BINARY_DIR}/magicseteditor.app/Contents/Resources"
+      COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${PROJECT_SOURCE_DIR}/mse.icns" "${CMAKE_BINARY_DIR}/magicseteditor.app/Contents/Resources/mse.icns"
+      COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${PROJECT_SOURCE_DIR}/mse-set.icns" "${CMAKE_BINARY_DIR}/magicseteditor.app/Contents/Resources/mse-set.icns"
+      WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
+      COMMENT "Copying icons…"
+    )
+    add_custom_command(
+      TARGET "magicseteditor"
+      POST_BUILD
+      COMMAND "${CMAKE_COMMAND}" -E make_directory "${CMAKE_BINARY_DIR}/magicseteditor.app/Contents/SharedSupport"
+      COMMAND "${CMAKE_COMMAND}" -E copy_directory "${PROJECT_SOURCE_DIR}/resource" "${CMAKE_BINARY_DIR}/magicseteditor.app/Contents/SharedSupport/resource"
+      WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
+      COMMENT "Copying application resources…"
+    )
+    add_custom_command(
+      TARGET "magicseteditor"
+      POST_BUILD
+      COMMAND "${CMAKE_COMMAND}" -DBUNDLE_PATH="${CMAKE_BINARY_DIR}/magicseteditor.app" -P "${PROJECT_SOURCE_DIR}/cmake/SignAppleBundle.cmake"
+      WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
+      COMMENT "Ad-hoc signing application bundle…"
+    )
+  endif()
 
-if(WIN32)
-  add_executable(magicseteditor-cli)
-  target_sources(magicseteditor-cli PRIVATE src/cli/win32_cli_wrapper.cpp)
-  add_custom_command(TARGET magicseteditor-cli POST_BUILD COMMAND
-    ${CMAKE_COMMAND} -E copy "${PROJECT_BINARY_DIR}/magicseteditor-cli.exe" "${PROJECT_BINARY_DIR}/magicseteditor.com"
-  )
-endif()
+  # magicseteditor.com: wrapper to enable command line executable on windows
 
-# Magic Set Editor Updater executable: needs wx >= 3.3 (wxWebRequestSync,
-# SetAppearance) and self-updates a desktop install, so it is not built for the
-# wx 3.2 test host.
+  if(WIN32)
+    add_executable(magicseteditor-cli)
+    target_sources(magicseteditor-cli PRIVATE src/cli/win32_cli_wrapper.cpp)
+    add_custom_command(TARGET magicseteditor-cli POST_BUILD COMMAND
+      ${CMAKE_COMMAND} -E copy "${PROJECT_BINARY_DIR}/magicseteditor-cli.exe" "${PROJECT_BINARY_DIR}/magicseteditor.com"
+    )
+  endif()
 
-if(wxWidgets_VERSION VERSION_GREATER_EQUAL 3.3)
-  add_executable(magicseteditor-updater WIN32)
-  target_link_libraries(magicseteditor-updater PRIVATE wxWidgets::wxWidgets)
-  target_sources(magicseteditor-updater PRIVATE src_updater/main.cpp src_updater/win32_res.rc src_updater/updater.ico)
+  # Magic Set Editor Updater executable: needs wx >= 3.3 (wxWebRequestSync,
+  # SetAppearance) and self-updates a desktop install, so it is not built for the
+  # wx 3.2 test host.
+
+  if(wxWidgets_VERSION VERSION_GREATER_EQUAL 3.3)
+    add_executable(magicseteditor-updater WIN32)
+    target_link_libraries(magicseteditor-updater PRIVATE wxWidgets::wxWidgets)
+    target_sources(magicseteditor-updater PRIVATE src_updater/main.cpp src_updater/win32_res.rc src_updater/updater.ico)
+  endif()
+
 endif()
 
 # warnings
@@ -286,5 +363,3 @@ endif()
 # Test suite
 include(test/tests.cmake)
 
-# Debug Message
-message("-- Does this have a full path? If not, and it's just a file name, it's broken: ${HUNSPELL_LIBRARIES}")

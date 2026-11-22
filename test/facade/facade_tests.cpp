@@ -16,7 +16,7 @@
 
 #include <util/prec.hpp>
 #include <facade/facade.hpp>
-#include <facade/desktop/desktop_host.hpp>
+#include "test_host.hpp"
 #include <facade/template_import.hpp>
 #include <data/text_editing.hpp>
 #include <gfx/image_codec.hpp>
@@ -203,13 +203,9 @@ TEST(render_matches_export_layout_and_goldens) {
       std::string golden_png = read_text(goldens_dir / (n + ".png"));
       Image golden;
       CHECK(image_codec().decode(golden_png.data(), golden_png.size(), golden));
-      #ifdef MSE_SKIA_CANVAS
-        // the Golden images were drawn by wx: another canvas must match their Layout dump (above),
-        // its pixels are only compared, advisorily, by tools/goldens (ADR 0004, ADR 0010)
-        const bool exact_pixels = false;
-      #else
-        const bool exact_pixels = true;
-      #endif
+      // the Golden images were drawn by wx: another canvas must match their Layout dump (above),
+      // its pixels are only compared, advisorily, by tools/goldens (ADR 0004, ADR 0010)
+      const bool exact_pixels = test_host::draws_like_goldens();
       if (!exact_pixels) {
         CHECK_EQ(golden.GetWidth(), w);
       } else if (golden.GetWidth() == w && golden.GetHeight() == h) {
@@ -1939,8 +1935,8 @@ TEST(template_import_failure) {
 /// facade_tests --import <zip> <template store> <font store>
 static int import_main(int argc, char** argv) {
   fs::create_directories(argv[3]);
-  if (!mse::facade::desktop::start_host(argc, argv)) {
-    std::fprintf(stderr, "could not start the desktop host (no display? run under xvfb-run)\n");
+  if (!test_host::start(argc, argv)) {
+    std::fprintf(stderr, "could not start the test host (no display for the desktop host? run under xvfb-run)\n");
     return 1;
   }
   F::InitOptions options;
@@ -1987,7 +1983,7 @@ static int import_main(int argc, char** argv) {
   std::printf("fonts: %zu\n", r.fonts.size());
   std::printf("dictionaries: %zu\n", r.dictionaries.size());
   F::shutdown();
-  mse::facade::desktop::stop_host();
+  test_host::stop();
   return counts[4] == 0 && r.messages.empty() ? 0 : 1;
 }
 
@@ -2007,8 +2003,8 @@ int main(int argc, char** argv) {
   fs::create_directories(work_dir / "sessions");
   fs::copy(fixture_dir / "data", templates_dir, fs::copy_options::recursive);
 
-  if (!mse::facade::desktop::start_host(argc, argv)) {
-    std::fprintf(stderr, "could not start the desktop host (no display? run under xvfb-run)\n");
+  if (!test_host::start(argc, argv)) {
+    std::fprintf(stderr, "could not start the test host (no display for the desktop host? run under xvfb-run)\n");
     return 1;
   }
   F::InitOptions options;
@@ -2032,7 +2028,7 @@ int main(int argc, char** argv) {
     if (failures != before) ++failed_tests;
   }
   F::shutdown();
-  mse::facade::desktop::stop_host();
+  test_host::stop();
   std::printf("%zu tests, %d failed, %d checks, %d failed checks\n", tests().size(), failed_tests, checks, failures);
   return failures == 0 ? 0 : 1;
 }

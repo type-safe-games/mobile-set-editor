@@ -21,8 +21,7 @@
  *  Fonts are described by CanvasFont, which carries the face the font registry
  *  (gfx/font_registry.hpp) resolved for it.
  *
- *  Coordinates are device pixels. Geometry still uses wx's plain value types
- *  (IntPoint, IntSize, IntRect); replacing those is a separate, mechanical cleanup.
+ *  Coordinates are device pixels, as IntPoint, IntSize and IntRect (util/geometry.hpp).
  *
  *  Implementations: gfx/wx_canvas.hpp (the desktop, over a wxDC) and gfx/skia/skia_canvas.hpp
  *  (CPU-only Skia, for Android; on the desktop with the CMake option MSE_SKIA_CANVAS).
