@@ -96,20 +96,4 @@ class CardEditorTest {
         compose.onNodeWithTag("field-text").assertTextContains(original)
         compose.onNodeWithTag("redo").assertIsDisplayed()
     }
-
-    @Test
-    fun aNonTextFieldIsNotEditableYet() {
-        val model = SetViewModel(TestFixture.app.applicationContext as Application)
-        compose.setContent { CardEditorScreen(model, onBack = {}) }
-        model.open(Uri.fromFile(TestFixture.zip("editor-picture.mse-set", TestFixture.assetFiles("sets/fixture-cards.mse-set"))))
-        compose.waitUntil(30_000) { model.state.value.card != null }
-        val card = model.state.value.card!!
-        val picture = card.regions.first { it.editable && it.field == "picture" }
-        compose.onNodeWithTag("card-${card.uid}").performTouchInput {
-            val scale = width.toFloat() / card.bitmap.width
-            click(Offset(((picture.x + picture.width / 2) * scale).toFloat(), ((picture.y + picture.height / 2) * scale).toFloat()))
-        }
-        waitForTag("not-editable")
-        compose.onNodeWithTag("not-editable").assertIsDisplayed()
-    }
 }

@@ -704,6 +704,17 @@ static FieldRef find_field(Session& s, const Target& t, const std::string& name)
       return ref;
     }
   }
+  if (t.kind == Target::Kind::Card) {
+    // the extra card fields of the card's Style
+    StyleSheet& stylesheet = const_cast<StyleSheet&>(set.stylesheetFor(ref.card));
+    for (const ValueP& v : ref.card->extraDataFor(stylesheet)) {
+      if (v->fieldP->name == n) {
+        ref.value = v;
+        if (v->fieldP->index < stylesheet.extra_card_style.size()) ref.style = stylesheet.extra_card_style.at(v->fieldP->index);
+        return ref;
+      }
+    }
+  }
   fail(Status::NotFound, "no field '" + name + "'");
 }
 
@@ -836,6 +847,18 @@ static FieldInfo field_info(const Field& f) {
       }
     }
   }
+  if (const ColorField* cf = dynamic_cast<const ColorField*>(&f)) {
+    for (const ColorField::ChoiceP& c : cf->choices) {
+      info.colors.push_back(ColorChoice{to_utf8(c->name), to_utf8(format_color(c->color))});
+    }
+    info.allow_custom = cf->allow_custom;
+  }
+  if (const PackageChoiceField* pf = dynamic_cast<const PackageChoiceField*>(&f)) {
+    if (!pf->required) info.choices.push_back(std::string());
+    vector<PackagedP> packages;
+    package_manager.findMatching(pf->match, packages);
+    for (const PackagedP& p : packages) info.choices.push_back(to_utf8(p->relativeFilename()));
+  }
   return info;
 }
 
@@ -845,7 +868,13 @@ FieldList listFields(SessionHandle h, const Target& t) {
     Set& set = *s.set;
     IndexMap<FieldP, ValueP>* values = nullptr;
     switch (t.kind) {
-      case Target::Kind::Card:      values = &find_card(set, t.card_uid)->data; break;
+      case Target::Kind::Card: {
+        CardP card = find_card(set, t.card_uid);
+        for (const ValueP& v : card->data) r.fields.push_back(field_info(*v->fieldP));
+        // and the extra card fields of the card's Style (e.g. a saga's chapter count)
+        values = &card->extraDataFor(set.stylesheetFor(card));
+        break;
+      }
       case Target::Kind::Set:       values = &set.data; break;
       case Target::Kind::CardStyle: values = &set.stylingDataFor(find_card(set, t.card_uid)); break;
       case Target::Kind::SetStyle:  values = &set.stylingDataFor(*set.stylesheet); break;

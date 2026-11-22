@@ -247,12 +247,23 @@ struct Target {
   static Target keyword(KeywordId id)             { return Target{Kind::Keyword, std::string(), id}; }
 };
 
+/// One of a color field's preset colors
+struct ColorChoice {
+  std::string name;
+  std::string color; ///< as setValue takes it, e.g. "rgb(255,0,0)"
+};
+
 struct FieldInfo {
   std::string name;
-  std::string type;   ///< "text", "choice", "multiple choice", "color", "image", "symbol", "package choice", "info", ...
+  std::string type;   ///< "text", "choice", "multiple choice", "slider", "color", "image", "symbol", "package choice", "info", ...
   bool editable = true;
   bool multi_line = false; ///< text fields
-  std::vector<std::string> choices; ///< choice fields: the choice names, in order
+  /// choice, multiple choice and slider fields: the choice names, in order (a slider's are its
+  /** numbers); package choice fields: the installed packages that match, with "" first if none
+   *  is allowed */
+  std::vector<std::string> choices;
+  std::vector<ColorChoice> colors; ///< color fields: the preset colors
+  bool allow_custom = false;       ///< color fields: are other colors than the presets allowed?
 };
 
 struct FieldList : Result {

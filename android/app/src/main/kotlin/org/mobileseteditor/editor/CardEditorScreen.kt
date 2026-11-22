@@ -66,6 +66,9 @@ import org.mobileseteditor.core.TargetKind
 import org.mobileseteditor.core.TextResult
 import org.mobileseteditor.render.RenderKey
 
+/** A field's name (or an undo step's, which may contain one) as people read it: "card_color" is "card color" */
+fun displayName(name: String) = name.replace('_', ' ')
+
 /** The field being edited: which Card, which field */
 private data class EditTarget(val uid: String, val field: String)
 
@@ -103,12 +106,12 @@ fun CardEditorScreen(model: SetViewModel, onBack: () -> Unit) {
                 onClick = { scope.launch { model.undo(); revision++ } },
                 enabled = state.canUndo,
                 modifier = Modifier.testTag("undo"),
-            ) { Text(if (state.undoName.isEmpty()) "Undo" else "Undo ${state.undoName.lowercase()}", maxLines = 1) }
+            ) { Text(if (state.undoName.isEmpty()) "Undo" else "Undo ${displayName(state.undoName).lowercase()}", maxLines = 1) }
             TextButton(
                 onClick = { scope.launch { model.redo(); revision++ } },
                 enabled = state.canRedo,
                 modifier = Modifier.testTag("redo"),
-            ) { Text(if (state.redoName.isEmpty()) "Redo" else "Redo ${state.redoName.lowercase()}", maxLines = 1) }
+            ) { Text(if (state.redoName.isEmpty()) "Redo" else "Redo ${displayName(state.redoName).lowercase()}", maxLines = 1) }
         }
         if (state.cardUids.isEmpty()) {
             Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
@@ -227,24 +230,28 @@ private fun CardPage(
     }
 }
 
-/** The sheet below the Card: the field's name, ‹ › to the other text fields, and its editor */
+/** The sheet below the Card: the field's name, ‹ › to the Card's other editable fields, and its editor */
 @Composable
 private fun FieldSheet(model: SetViewModel, target: EditTarget, revision: Int, onField: (String) -> Unit, onClose: () -> Unit) {
     val session = model.state.value.session
     var fields by remember(target.uid) { mutableStateOf<List<FieldInfo>?>(null) }
     LaunchedEffect(target.uid) { fields = Core.listFields(session, TargetKind.Card, target.uid).fields }
     // the fields this Card shows, from its render
-    val onCard = model.observe(RenderKey(target.uid, model.renderWidth))?.collectAsState()?.value?.regions?.map { it.field }?.toSet()
+    val regions = model.observe(RenderKey(target.uid, model.renderWidth))?.collectAsState()?.value?.regions
+    val onCard = regions?.map { it.field }?.toSet()
+    val aspect = regions?.firstOrNull { it.field == target.field }?.let { (it.width / it.height).toFloat() } ?: 1f
     val all = fields
     val info = all?.firstOrNull { it.name == target.field }
-    val textFields = all.orEmpty().filter { it.type == "text" && it.editable && (onCard == null || it.name in onCard) }.map { it.name }
+    val textFields = all.orEmpty()
+        .filter { it.editable && (it.type == "text" || it.type in VALUE_EDITOR_TYPES) && (onCard == null || it.name in onCard) }
+        .map { it.name }
     val at = textFields.indexOf(target.field)
     Surface(tonalElevation = 3.dp, modifier = Modifier.fillMaxWidth().testTag("field-sheet")) {
         Column(Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 TextButton(onClick = { onField(textFields[at - 1]) }, enabled = at > 0, modifier = Modifier.testTag("previous-field")) { Text("‹") }
                 Text(
-                    target.field.replaceFirstChar { it.uppercase() },
+                    displayName(target.field).replaceFirstChar { it.uppercase() },
                     style = MaterialTheme.typography.titleSmall,
                     modifier = Modifier.weight(1f).testTag("editing-field"),
                     maxLines = 1,
@@ -254,8 +261,9 @@ private fun FieldSheet(model: SetViewModel, target: EditTarget, revision: Int, o
             }
             when {
                 info == null -> CircularProgressIndicator(Modifier.padding(8.dp))
+                info.editable && info.type in VALUE_EDITOR_TYPES -> ValueEditor(model, session, target.uid, info, aspect, revision)
                 info.type != "text" || !info.editable -> Text(
-                    "This is a ${info.type} field: editing it here comes later.",
+                    if (!info.editable) "This field can't be edited." else "This is a ${info.type} field: editing it here comes later.",
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.padding(8.dp).testTag("not-editable"),
                 )

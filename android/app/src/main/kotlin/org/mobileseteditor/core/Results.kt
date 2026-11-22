@@ -148,7 +148,23 @@ enum class TargetKind { Card, Set, CardStyle, SetStyle, Keyword }
 // ----------------------------------------------------------------------------- Fields and text editing (ADR 0009)
 
 /** A field of a Card, the Set info or a Style's options */
-class FieldInfo(val name: String, val type: String, val editable: Boolean, val multiLine: Boolean, val choices: List<String>)
+/** One of a color field's preset colors; [color] as setValue takes it, e.g. "rgb(255,0,0)" */
+class ColorChoice(val name: String, val color: String)
+
+/**
+ * A field. [choices]: a choice, multiple choice or slider field's choice names (a slider's are its
+ * numbers), or a package choice field's matching packages ("" first if none is allowed). [colors]
+ * and [allowCustom]: a color field's presets, and whether other colors are allowed.
+ */
+class FieldInfo(
+    val name: String,
+    val type: String,
+    val editable: Boolean,
+    val multiLine: Boolean,
+    val choices: List<String>,
+    val colors: List<ColorChoice> = emptyList(),
+    val allowCustom: Boolean = false,
+)
 
 class FieldListResult(
     val result: CoreResult,
@@ -157,8 +173,17 @@ class FieldListResult(
     editable: BooleanArray,
     multiLine: BooleanArray,
     choices: Array<Array<String>>,
+    colorNames: Array<Array<String>>,
+    colorValues: Array<Array<String>>,
+    allowCustom: BooleanArray,
 ) {
-    val fields: List<FieldInfo> = names.indices.map { FieldInfo(names[it], types[it], editable[it], multiLine[it], choices[it].toList()) }
+    val fields: List<FieldInfo> = names.indices.map { i ->
+        FieldInfo(
+            names[i], types[i], editable[i], multiLine[i], choices[i].toList(),
+            colorNames[i].indices.map { ColorChoice(colorNames[i][it], colorValues[i][it]) },
+            allowCustom[i],
+        )
+    }
 }
 
 /**

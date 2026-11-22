@@ -15,6 +15,23 @@ card height: 400
 card dpi: 150
 card background: rgb(240,240,232)
 
+extra card field:
+	type: slider
+	name: chapters
+	minimum: 1
+	maximum: 3
+	initial: 2
+extra card field:
+	type: color
+	name: border
+	choice:
+		name: black
+		color: rgb(0,0,0)
+	choice:
+		name: white
+		color: rgb(255,255,255)
+	initial: rgb(0,0,0)
+
 styling field:
 	type: choice
 	name: accent
@@ -76,3 +93,25 @@ card style:
 			name: fixture-symbols
 			size: 10
 		alignment: top left
+
+extra card style:
+	chapters:
+		left: 20
+		top: 370
+		width: 40
+		height: 20
+		render style: text
+		font:
+			name: DejaVu Sans
+			size: 8
+			color: black
+	border:
+		left: 0
+		top: 0
+		width: 280
+		height: 400
+		left width: 4
+		right width: 4
+		top width: 4
+		bottom width: 4
+		z index: -2

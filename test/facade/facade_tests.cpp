@@ -48,6 +48,7 @@ static void report_failure(const char* file, int line, const std::string& what) 
     if (!(a_ == b_)) report_failure(__FILE__, __LINE__, std::string(#a " == " #b) + " (" + to_s(a_) + " vs " + to_s(b_) + ")"); } while (0)
 #define CHECK_OK(r) do { ++checks; const auto& r_ = (r); \
     if (!r_.ok()) report_failure(__FILE__, __LINE__, std::string(#r) + " failed: status " + std::to_string((int)r_.status) + ": " + r_.error); } while (0)
+#define REQUIRE(cond) do { ++checks; if (!(cond)) { report_failure(__FILE__, __LINE__, #cond); return; } } while (0)
 #define REQUIRE_OK(r) do { const auto& r_ = (r); ++checks; \
     if (!r_.ok()) { report_failure(__FILE__, __LINE__, std::string(#r) + " failed: status " + std::to_string((int)r_.status) + ": " + r_.error); return; } } while (0)
 
@@ -1440,6 +1441,56 @@ TEST(change_card_style) {
   CHECK_EQ(F::setCardStyle(s, "nope", "fixture-alternate.mse-style").status, F::Status::NotFound);
   CHECK(!F::sessionInfo(s).can_undo);
   F::closeSession(s);
+}
+
+static const F::FieldInfo* find_field_info(const F::FieldList& list, const std::string& name) {
+  for (const F::FieldInfo& f : list.fields) if (f.name == name) return &f;
+  return nullptr;
+}
+
+TEST(field_details_and_extra_card_fields) {
+  F::SessionHandle s = open_fixture();
+  F::FieldList fields = F::listFields(s, F::Target::card("fixture-wrap"));
+  REQUIRE_OK(fields);
+  const F::FieldInfo* frame = find_field_info(fields, "frame");
+  const F::FieldInfo* level = find_field_info(fields, "level");
+  REQUIRE(frame && level);
+  CHECK_EQ(frame->type, std::string("choice"));
+  CHECK(frame->choices == (std::vector<std::string>{"red", "blue", "grey"}));
+  CHECK_EQ(level->type, std::string("slider"));
+  CHECK(level->choices == (std::vector<std::string>{"0", "1", "2", "3", "4", "5"}));
+  CHECK(find_field_info(fields, "chapters") == nullptr); // (the standard Style has no extra fields)
+
+  // the alternate Style's extra card fields: listed, read and set like the Game's own
+  REQUIRE_OK(F::setCardStyle(s, "fixture-wrap", "fixture-alternate.mse-style"));
+  fields = F::listFields(s, F::Target::card("fixture-wrap"));
+  const F::FieldInfo* chapters = find_field_info(fields, "chapters");
+  const F::FieldInfo* border = find_field_info(fields, "border");
+  REQUIRE(chapters && border);
+  CHECK_EQ(chapters->type, std::string("slider"));
+  CHECK(chapters->choices == (std::vector<std::string>{"1", "2", "3"}));
+  CHECK_EQ(border->type, std::string("color"));
+  REQUIRE(border->colors.size() == 2);
+  CHECK_EQ(border->colors[1].name, std::string("white"));
+  CHECK_EQ(border->colors[1].color, std::string("rgb(255,255,255)"));
+  CHECK(border->allow_custom);
+  CHECK_EQ(F::getValue(s, F::Target::card("fixture-wrap"), "chapters").value, std::string("2"));
+  F::ActionResult set = F::setValue(s, F::Target::card("fixture-wrap"), "chapters", "3");
+  REQUIRE_OK(set);
+  CHECK(contains(set.stale.card_uids, "fixture-wrap"));
+  CHECK_EQ(F::getValue(s, F::Target::card("fixture-wrap"), "chapters").value, std::string("3"));
+  REQUIRE_OK(F::setValue(s, F::Target::card("fixture-wrap"), "border", "rgb(255,255,255)"));
+  CHECK_EQ(F::getValue(s, F::Target::card("fixture-wrap"), "border").value, std::string("rgb(255,255,255)"));
+  CHECK_EQ(F::fieldAt(s, "fixture-wrap", 30, 380, 280).field, std::string("chapters"));
+  // the color's frame is 4 pixels wide: its inside is the fields under it, or nothing
+  CHECK_EQ(F::fieldAt(s, "fixture-wrap", 2, 200, 280).field, std::string("border"));
+  CHECK(F::fieldAt(s, "fixture-wrap", 10, 190, 280).field != "border");
+  // one undo step each
+  CHECK_OK(F::undo(s));
+  CHECK_EQ(F::getValue(s, F::Target::card("fixture-wrap"), "border").value, std::string("rgb(0,0,0)"));
+  CHECK_OK(F::undo(s));
+  CHECK_EQ(F::getValue(s, F::Target::card("fixture-wrap"), "chapters").value, std::string("2"));
+  CHECK_OK(F::closeSession(s));
 }
 
 TEST(change_set_style) {

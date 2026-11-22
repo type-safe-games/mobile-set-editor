@@ -103,7 +103,7 @@ bool load_classes(JNIEnv* env) {
   cls.field_at_result_init  = env->GetMethodID(cls.field_at_result, "<init>", ("(" + result_sig + "Ljava/lang/String;)V").c_str());
   cls.value_result_init     = env->GetMethodID(cls.value_result, "<init>", ("(" + result_sig + "Ljava/lang/String;Ljava/lang/String;)V").c_str());
   cls.field_list_result_init = env->GetMethodID(cls.field_list_result, "<init>",
-    ("(" + result_sig + "[Ljava/lang/String;[Ljava/lang/String;[Z[Z[[Ljava/lang/String;)V").c_str());
+    ("(" + result_sig + "[Ljava/lang/String;[Ljava/lang/String;[Z[Z[[Ljava/lang/String;[[Ljava/lang/String;[[Ljava/lang/String;[Z)V").c_str());
   cls.text_result_init      = env->GetMethodID(cls.text_result, "<init>",
     ("(L" + p + "ActionResult;Ljava/lang/String;II[I[I)V").c_str());
   jstring utf8 = env->NewStringUTF("UTF-8");
@@ -359,6 +359,9 @@ Java_org_mobileseteditor_core_NativeCore_listFields(JNIEnv* env, jobject, jlong 
   jbooleanArray editable = env->NewBooleanArray(n), multi = env->NewBooleanArray(n);
   jclass string_array = env->FindClass("[Ljava/lang/String;");
   jobjectArray choices = env->NewObjectArray(n, string_array, nullptr);
+  jobjectArray color_names = env->NewObjectArray(n, string_array, nullptr);
+  jobjectArray color_values = env->NewObjectArray(n, string_array, nullptr);
+  jbooleanArray allow_custom = env->NewBooleanArray(n);
   for (jsize i = 0 ; i < n ; ++i) {
     const F::FieldInfo& f = r.fields[i];
     names.push_back(f.name);
@@ -369,11 +372,22 @@ Java_org_mobileseteditor_core_NativeCore_listFields(JNIEnv* env, jobject, jlong 
     jobjectArray c = to_java(env, f.choices);
     env->SetObjectArrayElement(choices, i, c);
     env->DeleteLocalRef(c);
+    std::vector<std::string> cn, cv;
+    for (const F::ColorChoice& cc : f.colors) { cn.push_back(cc.name); cv.push_back(cc.color); }
+    jobjectArray jcn = to_java(env, cn), jcv = to_java(env, cv);
+    env->SetObjectArrayElement(color_names, i, jcn);
+    env->SetObjectArrayElement(color_values, i, jcv);
+    env->DeleteLocalRef(jcn);
+    env->DeleteLocalRef(jcv);
+    jboolean ac = f.allow_custom;
+    env->SetBooleanArrayRegion(allow_custom, i, 1, &ac);
   }
   jobject result = to_java(env, r);
   jobjectArray jn = to_java(env, names), jt = to_java(env, types);
-  jobject out = env->NewObject(cls.field_list_result, cls.field_list_result_init, result, jn, jt, editable, multi, choices);
-  for (jobject o : {result, (jobject)jn, (jobject)jt, (jobject)editable, (jobject)multi, (jobject)choices, (jobject)string_array}) env->DeleteLocalRef(o);
+  jobject out = env->NewObject(cls.field_list_result, cls.field_list_result_init, result, jn, jt, editable, multi, choices,
+                               color_names, color_values, allow_custom);
+  for (jobject o : {result, (jobject)jn, (jobject)jt, (jobject)editable, (jobject)multi, (jobject)choices,
+                    (jobject)color_names, (jobject)color_values, (jobject)allow_custom, (jobject)string_array}) env->DeleteLocalRef(o);
   return out;
 }
 
