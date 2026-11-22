@@ -54,8 +54,14 @@ class Job:
 
 
 def system_font_dir(goldens: Path) -> Path:
-    """A directory with copies of SYSTEM_FONTS, as this machine's fontconfig finds them."""
+    """A directory with copies of SYSTEM_FONTS, as this machine's fontconfig finds them.
+
+    Made once next to the goldens, and reused as it is: CI jobs get it with the goldens, so they
+    render with the reference machine's files and need no fontconfig of their own.
+    """
     d = goldens / "native-system-fonts"
+    if d.is_dir() and len(list(d.glob("*.ttf"))) >= len(SYSTEM_FONTS):
+        return d
     d.mkdir(parents=True, exist_ok=True)
     for pattern in SYSTEM_FONTS:
         path = subprocess.run(["fc-match", "-f", "%{file}", pattern], capture_output=True, text=True).stdout.strip()

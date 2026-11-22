@@ -38,6 +38,12 @@ from common import (  # noqa: E402
 
 FIXTURE = REPO / "test" / "fixture"
 SSIM_WARN = 0.98  # below this a card's pixels are flagged (advisory only)
+try:  # the pixel comparison needs numpy and Pillow; without them only the Layout dumps are compared
+    import numpy  # noqa: F401
+    import PIL  # noqa: F401
+    HAVE_SSIM = True
+except ImportError:
+    HAVE_SSIM = False
 
 
 @dataclass
@@ -175,7 +181,7 @@ def compare(res: SetResult, golden_dir: Path, run_dir: Path) -> None:
                 f"golden/{res.gs.key}/{card}.json", f"now/{res.gs.key}/{card}.json", lineterm="", n=1,
             )
             res.dump_diffs[card] = "\n".join(diff)
-        if (golden_dir / f"{card}.png").exists() and (run_dir / f"{card}.png").exists():
+        if HAVE_SSIM and (golden_dir / f"{card}.png").exists() and (run_dir / f"{card}.png").exists():
             res.ssim[card] = ssim(golden_dir / f"{card}.png", run_dir / f"{card}.png")
 
 
@@ -198,7 +204,8 @@ def write_report(path: Path, results: list[SetResult], mode: str) -> None:
         diffs = [r for r in results if not r.dump_ok]
         flagged = [(r, c, v) for r in results for c, v in r.ssim.items() if v < SSIM_WARN]
         out += [f"**Layout dump: {'PASS' if not diffs else f'FAIL ({len(diffs)} Sets differ)'}**",
-                f"Pixels (advisory): {len(flagged)} cards below SSIM {SSIM_WARN}.", ""]
+                f"Pixels (advisory): {len(flagged)} cards below SSIM {SSIM_WARN}." if HAVE_SSIM
+                else "Pixels (advisory): not compared (numpy and Pillow are not installed).", ""]
         for r in diffs:
             out += [f"## Layout differs: {r.gs.key} ({r.gs.style})", ""]
             if r.missing:

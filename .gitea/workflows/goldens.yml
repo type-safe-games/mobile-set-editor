@@ -39,3 +39,69 @@ jobs:
       - name: Report
         if: always()
         run: cat "$RUNNER_TEMP/goldens/report-check.md" || true
+
+  # The same check on the real Android build (#44, #49): the core and Skia built with the NDK for
+  # x86_64, rendering inside an emulator, compared with the same goldens. Runs on the runner's
+  # `mse-android` label (#39): the host's Android SDK is mounted at /opt/android-sdk, /dev/kvm is
+  # passed through, and the pack and goldens are mounted as for the desktop job.
+  android:
+    runs-on: mse-android
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Submodules
+        # (shallow ones, as .gitmodules recommends; the pack is mounted, not checked out)
+        run: git submodule update --init --jobs 8 third_party
+
+      - name: Skia
+        # the image has gcc but no clang: gn is built with g++, Skia itself with the NDK's clang
+        run: CXX=g++ AR=ar tools/skia/build.sh android-x86_64
+
+      - name: Build
+        run: |
+          cmake -S . -B build-android-x86_64 -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_TOOLCHAIN_FILE="$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake" \
+            -DANDROID_ABI=x86_64 -DANDROID_PLATFORM=android-26
+          cmake --build build-android-x86_64 -j"$(nproc)" --target golden_render
+
+      - name: Emulator
+        run: |
+          mkdir -p "$ANDROID_AVD_HOME"
+          echo no | avdmanager create avd -n ci -k "system-images;android-36;default;x86_64" -d pixel_6 --force
+          # room for the pack (~1 GB) and the renders
+          echo "disk.dataPartition.size=8G" >> "$ANDROID_AVD_HOME/ci.avd/config.ini"
+          nohup emulator -avd ci -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect \
+            > "$RUNNER_TEMP/emulator.log" 2>&1 &
+          adb wait-for-device
+          for i in $(seq 1 120); do
+            [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = 1 ] && break
+            sleep 2
+          done
+          adb shell getprop ro.build.version.sdk
+
+      - name: Golden check
+        run: |
+          # numpy and Pillow for the advisory pixel comparison (not in the image)
+          python -m venv "$RUNNER_TEMP/venv" && "$RUNNER_TEMP/venv/bin/pip" install -q numpy pillow
+          mkdir -p "$RUNNER_TEMP/goldens"
+          cp -a /goldens-ro/images /goldens-ro/tier1 /goldens-ro/tier2 /goldens-ro/styles.tsv \
+                /goldens-ro/native-system-fonts "$RUNNER_TEMP/goldens/"
+          "$RUNNER_TEMP/venv/bin/python" tools/goldens/goldens.py check --android \
+            --pack /pack --goldens "$RUNNER_TEMP/goldens" --jobs 4
+
+      - name: Report
+        if: always()
+        run: cat "$RUNNER_TEMP/goldens/report-check-android.md" || true
+
+      - name: Upload the report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: goldens-android-report
+          path: ${{ runner.temp }}/goldens/report-check-android.md
+          if-no-files-found: ignore
+
+      - name: Stop the emulator
+        if: always()
+        run: adb emu kill || true
