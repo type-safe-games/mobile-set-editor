@@ -90,6 +90,11 @@ enum class CloseChoice {
  * Cards render through a [RenderService] (#59): the current one first, neighbours ahead.
  */
 class SetViewModel(app: Application) : AndroidViewModel(app) {
+    companion object {
+        /** What a new Set is called until it has a title */
+        const val UNTITLED = "Untitled set"
+    }
+
     private val _state = MutableStateFlow(SetState())
     val state: StateFlow<SetState> = _state
 
@@ -151,6 +156,26 @@ class SetViewModel(app: Application) : AndroidViewModel(app) {
             WorkingCopies.delete(context, copy)
             return@launch report(open.result, "The Set could not be opened")
         }
+        opened(open, copy)
+    }
+
+    /**
+     * A new Set from a Game and one of its Styles (package names), in a new Working copy named
+     * "Untitled set" (until its title says otherwise). It has no document yet: its first Save is a
+     * Save as.
+     */
+    fun newSet(game: String, stylesheet: String) = viewModelScope.launch {
+        closeQuietly()
+        _state.value = SetState(opening = true)
+        if (!startCore()) return@launch
+        val copy = WorkingCopies.create(context, null, UNTITLED).copy(unsaved = true).also(WorkingCopies::write)
+        val open = Core.newSession(game, stylesheet, copy.setDir)
+        if (!open.result.ok) {
+            WorkingCopies.delete(context, copy)
+            return@launch report(open.result, "The Set could not be made")
+        }
+        // in the Working copy at once, so it survives the process going away
+        Core.flush(open.session)
         opened(open, copy)
     }
 
@@ -258,6 +283,20 @@ class SetViewModel(app: Application) : AndroidViewModel(app) {
         val s = _state.value
         if (!cards.result.ok || s.session != session || cards.uids.toList() != s.cardUids) return
         _state.value = s.copy(cardNames = cards.names.toList(), cardLinks = cards.links)
+        nameAfterTitle()
+    }
+
+    /** A Set without a document yet is called by its title, once it has one */
+    private suspend fun nameAfterTitle() {
+        val s = _state.value
+        val copy = s.workingCopy ?: return
+        if (copy.uri != null) return
+        val title = Core.getValue(s.session, TargetKind.Set, "", "title").takeIf { it.result.ok }?.value?.trim().orEmpty()
+        val name = title.ifEmpty { UNTITLED }
+        if (name == copy.name) return
+        val renamed = copy.copy(name = name)
+        WorkingCopies.write(renamed)
+        _state.value = _state.value.copy(workingCopy = renamed)
     }
 
     // ------------------------------------------------------------------- Linked cards

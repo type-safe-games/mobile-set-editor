@@ -22,6 +22,7 @@ internal object NativeCore {
     external fun openSessionFd(fd: Int, workingCopyDir: String): OpenResult
     external fun closeSession(session: Long): CoreResult
     /** Reopen a working copy left by an earlier session (e.g. before the process was killed) */
+    external fun newSession(game: String, stylesheet: String, workingCopyDir: String): OpenResult
     external fun openWorkingCopy(workingCopyDir: String, unsaved: Boolean): OpenResult
     /** Autosave: write the working copy if the Set changed since the last flush */
     external fun flush(session: Long): CoreResult

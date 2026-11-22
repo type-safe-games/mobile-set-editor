@@ -36,7 +36,7 @@ import org.mobileseteditor.core.WorkingCopy
 
 /** The Working copies (name, when last edited, unsaved or not), Open Set, Templates and New Set */
 @Composable
-fun StartScreen(onOpenSet: () -> Unit, onOpenCopy: (WorkingCopy) -> Unit, onTemplates: () -> Unit) {
+fun StartScreen(onOpenSet: () -> Unit, onOpenCopy: (WorkingCopy) -> Unit, onTemplates: () -> Unit, onNewSet: () -> Unit = {}) {
     val context = LocalContext.current
     var copies by remember { mutableStateOf(WorkingCopies.list(context)) }
     var removing by remember { mutableStateOf<WorkingCopy?>(null) }
@@ -45,7 +45,7 @@ fun StartScreen(onOpenSet: () -> Unit, onOpenCopy: (WorkingCopy) -> Unit, onTemp
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(onClick = onOpenSet, modifier = Modifier.testTag("open-set")) { Text("Open Set") }
             OutlinedButton(onClick = onTemplates) { Text("Templates") }
-            OutlinedButton(onClick = {}, enabled = false) { Text("New Set") } // (a later issue)
+            OutlinedButton(onClick = onNewSet, modifier = Modifier.testTag("new-set")) { Text("New Set") }
         }
         HorizontalDivider()
         Text(if (copies.isEmpty()) "No Sets open yet" else "Working copies", style = MaterialTheme.typography.titleSmall)

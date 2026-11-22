@@ -96,7 +96,7 @@ bool load_classes(JNIEnv* env) {
   cls.imported_package_init = env->GetMethodID(cls.imported_package, "<init>", "(Ljava/lang/String;Ljava/lang/String;IZLjava/lang/String;)V");
   cls.import_result_init    = env->GetMethodID(cls.import_result, "<init>", ("(" + result_sig + "[L" + p + "ImportedPackage;IIZ)V").c_str());
   cls.template_info_init    = env->GetMethodID(cls.template_info, "<init>",
-    "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V");
+    "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V");
   cls.template_list_result_init = env->GetMethodID(cls.template_list_result, "<init>", ("(" + result_sig + "[L" + p + "TemplateInfo;)V").c_str());
   cls.progress_on_progress  = env->GetMethodID(cls.progress_listener, "onProgress", "(JJ)Z");
   cls.action_result_init    = env->GetMethodID(cls.action_result, "<init>",
@@ -300,6 +300,16 @@ Java_org_mobileseteditor_core_NativeCore_openSessionFd(JNIEnv* env, jobject, jin
     unlink(source.c_str());
     return open;
   });
+  jobject result = to_java(env, r);
+  jobject out = env->NewObject(cls.open_result, cls.open_result_init, result, (jlong)r.session);
+  env->DeleteLocalRef(result);
+  return out;
+}
+
+JNIEXPORT jobject JNICALL
+Java_org_mobileseteditor_core_NativeCore_newSession(JNIEnv* env, jobject, jstring game, jstring stylesheet, jstring working_copy_dir) {
+  std::string g = from_java(env, game), st = from_java(env, stylesheet), work = from_java(env, working_copy_dir);
+  F::OpenResult r = guarded<F::OpenResult>([&] { return F::newSession(g, st, work); });
   jobject result = to_java(env, r);
   jobject out = env->NewObject(cls.open_result, cls.open_result_init, result, (jlong)r.session);
   env->DeleteLocalRef(result);
@@ -608,10 +618,11 @@ Java_org_mobileseteditor_core_NativeCore_listTemplates(JNIEnv* env, jobject) {
   for (size_t i = 0 ; i < r.templates.size() ; ++i) {
     const F::TemplateInfo& t = r.templates[i];
     jstring name = to_java(env, t.name), type = to_java(env, t.type), full = to_java(env, t.full_name),
-            version = to_java(env, t.version), game = to_java(env, t.game);
-    jobject jt = env->NewObject(cls.template_info, cls.template_info_init, name, type, full, version, game);
+            version = to_java(env, t.version), game = to_java(env, t.game), short_name = to_java(env, t.short_name),
+            icon = to_java(env, t.icon_path);
+    jobject jt = env->NewObject(cls.template_info, cls.template_info_init, name, type, full, version, game, short_name, icon);
     env->SetObjectArrayElement(list, (jsize)i, jt);
-    for (jobject o : {(jobject)name, (jobject)type, (jobject)full, (jobject)version, (jobject)game, jt}) env->DeleteLocalRef(o);
+    for (jobject o : {(jobject)name, (jobject)type, (jobject)full, (jobject)version, (jobject)game, (jobject)short_name, (jobject)icon, jt}) env->DeleteLocalRef(o);
   }
   jobject result = to_java(env, r);
   jobject out = env->NewObject(cls.template_list_result, cls.template_list_result_init, result, list);

@@ -38,6 +38,10 @@ object Core {
     suspend fun closeSession(session: Long): CoreResult = withContext(dispatcher) { NativeCore.closeSession(session) }
 
     /** Reopen a working copy an earlier session left; [unsaved] if it differs from the user's file */
+    /** A new Set from a Game and one of its Styles (package names), in a Working copy, as the desktop's New set */
+    suspend fun newSession(game: String, stylesheet: String, workingCopyDir: File): OpenResult =
+        withContext(dispatcher) { NativeCore.newSession(game, stylesheet, workingCopyDir.path) }
+
     suspend fun openWorkingCopy(workingCopyDir: File, unsaved: Boolean): OpenResult =
         withContext(dispatcher) { NativeCore.openWorkingCopy(workingCopyDir.path, unsaved) }
 

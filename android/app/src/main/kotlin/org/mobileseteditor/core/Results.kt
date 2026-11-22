@@ -100,7 +100,17 @@ class RenderResult(val result: CoreResult, val regions: Array<FieldRegion>)
 // ----------------------------------------------------------------------------- Templates
 
 /** An installed Template */
-class TemplateInfo(val name: String, val type: String, val fullName: String, val version: String, val game: String)
+class TemplateInfo(
+    val name: String,
+    val type: String,
+    val fullName: String,
+    val version: String,
+    val game: String,
+    /** for pickers */
+    val shortName: String = fullName,
+    /** the package's icon image, "" if it has none */
+    val iconPath: String = "",
+)
 
 class TemplateListResult(val result: CoreResult, val templates: Array<TemplateInfo>)
 

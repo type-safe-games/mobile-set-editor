@@ -75,7 +75,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private enum class Screen { Start, Set, Card, Templates }
+private enum class Screen { Start, Set, Card, Templates, NewSet }
 
 @Composable
 fun App(setModel: SetViewModel) {
@@ -103,6 +103,15 @@ fun App(setModel: SetViewModel) {
             onOpenSet = pickSet,
             onOpenCopy = { setModel.openWorkingCopy(it); screen = Screen.Set },
             onTemplates = { screen = Screen.Templates },
+            onNewSet = { screen = Screen.NewSet },
+        )
+        Screen.NewSet -> NewSetScreen(
+            onCreate = { game, style ->
+                setModel.newSet(game, style)
+                screen = Screen.Set
+            },
+            onTemplates = { screen = Screen.Templates },
+            onBack = { screen = Screen.Start },
         )
         Screen.Set -> SetHomeScreen(
             setModel,
