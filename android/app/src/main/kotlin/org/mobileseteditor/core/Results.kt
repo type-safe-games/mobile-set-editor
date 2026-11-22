@@ -205,6 +205,49 @@ class ActionResult(
 /** The result of making Cards: [uids] are the new ones, in the Set's order */
 class NewCardsResult(val action: ActionResult, val uids: Array<String>)
 
+/** A keyword (see the facade's KeywordInfo); its fields are edited through TargetKind.Keyword with "$id" as the uid */
+class KeywordInfo(
+    val id: Long,
+    val keyword: String,
+    /** as the desktop lists it: parameters as <type> */
+    val match: String,
+    val reminder: String,
+    val rules: String,
+    val mode: String,
+    val fromGame: Boolean,
+    val valid: Boolean,
+    val reminderError: String,
+    /** how many Cards use it */
+    val usage: Int,
+)
+
+/** A keyword parameter type: what goes in a match */
+class KeywordParamType(val name: String, val description: String)
+
+class KeywordListResult(
+    val result: CoreResult,
+    ids: LongArray,
+    names: Array<String>,
+    matches: Array<String>,
+    reminders: Array<String>,
+    rules: Array<String>,
+    modes: Array<String>,
+    fromGame: BooleanArray,
+    valid: BooleanArray,
+    errors: Array<String>,
+    usage: IntArray,
+    typeNames: Array<String>,
+    typeDescriptions: Array<String>,
+) {
+    /** The Set's, in its order, then the Game's */
+    val keywords: List<KeywordInfo> = ids.indices.map {
+        KeywordInfo(ids[it], names[it], matches[it], reminders[it], rules[it], modes[it], fromGame[it], valid[it], errors[it], usage[it])
+    }
+    val parameterTypes: List<KeywordParamType> = typeNames.indices.map { KeywordParamType(typeNames[it], typeDescriptions[it]) }
+}
+
+class NewKeywordResult(val action: ActionResult, val id: Long)
+
 class SessionInfo(
     val result: CoreResult,
     val game: String,

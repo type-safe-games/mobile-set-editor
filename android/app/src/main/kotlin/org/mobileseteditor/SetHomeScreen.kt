@@ -179,7 +179,7 @@ fun SetHomeScreen(
                 }
             }
             SetTab.SetInfo -> Box(Modifier.weight(1f)) { SetInfoTab(model, state, revision) { editing = it } }
-            SetTab.Keywords -> Placeholder("The Set's keywords come here.")
+            SetTab.Keywords -> Box(Modifier.weight(1f)) { KeywordsTab(model, state, revision) { editing = it } }
         }
         editing?.let { target ->
             FieldSheet(model, target, revision, onField = { editing = target.copy(field = it) }, onClose = { editing = null; revision++ })

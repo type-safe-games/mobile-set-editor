@@ -86,6 +86,19 @@ object Core {
     suspend fun moveCards(session: Long, uids: List<String>, position: Int): ActionResult =
         withContext(dispatcher) { NativeCore.moveCards(session, uids.toTypedArray(), position) }
 
+    /** The Set's keywords, then the Game's (read-only), and the Game's parameter types */
+    suspend fun listKeywords(session: Long): KeywordListResult = withContext(dispatcher) { NativeCore.listKeywords(session) }
+
+    /** Add an empty keyword to the Set, one undo step */
+    suspend fun addKeyword(session: Long): NewKeywordResult = withContext(dispatcher) { NativeCore.addKeyword(session) }
+
+    /** Remove one of the Set's keywords, one undo step */
+    suspend fun removeKeyword(session: Long, keyword: Long): ActionResult = withContext(dispatcher) { NativeCore.removeKeyword(session, keyword) }
+
+    /** Replace [start, end) of a keyword's match (code points) with a parameter, one undo step */
+    suspend fun insertKeywordParameter(session: Long, keyword: Long, start: Int, end: Int, type: String): TextResult =
+        withContext(dispatcher) { NativeCore.insertKeywordParameter(session, keyword, start, end, type) }
+
     /** Give a Card a Style of its own ("" or the Set's: follow the Set's again), one undo step */
     suspend fun setCardStyle(session: Long, cardUid: String, stylesheet: String): ActionResult =
         withContext(dispatcher) { NativeCore.setCardStyle(session, cardUid, stylesheet) }

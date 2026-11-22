@@ -39,6 +39,10 @@ internal object NativeCore {
     external fun duplicateCards(session: Long, cardUids: Array<String>): NewCardsResult
     external fun removeCards(session: Long, cardUids: Array<String>): ActionResult
     external fun moveCards(session: Long, cardUids: Array<String>, position: Int): ActionResult
+    external fun listKeywords(session: Long): KeywordListResult
+    external fun addKeyword(session: Long): NewKeywordResult
+    external fun removeKeyword(session: Long, keyword: Long): ActionResult
+    external fun insertKeywordParameter(session: Long, keyword: Long, start: Int, end: Int, type: String): TextResult
     external fun setCardStyle(session: Long, cardUid: String, stylesheet: String): ActionResult
     external fun setSetStyle(session: Long, stylesheet: String): ActionResult
     external fun setCardOwnStyling(session: Long, cardUid: String, own: Boolean): ActionResult

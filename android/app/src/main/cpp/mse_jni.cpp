@@ -21,6 +21,7 @@
 
 #include <cerrno>
 #include <cstdio>
+#include <cstdlib>
 #include <fcntl.h>
 #include <filesystem>
 #include <unistd.h>
@@ -36,13 +37,13 @@ constexpr const char* PKG = "org/mobileseteditor/core/";
 struct Classes {
   jclass string, message, result, open_result, card_list_result, card_size_result, field_region, render_result;
   jclass scanned_package, scan_result, imported_package, import_result, template_info, template_list_result, progress_listener;
-  jclass action_result, session_info, value_result, field_at_result, new_cards_result, link_type_list_result, symbol_menu_result, symbol_preview_result, field_list_result, text_result;
+  jclass action_result, session_info, value_result, field_at_result, keyword_list_result, new_keyword_result, new_cards_result, link_type_list_result, symbol_menu_result, symbol_preview_result, field_list_result, text_result;
   jmethodID string_from_bytes, string_get_bytes;
   jmethodID message_init, result_init, open_result_init, card_list_result_init, card_size_result_init,
             field_region_init, render_result_init;
   jmethodID scanned_package_init, scan_result_init, imported_package_init, import_result_init,
             template_info_init, template_list_result_init, progress_on_progress;
-  jmethodID action_result_init, session_info_init, value_result_init, field_at_result_init, new_cards_result_init, link_type_list_result_init, symbol_menu_result_init, symbol_preview_result_init, field_list_result_init, text_result_init;
+  jmethodID action_result_init, session_info_init, value_result_init, field_at_result_init, keyword_list_result_init, new_keyword_result_init, new_cards_result_init, link_type_list_result_init, symbol_menu_result_init, symbol_preview_result_init, field_list_result_init, text_result_init;
   jstring utf8;
 } cls;
 
@@ -74,6 +75,8 @@ bool load_classes(JNIEnv* env) {
   cls.session_info         = global_class(env, p + "SessionInfo");
   cls.value_result         = global_class(env, p + "ValueResult");
   cls.field_at_result      = global_class(env, p + "FieldAtResult");
+  cls.keyword_list_result  = global_class(env, p + "KeywordListResult");
+  cls.new_keyword_result   = global_class(env, p + "NewKeywordResult");
   cls.new_cards_result     = global_class(env, p + "NewCardsResult");
   cls.link_type_list_result = global_class(env, p + "LinkTypeListResult");
   cls.symbol_menu_result   = global_class(env, p + "SymbolMenuResult");
@@ -109,6 +112,9 @@ bool load_classes(JNIEnv* env) {
   cls.symbol_preview_result_init = env->GetMethodID(cls.symbol_preview_result, "<init>", ("(" + result_sig + "II[I)V").c_str());
   cls.link_type_list_result_init = env->GetMethodID(cls.link_type_list_result, "<init>", ("(" + result_sig + "[Ljava/lang/String;[Ljava/lang/String;)V").c_str());
   cls.new_cards_result_init = env->GetMethodID(cls.new_cards_result, "<init>", ("(L" + p + "ActionResult;[Ljava/lang/String;)V").c_str());
+  cls.keyword_list_result_init = env->GetMethodID(cls.keyword_list_result, "<init>", ("(" + result_sig +
+    "[J[Ljava/lang/String;[Ljava/lang/String;[Ljava/lang/String;[Ljava/lang/String;[Ljava/lang/String;[Z[Z[Ljava/lang/String;[I[Ljava/lang/String;[Ljava/lang/String;)V").c_str());
+  cls.new_keyword_result_init = env->GetMethodID(cls.new_keyword_result, "<init>", ("(L" + p + "ActionResult;J)V").c_str());
   cls.field_at_result_init  = env->GetMethodID(cls.field_at_result, "<init>", ("(" + result_sig + "Ljava/lang/String;)V").c_str());
   cls.value_result_init     = env->GetMethodID(cls.value_result, "<init>", ("(" + result_sig + "Ljava/lang/String;Ljava/lang/String;)V").c_str());
   cls.field_list_result_init = env->GetMethodID(cls.field_list_result, "<init>",
@@ -225,6 +231,11 @@ F::Target target_from(JNIEnv* env, jint kind, jstring card_uid) {
   F::Target t;
   t.kind = (F::Target::Kind)kind;
   t.card_uid = from_java(env, card_uid);
+  // a keyword's id travels as the uid's string
+  if (t.kind == F::Target::Kind::Keyword) {
+    t.keyword_id = std::strtoll(t.card_uid.c_str(), nullptr, 10);
+    t.card_uid.clear();
+  }
   return t;
 }
 
@@ -530,6 +541,63 @@ JNIEXPORT jobject JNICALL
 Java_org_mobileseteditor_core_NativeCore_moveCards(JNIEnv* env, jobject, jlong session, jobjectArray card_uids, jint position) {
   std::vector<std::string> uids = from_java_strings(env, card_uids);
   return to_java(env, guarded<F::ActionResult>([&] { return F::moveCards(session, uids, (int)position); }));
+}
+
+JNIEXPORT jobject JNICALL
+Java_org_mobileseteditor_core_NativeCore_listKeywords(JNIEnv* env, jobject, jlong session) {
+  F::KeywordList r = guarded<F::KeywordList>([&] { return F::listKeywords(session); });
+  jsize n = (jsize)r.keywords.size();
+  std::vector<jlong> ids;
+  std::vector<std::string> names, matches, reminders, rules, modes, errors;
+  jbooleanArray from_game = env->NewBooleanArray(n), valid = env->NewBooleanArray(n);
+  std::vector<jint> usage;
+  for (jsize i = 0 ; i < n ; ++i) {
+    const F::KeywordInfo& k = r.keywords[i];
+    ids.push_back((jlong)k.id);
+    names.push_back(k.keyword); matches.push_back(k.match); reminders.push_back(k.reminder);
+    rules.push_back(k.rules); modes.push_back(k.mode); errors.push_back(k.reminder_error);
+    usage.push_back(k.usage);
+    jboolean g = k.from_game, v = k.valid;
+    env->SetBooleanArrayRegion(from_game, i, 1, &g);
+    env->SetBooleanArrayRegion(valid, i, 1, &v);
+  }
+  jlongArray jids = env->NewLongArray(n);
+  if (n) env->SetLongArrayRegion(jids, 0, n, ids.data());
+  jintArray jusage = env->NewIntArray(n);
+  if (n) env->SetIntArrayRegion(jusage, 0, n, usage.data());
+  // and the Game's parameter types, for inserting parameters
+  F::KeywordParamTypeList types = guarded<F::KeywordParamTypeList>([&] { return F::listKeywordParamTypes(session); });
+  std::vector<std::string> type_names, type_descriptions;
+  for (const F::KeywordParamTypeInfo& t : types.types) { type_names.push_back(t.name); type_descriptions.push_back(t.description); }
+  jobject result = to_java(env, r);
+  jobjectArray a = to_java(env, names), b = to_java(env, matches), c = to_java(env, reminders), d = to_java(env, rules),
+               e = to_java(env, modes), f = to_java(env, errors), g = to_java(env, type_names), h = to_java(env, type_descriptions);
+  jobject out = env->NewObject(cls.keyword_list_result, cls.keyword_list_result_init, result, jids, a, b, c, d, e,
+                               from_game, valid, f, jusage, g, h);
+  for (jobject o : {result, (jobject)jids, (jobject)a, (jobject)b, (jobject)c, (jobject)d, (jobject)e, (jobject)f, (jobject)g, (jobject)h,
+                    (jobject)from_game, (jobject)valid, (jobject)jusage}) env->DeleteLocalRef(o);
+  return out;
+}
+
+JNIEXPORT jobject JNICALL
+Java_org_mobileseteditor_core_NativeCore_addKeyword(JNIEnv* env, jobject, jlong session) {
+  F::NewKeywordResult r = guarded<F::NewKeywordResult>([&] { return F::addKeyword(session); });
+  jobject action = to_java(env, static_cast<const F::ActionResult&>(r));
+  jobject out = env->NewObject(cls.new_keyword_result, cls.new_keyword_result_init, action, (jlong)r.id);
+  env->DeleteLocalRef(action);
+  return out;
+}
+
+JNIEXPORT jobject JNICALL
+Java_org_mobileseteditor_core_NativeCore_removeKeyword(JNIEnv* env, jobject, jlong session, jlong keyword) {
+  return to_java(env, guarded<F::ActionResult>([&] { return F::removeKeyword(session, (F::KeywordId)keyword); }));
+}
+
+JNIEXPORT jobject JNICALL
+Java_org_mobileseteditor_core_NativeCore_insertKeywordParameter(JNIEnv* env, jobject, jlong session, jlong keyword,
+                                                               jint start, jint end, jstring type) {
+  std::string t = from_java(env, type);
+  return to_java(env, guarded<F::TextResult>([&] { return F::insertKeywordParameter(session, (F::KeywordId)keyword, start, end, t); }));
 }
 
 JNIEXPORT jobject JNICALL

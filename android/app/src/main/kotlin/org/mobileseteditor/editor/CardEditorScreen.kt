@@ -288,7 +288,7 @@ fun FieldSheet(model: SetViewModel, target: EditTarget, revision: Int, onField: 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 TextButton(onClick = { onField(textFields[at - 1]) }, enabled = at > 0, modifier = Modifier.testTag("previous-field")) { Text("‹") }
                 Text(
-                    (if (target.kind == TargetKind.CardStyle || target.kind == TargetKind.SetStyle) "Style option: " else "") + displayName(target.field).replaceFirstChar { it.uppercase() },
+                    (when (target.kind) { TargetKind.CardStyle, TargetKind.SetStyle -> "Style option: "; TargetKind.Keyword -> "Keyword: "; else -> "" }) + displayName(target.field).replaceFirstChar { it.uppercase() },
                     style = MaterialTheme.typography.titleSmall,
                     modifier = Modifier.weight(1f).testTag("editing-field"),
                     maxLines = 1,
@@ -392,6 +392,24 @@ private fun TextEditor(model: SetViewModel, session: Long, target: EditTarget, m
         maxLines = if (multiLine) 6 else 1,
         modifier = Modifier.fillMaxWidth().focusRequester(focus).testTag("field-text"),
     )
+    // a keyword's match: its parameters are inserted, as locked spans
+    if (target.kind == TargetKind.Keyword && target.field == "match") {
+        KeywordParameterBar(session) { type ->
+            scope.launch {
+                holder.mutex.withLock {
+                    val shown = value ?: return@withLock
+                    if (shown.text != holder.sync.shown) return@withLock
+                    val start = CodePoints.fromUtf16(shown.text, shown.selection.min)
+                    val end = CodePoints.fromUtf16(shown.text, shown.selection.max)
+                    val atomic = LockedSpans.adjust(holder.sync.toCore(TextChange(start, end, "x")), holder.locked)
+                    val r = Core.insertKeywordParameter(session, target.uid.toLong(), atomic.start, atomic.end, type)
+                    model.edited(r.action)
+                    show(if (r.action.result.ok) r else Core.getText(session, target.kind, target.uid, target.field))
+                }
+                focus.requestFocus()
+            }
+        }
+    }
     symbols?.takeIf { it.hasSymbols }?.let { menu ->
         SymbolBar(
             menu, session, target.uid, target.field, target.kind,
@@ -409,4 +427,23 @@ private class CoreText {
     val sync = TextSync()
     var locked: List<IntRange> = emptyList()
     val mutex = Mutex()
+}
+
+/** Buttons that insert a keyword parameter of each of the Game's types */
+@Composable
+private fun KeywordParameterBar(session: Long, onInsert: (String) -> Unit) {
+    val types by androidx.compose.runtime.produceState(emptyList<org.mobileseteditor.core.KeywordParamType>(), session) {
+        value = Core.listKeywords(session).parameterTypes
+    }
+    if (types.isEmpty()) return
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.testTag("keyword-parameters")) {
+        Text("Insert:", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(end = 4.dp))
+        androidx.compose.foundation.lazy.LazyRow {
+            items(types.size) { i ->
+                TextButton(onClick = { onInsert(types[i].name) }, modifier = Modifier.testTag("parameter-${types[i].name}")) {
+                    Text("<${types[i].name}>")
+                }
+            }
+        }
+    }
 }

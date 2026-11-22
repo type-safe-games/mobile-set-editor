@@ -320,6 +320,22 @@ class SetViewModel(app: Application) : AndroidViewModel(app) {
         show()
     }
 
+    // ------------------------------------------------------------------- Keywords
+
+    /** Add an empty keyword to the Set, one undo step; its id (0 if that failed) */
+    suspend fun addKeyword(): Long {
+        val session = _state.value.session.takeIf { it != 0L } ?: return 0
+        val r = Core.addKeyword(session)
+        edited(r.action)
+        return if (r.action.result.ok) r.id else 0
+    }
+
+    /** Remove one of the Set's keywords, one undo step */
+    suspend fun removeKeyword(id: Long) {
+        val session = _state.value.session.takeIf { it != 0L } ?: return
+        edited(Core.removeKeyword(session, id))
+    }
+
     // ------------------------------------------------------------------- Changing the card list
 
     /** Add a new Card after [after] (an index; -1: at the start), one undo step; its index, or -1 */
