@@ -98,7 +98,9 @@ jobs:
           key: skia-${{ runner.os }}-${{ hashFiles('skia-cache-key') }}
 
       - name: Skia
-        run: tools/skia/build.sh android-x86_64 android-arm64-v8a
+        # gn with g++: it needs C++23's std::expected, which Ubuntu 24.04's clang can't use with
+        # its libstdc++. Skia itself builds with the NDK's clang.
+        run: CXX=g++ AR=ar tools/skia/build.sh android-x86_64 android-arm64-v8a
 
       - name: APK
         run: cd android && ./gradlew assembleDebug --console=plain
