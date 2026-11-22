@@ -36,13 +36,13 @@ constexpr const char* PKG = "org/mobileseteditor/core/";
 struct Classes {
   jclass string, message, result, open_result, card_list_result, card_size_result, field_region, render_result;
   jclass scanned_package, scan_result, imported_package, import_result, template_info, template_list_result, progress_listener;
-  jclass action_result, session_info, value_result, field_at_result, symbol_menu_result, symbol_preview_result, field_list_result, text_result;
+  jclass action_result, session_info, value_result, field_at_result, link_type_list_result, symbol_menu_result, symbol_preview_result, field_list_result, text_result;
   jmethodID string_from_bytes, string_get_bytes;
   jmethodID message_init, result_init, open_result_init, card_list_result_init, card_size_result_init,
             field_region_init, render_result_init;
   jmethodID scanned_package_init, scan_result_init, imported_package_init, import_result_init,
             template_info_init, template_list_result_init, progress_on_progress;
-  jmethodID action_result_init, session_info_init, value_result_init, field_at_result_init, symbol_menu_result_init, symbol_preview_result_init, field_list_result_init, text_result_init;
+  jmethodID action_result_init, session_info_init, value_result_init, field_at_result_init, link_type_list_result_init, symbol_menu_result_init, symbol_preview_result_init, field_list_result_init, text_result_init;
   jstring utf8;
 } cls;
 
@@ -74,6 +74,7 @@ bool load_classes(JNIEnv* env) {
   cls.session_info         = global_class(env, p + "SessionInfo");
   cls.value_result         = global_class(env, p + "ValueResult");
   cls.field_at_result      = global_class(env, p + "FieldAtResult");
+  cls.link_type_list_result = global_class(env, p + "LinkTypeListResult");
   cls.symbol_menu_result   = global_class(env, p + "SymbolMenuResult");
   cls.symbol_preview_result = global_class(env, p + "SymbolPreviewResult");
   cls.field_list_result    = global_class(env, p + "FieldListResult");
@@ -85,7 +86,7 @@ bool load_classes(JNIEnv* env) {
   cls.message_init          = env->GetMethodID(cls.message, "<init>", "(ILjava/lang/String;Ljava/lang/String;Ljava/lang/String;)V");
   cls.result_init           = env->GetMethodID(cls.result, "<init>", ("(ILjava/lang/String;Ljava/lang/String;[L" + p + "CoreMessage;)V").c_str());
   cls.open_result_init      = env->GetMethodID(cls.open_result, "<init>", ("(" + result_sig + "J)V").c_str());
-  cls.card_list_result_init = env->GetMethodID(cls.card_list_result, "<init>", ("(" + result_sig + "[Ljava/lang/String;[Ljava/lang/String;)V").c_str());
+  cls.card_list_result_init = env->GetMethodID(cls.card_list_result, "<init>", ("(" + result_sig + "[Ljava/lang/String;[Ljava/lang/String;[[Ljava/lang/String;[[Ljava/lang/String;)V").c_str());
   cls.card_size_result_init = env->GetMethodID(cls.card_size_result, "<init>", ("(" + result_sig + "DD)V").c_str());
   cls.field_region_init     = env->GetMethodID(cls.field_region, "<init>", "(Ljava/lang/String;DDDDDIZ)V");
   cls.render_result_init    = env->GetMethodID(cls.render_result, "<init>", ("(" + result_sig + "[L" + p + "FieldRegion;)V").c_str());
@@ -105,6 +106,7 @@ bool load_classes(JNIEnv* env) {
   cls.symbol_menu_result_init = env->GetMethodID(cls.symbol_menu_result, "<init>",
     ("(" + result_sig + "ZZ[I[Ljava/lang/String;[Ljava/lang/String;[Ljava/lang/String;[I[I)V").c_str());
   cls.symbol_preview_result_init = env->GetMethodID(cls.symbol_preview_result, "<init>", ("(" + result_sig + "II[I)V").c_str());
+  cls.link_type_list_result_init = env->GetMethodID(cls.link_type_list_result, "<init>", ("(" + result_sig + "[Ljava/lang/String;[Ljava/lang/String;)V").c_str());
   cls.field_at_result_init  = env->GetMethodID(cls.field_at_result, "<init>", ("(" + result_sig + "Ljava/lang/String;)V").c_str());
   cls.value_result_init     = env->GetMethodID(cls.value_result, "<init>", ("(" + result_sig + "Ljava/lang/String;Ljava/lang/String;)V").c_str());
   cls.field_list_result_init = env->GetMethodID(cls.field_list_result, "<init>",
@@ -475,6 +477,32 @@ Java_org_mobileseteditor_core_NativeCore_replaceRange(JNIEnv* env, jobject, jlon
 }
 
 JNIEXPORT jobject JNICALL
+Java_org_mobileseteditor_core_NativeCore_listLinkTypes(JNIEnv* env, jobject, jlong session) {
+  F::LinkTypeList r = guarded<F::LinkTypeList>([&] { return F::listLinkTypes(session); });
+  std::vector<std::string> selected, linked;
+  for (const F::LinkType& t : r.types) { selected.push_back(t.selected); linked.push_back(t.linked); }
+  jobject result = to_java(env, r);
+  jobjectArray js = to_java(env, selected), jl = to_java(env, linked);
+  jobject out = env->NewObject(cls.link_type_list_result, cls.link_type_list_result_init, result, js, jl);
+  for (jobject o : {result, (jobject)js, (jobject)jl}) env->DeleteLocalRef(o);
+  return out;
+}
+
+JNIEXPORT jobject JNICALL
+Java_org_mobileseteditor_core_NativeCore_link(JNIEnv* env, jobject, jlong session, jstring card_uid, jstring other_uid,
+                                             jstring relation, jstring other_relation) {
+  std::string a = from_java(env, card_uid), b = from_java(env, other_uid);
+  std::string ra = from_java(env, relation), rb = from_java(env, other_relation);
+  return to_java(env, guarded<F::ActionResult>([&] { return F::link(session, a, b, ra, rb); }));
+}
+
+JNIEXPORT jobject JNICALL
+Java_org_mobileseteditor_core_NativeCore_unlink(JNIEnv* env, jobject, jlong session, jstring card_uid, jstring other_uid) {
+  std::string a = from_java(env, card_uid), b = from_java(env, other_uid);
+  return to_java(env, guarded<F::ActionResult>([&] { return F::unlink(session, a, b); }));
+}
+
+JNIEXPORT jobject JNICALL
 Java_org_mobileseteditor_core_NativeCore_undo(JNIEnv* env, jobject, jlong session) {
   return to_java(env, guarded<F::ActionResult>([&] { return F::undo(session); }));
 }
@@ -493,16 +521,25 @@ JNIEXPORT jobject JNICALL
 Java_org_mobileseteditor_core_NativeCore_listCards(JNIEnv* env, jobject, jlong session) {
   F::CardList r = guarded<F::CardList>([&] { return F::listCards(session); });
   std::vector<std::string> uids, names;
-  for (const F::CardInfo& c : r.cards) {
+  jclass string_array = env->FindClass("[Ljava/lang/String;");
+  jobjectArray link_uids = env->NewObjectArray((jsize)r.cards.size(), string_array, nullptr);
+  jobjectArray link_relations = env->NewObjectArray((jsize)r.cards.size(), string_array, nullptr);
+  for (size_t i = 0 ; i < r.cards.size() ; ++i) {
+    const F::CardInfo& c = r.cards[i];
     uids.push_back(c.uid);
     names.push_back(c.name);
+    std::vector<std::string> lu, lr;
+    for (const F::CardLinkInfo& l : c.links) { lu.push_back(l.uid); lr.push_back(l.relation); }
+    jobjectArray jlu = to_java(env, lu), jlr = to_java(env, lr);
+    env->SetObjectArrayElement(link_uids, (jsize)i, jlu);
+    env->SetObjectArrayElement(link_relations, (jsize)i, jlr);
+    env->DeleteLocalRef(jlu);
+    env->DeleteLocalRef(jlr);
   }
   jobject result = to_java(env, r);
   jobjectArray juids = to_java(env, uids), jnames = to_java(env, names);
-  jobject out = env->NewObject(cls.card_list_result, cls.card_list_result_init, result, juids, jnames);
-  env->DeleteLocalRef(result);
-  env->DeleteLocalRef(juids);
-  env->DeleteLocalRef(jnames);
+  jobject out = env->NewObject(cls.card_list_result, cls.card_list_result_init, result, juids, jnames, link_uids, link_relations);
+  for (jobject o : {result, (jobject)juids, (jobject)jnames, (jobject)link_uids, (jobject)link_relations, (jobject)string_array}) env->DeleteLocalRef(o);
   return out;
 }
 

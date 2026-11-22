@@ -174,7 +174,8 @@ private fun CardsGrid(model: SetViewModel, state: SetState, grid: LazyGridState,
             modifier = Modifier.fillMaxSize().testTag("card-grid"),
         ) {
             itemsIndexed(state.cardUids, key = { _, uid -> uid }) { index, uid ->
-                Thumbnail(model, RenderKey(uid, cellWidthPx), state.cardNames.getOrElse(index) { "" }, state.aspect) {
+                val linked = state.cardLinks.getOrElse(index) { emptyList() }.isNotEmpty()
+                Thumbnail(model, RenderKey(uid, cellWidthPx), state.cardNames.getOrElse(index) { "" }, state.aspect, linked) {
                     onOpenCard(index)
                 }
             }
@@ -183,7 +184,7 @@ private fun CardsGrid(model: SetViewModel, state: SetState, grid: LazyGridState,
 }
 
 @Composable
-private fun Thumbnail(model: SetViewModel, key: RenderKey, name: String, aspect: Float, onClick: () -> Unit) {
+private fun Thumbnail(model: SetViewModel, key: RenderKey, name: String, aspect: Float, linked: Boolean, onClick: () -> Unit) {
     val flow = remember(key) { model.observe(key) }
     val rendered = flow?.collectAsState()?.value
     Column(Modifier.clickable(onClick = onClick).testTag("thumbnail-${key.uid}")) {
@@ -199,6 +200,10 @@ private fun Thumbnail(model: SetViewModel, key: RenderKey, name: String, aspect:
                 contentAlignment = Alignment.Center,
             ) { CircularProgressIndicator(Modifier.padding(24.dp)) }
         }
-        Text(name, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            // Linked cards get a small badge
+            if (linked) Text("🔗 ", style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag("linked-${key.uid}"))
+            Text(name, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
     }
 }

@@ -24,10 +24,12 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.mobileseteditor.core.ActionResult
+import org.mobileseteditor.core.CardLink
 import org.mobileseteditor.core.Core
 import org.mobileseteditor.core.CoreMessage
 import org.mobileseteditor.core.CoreResult
 import org.mobileseteditor.core.FieldRegion
+import org.mobileseteditor.core.LinkType
 import org.mobileseteditor.core.OpenResult
 import org.mobileseteditor.core.Severity
 import org.mobileseteditor.core.Status
@@ -53,6 +55,8 @@ data class SetState(
     val saving: Boolean = false,
     val cardUids: List<String> = emptyList(),
     val cardNames: List<String> = emptyList(),
+    /** each Card's links, in the order of [cardUids] */
+    val cardLinks: List<List<CardLink>> = emptyList(),
     val index: Int = 0,
     /** width / height of the Set's Cards (of its first Card's Style), for thumbnail placeholders */
     val aspect: Float = 0.716f,
@@ -191,6 +195,7 @@ class SetViewModel(app: Application) : AndroidViewModel(app) {
             aspect = size?.takeIf { it.result.ok && it.height > 0 }?.let { (it.width / it.height).toFloat() } ?: 0.716f,
             cardUids = cards.uids.toList(),
             cardNames = cards.names.toList(),
+            cardLinks = cards.links,
             messages = messageLines(open.result) + messageLines(cards.result),
         )
         show()
@@ -242,6 +247,41 @@ class SetViewModel(app: Application) : AndroidViewModel(app) {
         renders?.invalidate(staleAll, staleUids.toList())
         staleAll = false
         staleUids.clear()
+        // names and links may have changed with it
+        viewModelScope.launch { refreshCards() }
+    }
+
+    /** List the Cards again: their names and links (the order and the Cards themselves stay, here) */
+    private suspend fun refreshCards() {
+        val session = _state.value.session.takeIf { it != 0L } ?: return
+        val cards = Core.listCards(session)
+        val s = _state.value
+        if (!cards.result.ok || s.session != session || cards.uids.toList() != s.cardUids) return
+        _state.value = s.copy(cardNames = cards.names.toList(), cardLinks = cards.links)
+    }
+
+    // ------------------------------------------------------------------- Linked cards
+
+    /** The Game's link types */
+    suspend fun linkTypes(): List<LinkType> {
+        val session = _state.value.session.takeIf { it != 0L } ?: return emptyList()
+        return Core.listLinkTypes(session).types
+    }
+
+    /** Link two Cards (one undo step): [uid] is [relation] to [other], which is [otherRelation] */
+    suspend fun link(uid: String, other: String, relation: String, otherRelation: String): Boolean {
+        val session = _state.value.session.takeIf { it != 0L } ?: return false
+        val result = Core.link(session, uid, other, relation, otherRelation)
+        edited(result)
+        refreshCards()
+        return result.result.ok
+    }
+
+    /** Remove the link between two Cards (one undo step) */
+    suspend fun unlink(uid: String, other: String) {
+        val session = _state.value.session.takeIf { it != 0L } ?: return
+        edited(Core.unlink(session, uid, other))
+        refreshCards()
     }
 
     /** Undo the last edit (one undo step); the result, for an editor to refresh its text */
@@ -251,7 +291,10 @@ class SetViewModel(app: Application) : AndroidViewModel(app) {
 
     private suspend fun undoOrRedo(call: suspend (Long) -> ActionResult): ActionResult? {
         val session = _state.value.session.takeIf { it != 0L } ?: return null
-        return call(session).also { edited(it) }
+        return call(session).also {
+            edited(it)
+            refreshCards()
+        }
     }
 
     /** A test-only edit (debug builds): add " (edited)" to the Set's title */

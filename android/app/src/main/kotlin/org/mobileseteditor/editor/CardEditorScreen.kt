@@ -89,6 +89,7 @@ fun CardEditorScreen(model: SetViewModel, onBack: () -> Unit) {
     // bumped by Undo and Redo: the sheet reads its text again
     var revision by remember { mutableIntStateOf(0) }
     BackHandler { if (editing != null) editing = null else onBack() }
+    val pager = rememberPagerState(initialPage = state.index.coerceIn(0, maxOf(0, state.cardUids.size - 1))) { state.cardUids.size }
 
     Column(Modifier.fillMaxSize().safeDrawingPadding()) {
         Row(
@@ -114,12 +115,14 @@ fun CardEditorScreen(model: SetViewModel, onBack: () -> Unit) {
                 modifier = Modifier.testTag("redo"),
             ) { Text(if (state.redoName.isEmpty()) "Redo" else "Redo ${displayName(state.redoName).lowercase()}", maxLines = 1) }
         }
+        if (state.cardUids.isNotEmpty()) {
+            LinkBar(model, state, pager.currentPage) { target -> scope.launch { pager.animateScrollToPage(target) } }
+        }
         if (state.cardUids.isEmpty()) {
             Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                 if (state.session != 0L || state.opening) CircularProgressIndicator() else Text("The Set has no Cards")
             }
         } else {
-            val pager = rememberPagerState(initialPage = state.index.coerceIn(0, state.cardUids.size - 1)) { state.cardUids.size }
             LaunchedEffect(pager) {
                 snapshotFlow { pager.currentPage }.collect { page ->
                     model.go(page)

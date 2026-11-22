@@ -468,7 +468,9 @@ struct LinkType {
   std::string linked;   ///< relation of the other card, e.g. "Back Face"
 };
 struct LinkTypeList : Result {
-  std::vector<LinkType> types; ///< the Game's card link types
+  /// the Game's card link types: the built-in "Front Face"/"Back Face" first, then the Game's own,
+  /** each pair once (a Game that declares the built-in pair itself doesn't list it twice) */
+  std::vector<LinkType> types;
 };
 LinkTypeList listLinkTypes(SessionHandle session);
 

@@ -67,6 +67,17 @@ object Core {
         session: Long, kind: TargetKind, cardUid: String, field: String, start: Int, end: Int, text: String, asSymbol: Boolean = false,
     ): TextResult = withContext(dispatcher) { NativeCore.replaceRange(session, kind.ordinal, cardUid, field, start, end, text, asSymbol) }
 
+    /** The Game's card link types, each a pair of relations (the card's own, the linked card's) */
+    suspend fun listLinkTypes(session: Long): LinkTypeListResult = withContext(dispatcher) { NativeCore.listLinkTypes(session) }
+
+    /** Link two Cards, one undo step: [cardUid] is [relation], [otherUid] is [otherRelation] */
+    suspend fun link(session: Long, cardUid: String, otherUid: String, relation: String, otherRelation: String): ActionResult =
+        withContext(dispatcher) { NativeCore.link(session, cardUid, otherUid, relation, otherRelation) }
+
+    /** Remove the link between two Cards, both ways, one undo step */
+    suspend fun unlink(session: Long, cardUid: String, otherUid: String): ActionResult =
+        withContext(dispatcher) { NativeCore.unlink(session, cardUid, otherUid) }
+
     suspend fun undo(session: Long): ActionResult = withContext(dispatcher) { NativeCore.undo(session) }
     suspend fun redo(session: Long): ActionResult = withContext(dispatcher) { NativeCore.redo(session) }
 

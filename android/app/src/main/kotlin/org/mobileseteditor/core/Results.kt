@@ -24,7 +24,26 @@ class CoreResult(status: Int, val error: String, val missingPackage: String, val
 
 class OpenResult(val result: CoreResult, val session: Long)
 
-class CardListResult(val result: CoreResult, val uids: Array<String>, val names: Array<String>)
+/** A Card's link: [uid] is the linked Card, [relation] what it is to this one (e.g. "Back Face") */
+data class CardLink(val uid: String, val relation: String)
+
+class CardListResult(
+    val result: CoreResult,
+    val uids: Array<String>,
+    val names: Array<String>,
+    linkUids: Array<Array<String>>,
+    linkRelations: Array<Array<String>>,
+) {
+    /** Each Card's links, in the order of [uids] */
+    val links: List<List<CardLink>> = uids.indices.map { i -> linkUids[i].indices.map { CardLink(linkUids[i][it], linkRelations[i][it]) } }
+}
+
+/** A card link type: the Card linked from is [selected], the other one [linked] (e.g. Front Face, Back Face) */
+data class LinkType(val selected: String, val linked: String)
+
+class LinkTypeListResult(val result: CoreResult, selected: Array<String>, linked: Array<String>) {
+    val types: List<LinkType> = selected.indices.map { LinkType(selected[it], linked[it]) }
+}
 
 class CardSizeResult(val result: CoreResult, val width: Double, val height: Double)
 

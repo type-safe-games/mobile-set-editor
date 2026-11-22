@@ -20,6 +20,7 @@ import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
 import org.junit.BeforeClass
 import org.junit.Rule
 import org.junit.Test
@@ -61,6 +62,10 @@ class SetHomeTest {
             uids.all { uid -> renders.cachedKeys.any { it.uid == uid && it.width < 600 } }
         }
         for (name in model.state.value.cardNames) compose.onNodeWithText(name).assertIsDisplayed()
+        // Linked cards have a badge
+        compose.onNodeWithTag("linked-fixture-front", useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag("linked-fixture-back", useUnmergedTree = true).assertExists()
+        assertTrue(compose.onAllNodesWithTag("linked-fixture-wrap", useUnmergedTree = true).fetchSemanticsNodes().isEmpty())
         compose.onNodeWithText("Set info").assertIsDisplayed()
         compose.onNodeWithText("Keywords").assertIsDisplayed()
 

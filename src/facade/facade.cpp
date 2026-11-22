@@ -1337,8 +1337,14 @@ ActionResult redo(SessionHandle h) {
 LinkTypeList listLinkTypes(SessionHandle h) {
   return guarded<LinkTypeList>("", "", [&](LinkTypeList& r) {
     Session& s = get_session(h);
+    // The core always puts the built-in "Front Face"/"Back Face" first (Game::after_reading), so a
+    // Game that declares that pair itself has it twice; the desktop's link dialog lists both.
+    // Same pairs are one choice here.
     for (const CardLinkP& link : s.set->game->card_links) {
-      r.types.push_back(LinkType{to_utf8(link->selected.default_), to_utf8(link->linked.default_)});
+      LinkType t{to_utf8(link->selected.default_), to_utf8(link->linked.default_)};
+      bool seen = false;
+      for (const LinkType& u : r.types) seen |= u.selected == t.selected && u.linked == t.linked;
+      if (!seen) r.types.push_back(t);
     }
   });
 }

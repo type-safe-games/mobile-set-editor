@@ -476,7 +476,8 @@ TEST(link_and_unlink_are_one_undo_step_each) {
   F::SessionHandle s = open_fixture();
   F::LinkTypeList types = F::listLinkTypes(s);
   REQUIRE_OK(types);
-  CHECK(!types.types.empty());
+  // the fixture Game declares Front Face/Back Face, which the core also adds built in: listed once
+  CHECK_EQ(types.types.size(), (size_t)1);
   if (!types.types.empty()) {
     CHECK_EQ(types.types[0].selected, "Front Face");
     CHECK_EQ(types.types[0].linked, "Back Face");
