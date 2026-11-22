@@ -6,6 +6,7 @@ package org.mobileseteditor
 import android.os.Bundle
 import android.text.format.Formatter
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -30,6 +31,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -39,23 +43,48 @@ import org.mobileseteditor.core.Outcome
 import org.mobileseteditor.core.TemplateInfo
 import org.mobileseteditor.core.Verdict
 
-/** For now the Templates screen; the rest of the UI comes with M4 */
+/** For now two screens: the Templates, and an open Set's Cards; the real UI comes with M4 */
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
             MaterialTheme {
                 Surface(Modifier.fillMaxSize()) {
-                    TemplatesScreen()
+                    App()
                 }
             }
         }
     }
 }
 
+@Composable
+fun App() {
+    var showSet by rememberSaveable { mutableStateOf(false) }
+    val setModel: SetViewModel = viewModel()
+    val openSet = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            setModel.open(uri)
+            showSet = true
+        }
+    }
+    // (.mse-set files have no registered type)
+    val pickSet = { openSet.launch(arrayOf("*/*")) }
+    if (showSet) {
+        BackHandler { showSet = false }
+        SetScreen(setModel, onOpen = pickSet, onBack = { showSet = false })
+    } else {
+        TemplatesScreen(onOpenSet = pickSet, onShowSet = { showSet = true }, hasSet = setModel.state.collectAsState().value.session != 0L)
+    }
+}
+
 /** The installed Templates, and "Import Templates" from a zip (ADR 0005) */
 @Composable
-fun TemplatesScreen(model: TemplatesViewModel = viewModel()) {
+fun TemplatesScreen(
+    model: TemplatesViewModel = viewModel(),
+    onOpenSet: () -> Unit = {},
+    onShowSet: () -> Unit = {},
+    hasSet: Boolean = false,
+) {
     val installed by model.installed.collectAsState()
     val state by model.import.collectAsState()
     val pick = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -68,6 +97,10 @@ fun TemplatesScreen(model: TemplatesViewModel = viewModel()) {
             enabled = state !is ImportState.Installing && state !is ImportState.Scanning,
             modifier = Modifier.testTag("import"),
         ) { Text("Import Templates") }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = onOpenSet, modifier = Modifier.testTag("open-set")) { Text("Open Set") }
+            if (hasSet) OutlinedButton(onClick = onShowSet) { Text("Back to the Set") }
+        }
         ImportPanel(state, onConfirm = model::confirm, onCancel = model::cancel, onDismiss = model::dismiss)
         HorizontalDivider()
         Text("${installed.size} installed", style = MaterialTheme.typography.titleSmall, modifier = Modifier.testTag("installed-count"))

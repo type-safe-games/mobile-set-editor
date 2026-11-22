@@ -63,6 +63,9 @@ dependencies {
     implementation(libs.activity.compose)
     implementation(libs.lifecycle.viewmodel.compose)
     implementation(libs.coroutines.android)
+    androidTestImplementation(platform(libs.compose.bom))
+    androidTestImplementation(libs.compose.ui.test.junit4)
+    debugImplementation(libs.compose.ui.test.manifest)
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.junit)
 }
@@ -88,4 +91,29 @@ val skiaTasks = abis.map { abi ->
 }
 tasks.matching { it.name.startsWith("configureCMake") || it.name.startsWith("buildCMake") }.configureEach {
     dependsOn(skiaTasks)
+}
+
+// The program's own data, the English locale the core runs with (as the desktop does): the
+// repository's data/en.mse-locale, as the assets' program-data/en.mse-locale
+abstract class CopyProgramData : DefaultTask() {
+    @get:InputDirectory
+    abstract val locale: DirectoryProperty
+
+    @get:OutputDirectory
+    abstract val output: DirectoryProperty
+
+    @TaskAction
+    fun copy() {
+        val out = output.get().asFile
+        out.deleteRecursively()
+        locale.get().asFile.copyRecursively(File(out, "program-data/en.mse-locale"))
+    }
+}
+val copyProgramData = tasks.register<CopyProgramData>("copyProgramData") {
+    locale.set(repoRoot.resolve("data/en.mse-locale"))
+}
+androidComponents {
+    onVariants { variant ->
+        variant.sources.assets?.addGeneratedSourceDirectory(copyProgramData, CopyProgramData::output)
+    }
 }

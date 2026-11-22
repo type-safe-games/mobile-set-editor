@@ -16,6 +16,10 @@ import kotlinx.coroutines.sync.withLock
 object Stores {
     fun templates(context: Context) = File(context.filesDir, "templates")
     fun fonts(context: Context) = File(context.filesDir, "fonts")
+    /** The program's own data (the English locale), copied from the APK's assets at each start */
+    fun programData(context: Context) = File(context.noBackupFilesDir, "program-data")
+
+    private const val LOCALE = "en"
 
     private val mutex = Mutex()
     private var started: CoreResult? = null
@@ -26,7 +30,21 @@ object Stores {
             val app = context.applicationContext
             templates(app).mkdirs()
             fonts(app).mkdirs()
-            Core.init(templates(app), fonts(app)).also { started = it }
+            val data = programData(app)
+            data.deleteRecursively()
+            copyAssets(app, "program-data", data)
+            Core.init(templates(app), fonts(app), data, LOCALE).also { started = it }
+        }
+    }
+
+    private fun copyAssets(context: Context, path: String, to: File) {
+        val children = context.assets.list(path) ?: emptyArray()
+        if (children.isEmpty()) {
+            to.parentFile!!.mkdirs()
+            context.assets.open(path).use { input -> to.outputStream().use { input.copyTo(it) } }
+        } else {
+            to.mkdirs()
+            for (child in children) copyAssets(context, "$path/$child", File(to, child))
         }
     }
 }
