@@ -50,6 +50,7 @@ import io.github.type_safe_games.mobileseteditor.core.FieldInfo
 import io.github.type_safe_games.mobileseteditor.core.TargetKind
 import io.github.type_safe_games.mobileseteditor.core.TemplateInfo
 import io.github.type_safe_games.mobileseteditor.editor.EditTarget
+import io.github.type_safe_games.mobileseteditor.editor.FieldBox
 import io.github.type_safe_games.mobileseteditor.editor.displayName
 import io.github.type_safe_games.mobileseteditor.editor.summary
 import io.github.type_safe_games.mobileseteditor.render.RenderKey
@@ -157,20 +158,14 @@ private fun LazyListScope.rows(title: String, rows: List<InfoRow>, onEdit: (Edit
     if (rows.isEmpty()) return
     item(key = title) { Header(title) }
     items(rows, key = { "${it.kind}/${it.info.name}" }) { row ->
-        val editable = row.info.editable
-        Column(
-            Modifier.fillMaxWidth()
-                .clickable(enabled = editable) { onEdit(EditTarget("", row.info.name, row.kind)) }
-                .padding(vertical = 8.dp)
-                .testTag("info-${if (row.kind == TargetKind.SetStyle) "style-" else ""}${row.info.name}"),
-        ) {
-            Text(
-                displayName(row.info.name).replaceFirstChar { it.uppercase() } + if (editable) "" else " (not editable)",
-                style = MaterialTheme.typography.bodyLarge,
-            )
-            if (row.summary.isNotEmpty()) {
-                Text(row.summary, style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            }
-        }
+        FieldBox(
+            label = displayName(row.info.name).replaceFirstChar { it.uppercase() },
+            value = row.summary,
+            type = row.info.type,
+            editable = row.info.editable,
+            multiLine = row.info.multiLine,
+            onClick = { onEdit(EditTarget("", row.info.name, row.kind)) },
+            modifier = Modifier.testTag("info-${if (row.kind == TargetKind.SetStyle) "style-" else ""}${row.info.name}"),
+        )
     }
 }
