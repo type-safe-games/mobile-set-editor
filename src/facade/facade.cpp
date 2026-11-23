@@ -1444,6 +1444,25 @@ FieldAt fieldAt(SessionHandle h, const std::string& card_uid, double x, double y
   });
 }
 
+TextCarets textCarets(SessionHandle h, const std::string& card_uid, const std::string& field, int width) {
+  return guarded<TextCarets>(card_uid, field, [&](TextCarets& r) {
+    Session& s = get_session(h);
+    if (width <= 0) fail(Status::InvalidArgument, "invalid width");
+    CardP card = find_card(*s.set, card_uid);
+    RealSize size = card_render_size(s.set, card);
+    if (size.width <= 0) fail(Status::Failed, "the card has no size");
+    Target t;
+    t.card_uid = card_uid;
+    TextValueP tv = text_value(find_field(s, t, field), field);
+    VisibleText vt = visible_text(tv->value());
+    vector<size_t> cursors;
+    for (size_t i = 0 ; i <= vt.text.size() ; ++i) cursors.push_back(vt.toCursor(i));
+    for (const CardCaret& c : card_text_carets(s.set, card, from_utf8(field), width / size.width, cursors)) {
+      r.carets.push_back(Caret{c.x, c.top, c.bottom});
+    }
+  });
+}
+
 TextOutput layoutDump(SessionHandle h, const std::string& card_uid) {
   return guarded<TextOutput>(card_uid, "", [&](TextOutput& r) {
     Session& s = get_session(h);

@@ -728,6 +728,18 @@ MSE_JNI(cardSize)(JNIEnv* env, jobject, jlong session, jstring card_uid) {
   return out;
 }
 
+/// x, top, bottom of each caret, flat; empty if the call failed (#83, a prototype)
+JNIEXPORT jdoubleArray JNICALL
+MSE_JNI(textCarets)(JNIEnv* env, jobject, jlong session, jstring card_uid, jstring field, jint width) {
+  std::string uid = from_java(env, card_uid), name = from_java(env, field);
+  F::TextCarets r = guarded<F::TextCarets>([&] { return F::textCarets(session, uid, name, (int)width); });
+  std::vector<jdouble> flat;
+  for (const F::Caret& c : r.carets) { flat.push_back(c.x); flat.push_back(c.top); flat.push_back(c.bottom); }
+  jdoubleArray out = env->NewDoubleArray((jsize)flat.size());
+  if (!flat.empty()) env->SetDoubleArrayRegion(out, 0, (jsize)flat.size(), flat.data());
+  return out;
+}
+
 JNIEXPORT jobject JNICALL
 MSE_JNI(fieldAt)(JNIEnv* env, jobject, jlong session, jstring card_uid, jdouble x, jdouble y, jint width) {
   std::string uid = from_java(env, card_uid);

@@ -136,6 +136,14 @@ object Core {
     suspend fun cardSize(session: Long, cardUid: String): CardSizeResult =
         withContext(dispatcher) { NativeCore.cardSize(session, cardUid) }
 
+    /** Where the caret goes at each visible text position of a text field on a render [width] wide:
+     *  x, top and bottom, flat (#83, a prototype). Empty if it isn't a visible text field. */
+    suspend fun textCarets(session: Long, cardUid: String, field: String, width: Int): List<Caret> =
+        withContext(dispatcher) {
+            val flat = NativeCore.textCarets(session, cardUid, field, width)
+            List(flat.size / 3) { Caret(flat[3 * it], flat[3 * it + 1], flat[3 * it + 2]) }
+        }
+
     /** Draw a card into [bitmap] (ARGB_8888, the card's aspect ratio), returning its field regions */
     /** A text field's insert-symbol menu (its symbol font's) */
     suspend fun symbolMenu(session: Long, kind: TargetKind, cardUid: String, field: String): SymbolMenuResult =

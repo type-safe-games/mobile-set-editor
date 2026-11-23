@@ -262,6 +262,37 @@ String card_field_at(const SetP& set, const CardP& card, const RealPoint& point)
   return String();
 }
 
+vector<CardCaret> card_text_carets(const SetP& set, const CardP& card, const String& field, double zoom, const vector<size_t>& cursors) {
+  if (!set) throw Error(_("no set"));
+  if (!card) throw Error(_("no card"));
+  RegionDataViewer viewer(zoom);
+  viewer.setSet(set);
+  viewer.setCard(card);
+  RealSize size = viewer.getRotation().getExternalSize();
+  OffscreenCanvasP canvas = new_canvas(max(1, (int)ceil(size.width)), max(1, (int)ceil(size.height)), CanvasFormat::RGB);
+  viewer.draw(*canvas); // lays the text out
+  vector<CardCaret> out;
+  for (const ValueViewerP& v : viewer.getViewers()) {
+    if (v->getField()->name != field) continue;
+    const TextValueViewer* tv = dynamic_cast<const TextValueViewer*>(v.get());
+    if (!tv || !v->isVisible()) return out;
+    const TextViewer& text = tv->getTextViewer();
+    const String& value = static_cast<const TextValue&>(*v->getValue()).value();
+    Rotation rot = viewer.getRotation();
+    Rotater r(rot, v->getRotation());
+    for (size_t cursor : cursors) {
+      // as the desktop's editor places its caret (TextValueEditor::showCaret)
+      RealRect c = text.charRect(cursor_to_index(value, cursor), true);
+      if (c.height == 0) c.height = text.heightOfLastLine();
+      RealPoint top = rot.tr(RealPoint(c.x, c.y));
+      double height = rot.trS(c.height);
+      out.push_back(CardCaret{top.x, top.y, top.y + height});
+    }
+    return out;
+  }
+  return out;
+}
+
 // ----------------------------------------------------------------------------- : Stitching faces
 
 /// Paste images side by side onto one transparent canvas, and report the x offset of each.

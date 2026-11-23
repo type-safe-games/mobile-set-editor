@@ -523,6 +523,17 @@ struct TextOutput : Result {
 };
 TextOutput layoutDump(SessionHandle session, const std::string& card_uid);
 
+/// Where the caret goes in a text field of a rendered card, as the drawing pass lays its text out
+struct Caret {
+  double x = 0, top = 0, bottom = 0; ///< in pixels of a render `width` pixels wide
+};
+struct TextCarets : Result {
+  std::vector<Caret> carets; ///< one per visible text position (getText), 0 to its length inclusive
+};
+/** For editing text on the card itself (#83, a prototype): draw the caret at carets[i], and find
+ *  the position nearest a tap. Empty when the field isn't a visible text field. */
+TextCarets textCarets(SessionHandle session, const std::string& card_uid, const std::string& field, int width);
+
 // ----------------------------------------------------------------------------- : Export
 
 struct ExportOptions {

@@ -132,6 +132,17 @@ void render_card(const SetP& set, const CardP& card, Canvas& canvas, double zoom
 /// Empty if there is none.
 String card_field_at(const SetP& set, const CardP& card, const RealPoint& point);
 
+/// Where a text caret goes, in a card drawn by render_card: canvas pixels at its zoom
+struct CardCaret {
+  double x = 0, top = 0, bottom = 0;
+};
+
+/// The caret at each of `cursors` (cursor positions in the field's value, see tagged_string.hpp) in
+/// the text field `field` of a card drawn by render_card at `zoom`, laid out as that pass lays it
+/// out (#83). Empty if the field isn't a visible text field. Rotation is applied to the caret's
+/// position only: on a rotated field the caret stays upright.
+vector<CardCaret> card_text_carets(const SetP& set, const CardP& card, const String& field, double zoom, const vector<size_t>& cursors);
+
 /// Write the metadata for a card
 // Assuming first the zoom is applied, then the rotation, then the offset.
 // This means that width and height need to be already scaled by a factor of zoom, but not already rotated

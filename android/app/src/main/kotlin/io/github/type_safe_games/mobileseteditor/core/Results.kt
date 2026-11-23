@@ -53,6 +53,9 @@ class LinkTypeListResult(val result: CoreResult, selected: Array<String>, linked
 
 class CardSizeResult(val result: CoreResult, val width: Double, val height: Double)
 
+/** A caret in a rendered text field, in render pixels (#83) */
+data class Caret(val x: Double, val top: Double, val bottom: Double)
+
 /** A field's region in a rendered card, in bitmap pixels */
 class FieldRegion(
     val field: String,

@@ -81,12 +81,35 @@ import io.github.type_safe_games.mobileseteditor.AddCardMenu
 import io.github.type_safe_games.mobileseteditor.StylePickerDialog
 import io.github.type_safe_games.mobileseteditor.rememberGameStyles
 import io.github.type_safe_games.mobileseteditor.styleLabel
+import io.github.type_safe_games.mobileseteditor.core.Caret
+import androidx.compose.runtime.SideEffect
+import androidx.compose.ui.draw.alpha
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.platform.LocalContext
 
 /** A field's name (or an undo step's, which may contain one) as people read it: "card_color" is "card color" */
 fun displayName(name: String) = name.replace('_', ' ')
 
 /** The field being edited: which Card, which field, of the Card itself or of its style options */
 data class EditTarget(val uid: String, val field: String, val kind: TargetKind = TargetKind.Card)
+
+/**
+ * Editing text on the Card itself (#83, a prototype): the text field stays, invisible, for the
+ * keyboard; the caret is drawn on the Card. [caret] is where it is, [tapped] where a tap on the
+ * Card asks it to go (both visible text code points).
+ */
+class OnCardEditing {
+    var caret by mutableIntStateOf(0)
+    var tapped by mutableStateOf<Int?>(null)
+}
+
+/** The caret nearest a point: on the line under it, else the nearest line, then the nearest x */
+fun nearestCaret(carets: List<Caret>, x: Double, y: Double): Int =
+    carets.indices.minByOrNull { i ->
+        val c = carets[i]
+        val dy = when { y < c.top -> c.top - y; y > c.bottom -> y - c.bottom; else -> 0.0 }
+        dy * 1000 + kotlin.math.abs(c.x - x)
+    } ?: 0
 
 /** Hold the re-render back this long after a keystroke, so typing doesn't queue a render per key */
 private const val TYPING_RENDER_DELAY = 300L
@@ -109,6 +132,10 @@ fun CardEditorScreen(model: SetViewModel, onBack: () -> Unit) {
     val styles = rememberGameStyles(model)
     var adding by remember { mutableStateOf(false) }
     var pickingStyle by remember { mutableStateOf(false) }
+    // #83's prototype, on by default so it can be tried; the old sheet is a tap away
+    val prefs = LocalContext.current.getSharedPreferences("prototypes", android.content.Context.MODE_PRIVATE)
+    var onCardMode by remember { mutableStateOf(prefs.getBoolean("on-card-editing", true)) }
+    val onCard = remember { OnCardEditing() }
     BackHandler { if (editing != null) editing = null else onBack() }
     val pager = rememberPagerState(initialPage = state.index.coerceIn(0, maxOf(0, state.cardUids.size - 1))) { state.cardUids.size }
 
@@ -179,6 +206,10 @@ fun CardEditorScreen(model: SetViewModel, onBack: () -> Unit) {
                     onClick = { state.cardUids.getOrNull(pager.currentPage)?.let { export.start(listOf(it)) } },
                     modifier = Modifier.testTag("export-card"),
                 ) { Text("Export") }
+                TextButton(
+                    onClick = { onCardMode = !onCardMode; prefs.edit().putBoolean("on-card-editing", onCardMode).apply(); editing = null },
+                    modifier = Modifier.testTag("on-card-toggle"),
+                ) { Text(if (onCardMode) "On card ✓" else "On card") }
                 Box(Modifier.weight(1f)) {
                     LinkBar(model, state, pager.currentPage) { target -> scope.launch { pager.animateScrollToPage(target) } }
                 }
@@ -217,12 +248,13 @@ fun CardEditorScreen(model: SetViewModel, onBack: () -> Unit) {
                         onTap = { editing = EditTarget(uid, it) },
                         onLongPress = { details = uid },
                         scrolling = { pager.isScrollInProgress },
+                        onCard = onCard.takeIf { onCardMode },
                     )
                 }
             }
         }
         editing?.let { target ->
-            FieldSheet(model, target, revision, onField = { editing = target.copy(field = it) }, onClose = { editing = null })
+            FieldSheet(model, target, revision, onField = { editing = target.copy(field = it) }, onClose = { editing = null }, inline = onCard.takeIf { onCardMode })
         }
         if (state.messages.isNotEmpty()) {
             Column(Modifier.fillMaxWidth().padding(horizontal = 8.dp).testTag("messages")) {
@@ -260,6 +292,7 @@ private fun CardPage(
     onTap: (String) -> Unit,
     onLongPress: () -> Unit,
     scrolling: () -> Boolean,
+    onCard: OnCardEditing? = null,
 ) {
     val scope = rememberCoroutineScope()
     val flow = remember(key) { model.observe(key) }
@@ -268,6 +301,13 @@ private fun CardPage(
     val highlight = MaterialTheme.colorScheme.primary
     val stroke = with(LocalDensity.current) { 3.dp.toPx() }
     val region = rendered?.regions?.firstOrNull { it.field == selected }
+    // the field's carets on this render, when editing it on the Card (#83)
+    var carets by remember(key) { mutableStateOf<List<Caret>>(emptyList()) }
+    LaunchedEffect(rendered, selected, onCard) {
+        carets = if (onCard != null && selected != null && rendered != null)
+            Core.textCarets(model.state.value.session, key.uid, selected, rendered.image.width) else emptyList()
+    }
+    val caretColor = MaterialTheme.colorScheme.primary
     // keep the field being edited in view, also when the sheet and the keyboard take space
     LaunchedEffect(region?.field, region?.y, viewport) {
         if (region == null) return@LaunchedEffect
@@ -302,7 +342,10 @@ private fun CardPage(
                         val s = image.width / size.width.toDouble()
                         scope.launch {
                             val hit = Core.fieldAt(model.state.value.session, key.uid, at.x * s, at.y * s, image.width)
-                            if (hit.result.ok && hit.field.isNotEmpty()) onTap(hit.field)
+                            if (!hit.result.ok || hit.field.isEmpty()) return@launch
+                            // a tap in the field being edited on the Card moves the caret there (#83)
+                            if (onCard != null && hit.field == selected && carets.isNotEmpty()) onCard.tapped = nearestCaret(carets, at.x * s, at.y * s)
+                            else onTap(hit.field)
                         }
                     }
                 }
@@ -316,6 +359,13 @@ private fun CardPage(
                             }
                         }
                     }
+                    carets.getOrNull(onCard?.caret ?: -1)?.let { c ->
+                        val s = size.width / image.width
+                        drawLine(
+                            caretColor, Offset(c.x.toFloat() * s, c.top.toFloat() * s), Offset(c.x.toFloat() * s, c.bottom.toFloat() * s),
+                            strokeWidth = stroke * 0.8f,
+                        )
+                    }
                 }
                 .testTag("card-${key.uid}"),
         )
@@ -324,7 +374,7 @@ private fun CardPage(
 
 /** The sheet below the Card: the field's name, ‹ › to the Card's other editable fields, and its editor */
 @Composable
-fun FieldSheet(model: SetViewModel, target: EditTarget, revision: Int, onField: (String) -> Unit, onClose: () -> Unit) {
+fun FieldSheet(model: SetViewModel, target: EditTarget, revision: Int, onField: (String) -> Unit, onClose: () -> Unit, inline: OnCardEditing? = null) {
     val session = model.state.collectAsState().value.session
     var fields by remember(target.uid, target.kind) { mutableStateOf<List<FieldInfo>?>(null) }
     LaunchedEffect(target.uid, target.kind, revision) { fields = Core.listFields(session, target.kind, target.uid).fields }
@@ -360,7 +410,7 @@ fun FieldSheet(model: SetViewModel, target: EditTarget, revision: Int, onField: 
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.padding(8.dp).testTag("not-editable"),
                 )
-                else -> TextEditor(model, session, target, info.multiLine, revision)
+                else -> TextEditor(model, session, target, info.multiLine, revision, inline.takeIf { target.kind == TargetKind.Card })
             }
         }
     }
@@ -372,7 +422,7 @@ fun FieldSheet(model: SetViewModel, target: EditTarget, revision: Int, onField: 
  * more was typed meanwhile. Locked spans (e.g. reminder text, keyword parameters) are atomic.
  */
 @Composable
-private fun TextEditor(model: SetViewModel, session: Long, target: EditTarget, multiLine: Boolean, revision: Int) {
+private fun TextEditor(model: SetViewModel, session: Long, target: EditTarget, multiLine: Boolean, revision: Int, onCard: OnCardEditing? = null) {
     val scope = rememberCoroutineScope()
     val holder = remember(target) { CoreText() }
     var value by remember(target) { mutableStateOf<TextFieldValue?>(null) }
@@ -404,6 +454,19 @@ private fun TextEditor(model: SetViewModel, session: Long, target: EditTarget, m
         focus.requestFocus()
     }
     val current = value ?: return
+    if (onCard != null) {
+        // the caret on the Card follows this field's, and a tap on the Card moves it (#83)
+        SideEffect { onCard.caret = CodePoints.fromUtf16(current.text, current.selection.end) }
+        LaunchedEffect(onCard.tapped) {
+            val to = onCard.tapped ?: return@LaunchedEffect
+            onCard.tapped = null
+            val shown = value ?: return@LaunchedEffect
+            val snapped = if (shown.text == holder.sync.core) LockedSpans.snap(to, holder.locked) else to
+            val at = CodePoints.toUtf16(shown.text, snapped)
+            value = shown.copy(selection = TextRange(at))
+            focus.requestFocus()
+        }
+    }
     OutlinedTextField(
         value = current,
         onValueChange = { new ->
@@ -446,7 +509,8 @@ private fun TextEditor(model: SetViewModel, session: Long, target: EditTarget, m
         singleLine = !multiLine,
         minLines = if (multiLine) 3 else 1,
         maxLines = if (multiLine) 6 else 1,
-        modifier = Modifier.fillMaxWidth().focusRequester(focus).testTag("field-text"),
+        // on the Card (#83): still here for the keyboard, but not seen
+        modifier = (if (onCard != null) Modifier.size(1.dp).alpha(0f) else Modifier.fillMaxWidth()).focusRequester(focus).testTag("field-text"),
     )
     // a keyword's match: its parameters are inserted, as locked spans
     if (target.kind == TargetKind.Keyword && target.field == "match") {
@@ -466,7 +530,14 @@ private fun TextEditor(model: SetViewModel, session: Long, target: EditTarget, m
             }
         }
     }
-    symbols?.takeIf { it.hasSymbols }?.let { menu ->
+    // on the Card the symbols wait behind a button, so the Card keeps the space (#83)
+    var showSymbols by remember(target) { mutableStateOf(onCard == null) }
+    if (onCard != null && symbols?.hasSymbols == true) {
+        TextButton(onClick = { showSymbols = !showSymbols }, modifier = Modifier.testTag("symbols-toggle")) {
+            Text(if (showSymbols) "Hide symbols" else "Symbols…")
+        }
+    }
+    symbols?.takeIf { it.hasSymbols && showSymbols }?.let { menu ->
         SymbolBar(
             menu, session, target.uid, target.field, target.kind,
             symbolMode = symbolMode,
