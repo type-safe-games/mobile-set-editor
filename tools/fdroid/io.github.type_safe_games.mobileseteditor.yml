@@ -1,0 +1,46 @@
+Categories:
+  - Graphics
+License: GPL-3.0-or-later
+SourceCode: https://github.com/type-safe-games/mobile-set-editor
+IssueTracker: https://github.com/type-safe-games/mobile-set-editor/issues
+
+AutoName: Mobile Set Editor
+
+RepoType: git
+Repo: https://github.com/type-safe-games/mobile-set-editor.git
+
+Builds:
+  - versionName: 0.1.0
+    versionCode: 1001
+    commit: v0.1.0
+    subdir: android/app
+    submodules: true
+    sudo:
+      - apt-get update
+      - apt-get install -y --no-install-recommends clang cmake ninja-build
+    output: build/outputs/apk/release/app-arm64-v8a-release-unsigned.apk
+    gradle:
+      - yes
+    ndk: 29.0.14206865
+
+  - versionName: 0.1.0
+    versionCode: 1002
+    commit: v0.1.0
+    subdir: android/app
+    submodules: true
+    sudo:
+      - apt-get update
+      - apt-get install -y --no-install-recommends clang cmake ninja-build
+    output: build/outputs/apk/release/app-x86_64-release-unsigned.apk
+    gradle:
+      - yes
+    ndk: 29.0.14206865
+
+AutoUpdateMode: Version
+UpdateCheckMode: Tags
+VercodeOperation:
+  - '%c * 10 + 1'
+  - '%c * 10 + 2'
+UpdateCheckData: android/app/build.gradle.kts|val baseVersionCode = (\d+)|.|val appVersion = "([^"]+)"
+CurrentVersion: 0.1.0
+CurrentVersionCode: 1002
