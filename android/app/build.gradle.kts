@@ -16,10 +16,15 @@ val abis = listOf("arm64-v8a", "x86_64")
 // digit (arm64-v8a 1, x86_64 2), so 0.1.0 is 1001 on arm64-v8a and 1002 on x86_64; an APK with
 // every ABI (debug builds) has digit 0.
 val appVersion = "0.1.0"
+// appVersion's versionCode before the ABI digit, written out so that F-Droid's update check can read
+// it (tools/fdroid/README.md); the build stops if it doesn't match appVersion.
+val baseVersionCode = 100
 val abiDigits = mapOf("arm64-v8a" to 1, "x86_64" to 2)
 /** A release build: one APK per ABI (splits); otherwise one APK with every ABI */
 val releaseBuild = gradle.startParameter.taskNames.any { it.contains("Release", ignoreCase = true) }
-val baseVersionCode = appVersion.split('.').map(String::toInt).let { (major, minor, patch) -> major * 10000 + minor * 100 + patch }
+appVersion.split('.').map(String::toInt).let { (major, minor, patch) -> major * 10000 + minor * 100 + patch }.let {
+    if (it != baseVersionCode) throw GradleException("baseVersionCode is $baseVersionCode, but appVersion $appVersion needs $it")
+}
 
 android {
     // After the GitHub owner type-safe-games (#53), with "_" for "-", which package names can't have.
