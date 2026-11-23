@@ -185,6 +185,9 @@ val nativeComponents = listOf(
         listOf("third_party/hunspell/license.hunspell", "third_party/hunspell/COPYING", "third_party/hunspell/COPYING.MPL"), listOf("third_party/hunspell")),
     NativeComponent("minizip-ng", "zip files", "Zlib", "https://github.com/zlib-ng/minizip-ng",
         listOf("third_party/minizip-ng/LICENSE"), listOf("third_party/minizip-ng")),
+    // not a library: the fonts for text in a font nobody installed (#91), in the assets
+    NativeComponent("Noto Sans", "the font for text whose own font isn't installed", "OFL-1.1", "https://notofonts.github.io",
+        listOf("android/app/src/main/assets/fallback-fonts/OFL.txt"), emptyList()),
 )
 /** Submodules that are build tools only: nothing from them is in the APK */
 val buildToolSubmodules = setOf("third_party/gn")

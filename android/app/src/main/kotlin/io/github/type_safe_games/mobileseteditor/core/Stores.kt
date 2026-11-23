@@ -33,9 +33,27 @@ object Stores {
             val data = programData(app)
             data.deleteRecursively()
             copyAssets(app, "program-data", data)
+            addFallbackFonts(app)
             Core.init(templates(app), fonts(app), data, LOCALE).also { started = it }
         }
     }
+
+    /**
+     * Noto Sans, the family the font registry falls back to for a font nobody installed (ADR 0004):
+     * Android has no system fonts the core can use, so without it such text was not drawn at all
+     * (#91). Copied into the font store when missing or changed; a Template import may bring its
+     * own copy, which is the same family.
+     */
+    private fun addFallbackFonts(context: Context) {
+        val store = fonts(context)
+        for (name in context.assets.list(FALLBACK_FONTS).orEmpty().filter { it.endsWith(".ttf") }) {
+            val to = File(store, name)
+            val bytes = context.assets.open("$FALLBACK_FONTS/$name").use { it.readBytes() }
+            if (to.length() != bytes.size.toLong() || !to.readBytes().contentEquals(bytes)) to.writeBytes(bytes)
+        }
+    }
+
+    private const val FALLBACK_FONTS = "fallback-fonts"
 
     private fun copyAssets(context: Context, path: String, to: File) {
         val children = context.assets.list(path) ?: emptyArray()
