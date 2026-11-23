@@ -1,0 +1,7 @@
+# Only bug reports are taken here (ADR 0008). Planning and feature work happen in the
+# maintainers' own tracker; bugs filed here are triaged onto it by hand.
+blank_issues_enabled: false
+contact_links:
+  - name: Upstream Magic Set Editor
+    url: https://github.com/G-e-n-e-v-e-n-s-i-S/MagicSetEditor2
+    about: Bugs in desktop Magic Set Editor itself, or in a template that also misbehaves there, belong upstream.

@@ -1,0 +1,55 @@
+name: Bug report
+description: Something in the app is broken, crashes, or renders a card wrong.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This repository takes **bug reports only**. Feature requests and planning happen
+        elsewhere, so issues that aren't bugs will be closed.
+
+        The app ships no templates: say which ones you imported, since many card problems
+        come from the template rather than the app.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+      placeholder: |
+        1. Open a Set using ...
+        2. Tap ...
+        3. Expected ..., but ...
+    validations:
+      required: true
+  - type: input
+    id: app-version
+    attributes:
+      label: App version
+      description: From the About screen, or the commit if you built it yourself.
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Device and Android version
+      placeholder: Pixel 7, Android 15
+    validations:
+      required: true
+  - type: textarea
+    id: templates
+    attributes:
+      label: Templates involved
+      description: The Game and Style (and their versions, if you know them) of the affected Set or Card.
+  - type: dropdown
+    id: desktop
+    attributes:
+      label: Does desktop Magic Set Editor 2.6 do the same with the same templates?
+      options:
+        - Didn't check
+        - "No, only this app gets it wrong"
+        - "Yes, desktop gets it wrong too"
+  - type: textarea
+    id: attachments
+    attributes:
+      label: Screenshots or logs
+      description: A screenshot of a wrong card, or `adb logcat` output for a crash. You can attach the .mse-set file if it's small and shareable.
