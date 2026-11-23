@@ -1,0 +1,1 @@
+First release: import templates, create sets, edit a card by tapping it, mix card styles, set info, symbols and keywords, undo and redo, and export cards as PNGs.

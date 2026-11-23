@@ -1,0 +1,22 @@
+Mobile Set Editor lets you design your own trading cards and card sets on an Android phone or tablet. It works with templates in the format of MSE, the desktop card set editor, and opens and saves the same .mse-set files, so a set can move between your phone and your computer.
+
+<b>No templates are included.</b> The app starts empty: you import a zip of the templates you want to use, from wherever you got them. Everything after that works offline; the app has no internet permission.
+
+<b>What you can do</b>
+<ul>
+<li>Import templates from a zip, choosing which ones to install, with their fonts and dependencies</li>
+<li>Create a set, or open an existing .mse-set file</li>
+<li>Edit a card by tapping the part you want to change: its name, its text, its image, its symbols</li>
+<li>Swipe or step between cards; add, duplicate, reorder and delete them</li>
+<li>Mix card styles in one set, each card in its own style if you like</li>
+<li>Edit the set's information, its symbol and its keywords</li>
+<li>Undo and redo everything</li>
+<li>Export cards as PNG images, share them, or save the whole set as a zip of PNGs</li>
+</ul>
+
+Your work is kept as you go, so nothing is lost if Android closes the app.
+
+<b>Credits</b>
+Mobile Set Editor is based on MSE, by Twan van Laarhoven (twanvl) and the other MSE developers, with later versions by haganbmj and GenevensiS. It is free software under the GNU General Public License, version 3 or later.
+
+Mobile Set Editor is not affiliated with, endorsed by or sponsored by Wizards of the Coast.

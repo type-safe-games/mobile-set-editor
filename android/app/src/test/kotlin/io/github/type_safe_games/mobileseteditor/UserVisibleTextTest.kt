@@ -62,4 +62,14 @@ class UserVisibleTextTest {
         }
         assertTrue("user-visible text names Magic or a Template pack:\n" + hits.joinToString("\n"), hits.isEmpty())
     }
+
+    /** The F-Droid store listing (#79), in the repository's fastlane/ */
+    @Test
+    fun theStoreListingSaysNothingAboutMagic() {
+        val listing = File("../../fastlane")
+        val texts = listing.walk().filter { it.isFile && it.extension == "txt" }.toList()
+        assertTrue("no store listing under ${listing.absolutePath}", texts.isNotEmpty())
+        val hits = texts.flatMap { file -> file.readLines().filter { banned.containsMatchIn(it) }.map { "${file.path}: $it" } }
+        assertTrue("the store listing names Magic:\n" + hits.joinToString("\n"), hits.isEmpty())
+    }
 }
