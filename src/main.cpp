@@ -100,7 +100,6 @@ int MSE::OnRun() {
     SetAppearance((Appearance)settings.dark_mode_type);
     the_locale = Locale::byName(settings.locale);
     nag_about_ascii_version();
-    downloadable_installers.check_updates();
 
     // interpret command line
     {
@@ -289,6 +288,9 @@ int MSE::OnRun() {
 }
 
 int MSE::runGUI() {
+  // Only the GUI can show what the update check finds. A command-line run (--cli, a script, an export)
+  // often ends before the check's detached thread does, and that thread then crashes in wx's cleanup.
+  downloadable_installers.check_updates();
   return wxApp::OnRun();
 }
 

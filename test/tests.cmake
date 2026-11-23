@@ -15,7 +15,11 @@ add_test(
 set(FIXTURE_FONTS_DIR "${test_dir}/fixture/fonts")
 set(FIXTURE_FONT_CACHE_DIR "${PROJECT_BINARY_DIR}/fixture-fontconfig-cache")
 configure_file("${test_dir}/fixture/fonts.conf.in" "${PROJECT_BINARY_DIR}/fixture-fonts.conf" @ONLY)
+# GTK's accessibility bridge prints "dbind-WARNING" to stderr when there is no session bus (as on
+# GitHub's hosted runners), and run_cli.cmake fails any test whose output says WARNING.
+set(desktop_env "NO_AT_BRIDGE=1")
 set(fixture_env
+  ${desktop_env}
   "FONTCONFIG_FILE=${PROJECT_BINARY_DIR}/fixture-fonts.conf"
   "MSE_TEMPLATES_DIR=${test_dir}/fixture/data"
 )
@@ -31,6 +35,7 @@ if(MSE_DESKTOP)
     NAME script-functions
     COMMAND magicseteditor ${test_dir}/script/script-functions.mse-script
   )
+  set_tests_properties(script-functions PROPERTIES ENVIRONMENT "${desktop_env}")
 
   # Rendering tests
   # TODO
