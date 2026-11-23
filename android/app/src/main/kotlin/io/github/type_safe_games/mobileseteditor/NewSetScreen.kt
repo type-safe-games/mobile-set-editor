@@ -79,7 +79,7 @@ fun NewSetScreen(onCreate: (game: String, style: String) -> Unit, onTemplates: (
         when {
             all == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
             games.isEmpty() -> Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.testTag("no-games")) {
-                Text("No Templates are installed yet. Templates come from Template import: pick a zip of them, such as the Full Magic Pack.")
+                Text("No Templates are installed yet. Templates come from Template import: pick a zip of them.")
                 Button(onClick = onTemplates) { Text("Import Templates") }
             }
             chosen == null -> LazyColumn(Modifier.fillMaxSize().testTag("games")) {
