@@ -159,9 +159,129 @@ abstract class CopyProgramData : DefaultTask() {
 val copyProgramData = tasks.register<CopyProgramData>("copyProgramData") {
     locale.set(repoRoot.resolve("data/en.mse-locale"))
 }
+// The licences screen (#76): everything in the APK that isn't ours, with its licence text. The
+// native components' texts are copied from their pinned submodules, so they are the ones built;
+// the Java libraries come from the variant's runtime classpath.
+/** A native component: its name, what it is, its licence, where its source is, its licence files
+ *  (relative to the repository) and the third_party submodules it covers */
+data class NativeComponent(val name: String, val what: String, val licence: String, val source: String, val files: List<String>, val covers: List<String>)
+val nativeComponents = listOf(
+    NativeComponent("Skia", "2D graphics", "BSD-3-Clause", "https://skia.org",
+        listOf("third_party/skia/LICENSE"), listOf("third_party/skia")),
+    NativeComponent("zlib", "compression, as Skia uses it", "Zlib", "https://chromium.googlesource.com/chromium/src/third_party/zlib",
+        listOf("third_party/skia-deps/zlib/LICENSE"), listOf("third_party/skia-deps/zlib")),
+    NativeComponent("libpng", "PNG images", "libpng-2.0", "http://www.libpng.org/pub/png/libpng.html",
+        listOf("third_party/skia-deps/libpng/LICENSE"), listOf("third_party/skia-deps/libpng")),
+    NativeComponent("libjpeg-turbo", "JPEG images", "IJG AND BSD-3-Clause AND Zlib", "https://libjpeg-turbo.org",
+        listOf("third_party/skia-deps/libjpeg-turbo/LICENSE.md", "third_party/skia-deps/libjpeg-turbo/README.ijg"), listOf("third_party/skia-deps/libjpeg-turbo")),
+    NativeComponent("FreeType", "font rendering. Portions of this software are copyright © The FreeType Project (www.freetype.org). All rights reserved.", "FTL", "https://freetype.org",
+        listOf("third_party/skia-deps/freetype/LICENSE.TXT", "third_party/skia-deps/freetype/docs/FTL.TXT"), listOf("third_party/skia-deps/freetype")),
+    NativeComponent("HarfBuzz", "text shaping", "MIT-Modern-Variant", "https://harfbuzz.github.io",
+        listOf("third_party/skia-deps/harfbuzz/COPYING"), listOf("third_party/skia-deps/harfbuzz")),
+    NativeComponent("Boost", "C++ libraries (header-only)", "BSL-1.0", "https://www.boost.org",
+        listOf("third_party/boost/json/LICENSE_1_0.txt"), listOf("third_party/boost")),
+    NativeComponent("Hunspell", "spell checking; used under the GPL", "MPL-1.1 OR GPL-2.0-or-later OR LGPL-2.1-or-later", "https://hunspell.github.io",
+        listOf("third_party/hunspell/license.hunspell", "third_party/hunspell/COPYING", "third_party/hunspell/COPYING.MPL"), listOf("third_party/hunspell")),
+    NativeComponent("minizip-ng", "zip files", "Zlib", "https://github.com/zlib-ng/minizip-ng",
+        listOf("third_party/minizip-ng/LICENSE"), listOf("third_party/minizip-ng")),
+)
+/** Submodules that are build tools only: nothing from them is in the APK */
+val buildToolSubmodules = setOf("third_party/gn")
+/** Groups of Java libraries known to be Apache-2.0. A library from any other group fails the
+ *  build until its licence is added here and on the screen. */
+val apacheGroups = Regex("""androidx(\..+)?|org\.jetbrains(\.kotlinx?)?|org\.jspecify|com\.google\.guava""")
+
+abstract class CollectLicences : DefaultTask() {
+    /** One line per native component: name, what, licence, source and its files, tab-separated */
+    @get:Input
+    abstract val components: ListProperty<String>
+
+    @get:InputFiles
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val licenceFiles: ConfigurableFileCollection
+
+    /** group:name:version of each Java library in the APK */
+    @get:Input
+    abstract val libraries: ListProperty<String>
+
+    @get:InputFile
+    @get:PathSensitive(PathSensitivity.NONE)
+    abstract val apache: RegularFileProperty
+
+    @get:InputFile
+    @get:PathSensitive(PathSensitivity.NONE)
+    abstract val gpl: RegularFileProperty
+
+    @get:Internal
+    abstract val repo: DirectoryProperty
+
+    @get:OutputDirectory
+    abstract val output: DirectoryProperty
+
+    @TaskAction
+    fun collect() {
+        val out = File(output.get().asFile, "licences")
+        out.parentFile.deleteRecursively()
+        out.mkdirs()
+        val index = StringBuilder()
+        // this app: name, what, licence, source, files (each file is copied under licences/<n>/)
+        val app = "Mobile Set Editor\tthis app\tGPL-3.0-or-later\thttps://github.com/type-safe-games/mobile-set-editor"
+        gpl.get().asFile.copyTo(File(out, "0/COPYING"))
+        index.append("$app\tCOPYING\n")
+        components.get().forEachIndexed { i, line ->
+            val fields = line.split('\t')
+            val files = fields[4].split(';').map { File(repo.get().asFile, it) }
+            files.forEach { it.copyTo(File(out, "${i + 1}/${it.name}")) }
+            index.append(fields.take(4).joinToString("\t")).append('\t').append(files.joinToString(";") { it.name }).append('\n')
+        }
+        val n = components.get().size + 1
+        apache.get().asFile.copyTo(File(out, "$n/LICENSE-2.0.txt"))
+        index.append("AndroidX, Kotlin and their libraries\tthe user interface (the list below)\tApache-2.0\thttps://developer.android.com/jetpack/androidx\tLICENSE-2.0.txt\n")
+        File(out, "index.tsv").writeText(index.toString())
+        File(out, "java-libraries.txt").writeText(libraries.get().joinToString("\n", postfix = "\n"))
+    }
+}
+
+/** The third_party submodules, from .gitmodules */
+val thirdPartySubmodules: List<String> = repoRoot.resolve(".gitmodules").readLines()
+    .mapNotNull { Regex("""^\s*path\s*=\s*(third_party/\S+)""").find(it)?.groupValues?.get(1) }
+run {
+    val uncovered = thirdPartySubmodules.filter { sub ->
+        sub !in buildToolSubmodules && nativeComponents.none { c -> c.covers.any { sub == it || sub.startsWith("$it/") } }
+    }
+    if (uncovered.isNotEmpty()) throw GradleException("No licence on the licences screen for ${uncovered.joinToString()} (#76): add it to nativeComponents")
+}
+
+/** Every module (group:name:version) a resolved dependency graph reaches */
+fun modules(root: org.gradle.api.artifacts.result.ResolvedComponentResult): List<String> {
+    val seen = mutableSetOf<org.gradle.api.artifacts.component.ComponentIdentifier>()
+    val out = sortedSetOf<String>()
+    fun walk(c: org.gradle.api.artifacts.result.ResolvedComponentResult) {
+        if (!seen.add(c.id)) return
+        (c.id as? org.gradle.api.artifacts.component.ModuleComponentIdentifier)?.let { out += "${it.group}:${it.module}:${it.version}" }
+        c.dependencies.filterIsInstance<org.gradle.api.artifacts.result.ResolvedDependencyResult>().forEach { walk(it.selected) }
+    }
+    walk(root)
+    return out.toList()
+}
+
 androidComponents {
     onVariants { variant ->
         variant.sources.assets?.addGeneratedSourceDirectory(copyProgramData, CopyProgramData::output)
+        val licences = tasks.register<CollectLicences>("collect${variant.name.replaceFirstChar(Char::uppercase)}Licences") {
+            components.set(nativeComponents.map { listOf(it.name, it.what, it.licence, it.source, it.files.joinToString(";")).joinToString("\t") })
+            licenceFiles.from(nativeComponents.flatMap { c -> c.files.map { repoRoot.resolve(it) } })
+            libraries.set(variant.runtimeConfiguration.incoming.resolutionResult.rootComponent.map { root ->
+                val libs = modules(root)
+                val other = libs.filterNot { apacheGroups.matches(it.substringBefore(':')) }
+                if (other.isNotEmpty()) throw GradleException("Java libraries with no licence on the licences screen (#76): ${other.joinToString()}")
+                libs
+            })
+            apache.set(layout.projectDirectory.file("licences/Apache-2.0.txt"))
+            gpl.set(repoRoot.resolve("COPYING"))
+            repo.set(repoRoot)
+        }
+        variant.sources.assets?.addGeneratedSourceDirectory(licences, CollectLicences::output)
         // per-ABI version codes (see appVersion)
         for (output in variant.outputs) {
             val abi = output.filters.find { it.filterType == com.android.build.api.variant.FilterConfiguration.FilterType.ABI }?.identifier

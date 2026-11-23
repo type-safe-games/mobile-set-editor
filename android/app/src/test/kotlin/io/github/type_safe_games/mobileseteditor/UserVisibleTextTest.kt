@@ -1,4 +1,4 @@
-// Mobile Set Editor - no user-visible text names Magic, its publisher or a Template pack (#76)
+// Mobile Set Editor - no user-visible text names Magic or a Template pack (#76)
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 package io.github.type_safe_games.mobileseteditor
@@ -10,12 +10,12 @@ import org.junit.Test
 
 /**
  * ADR 0008: the app never says "Magic"; ADR 0005: it never names, links to or downloads a Template
- * pack. The app's text is in Kotlin string literals and the XML resources, so this reads both from
+ * pack. (Its publisher may be named: the About screen says the app is not affiliated with it.) The app's text is in Kotlin string literals and the XML resources, so this reads both from
  * the sources (comments don't count: nobody sees them). Package names in the Style support table
  * (assets/style-status.tsv, #72) are data matched against the user's own Templates, not text.
  */
 class UserVisibleTextTest {
-    private val banned = Regex("""magic|\bmtg\b|wizards of the coast|\bwotc\b|gathering|planeswalker""", RegexOption.IGNORE_CASE)
+    private val banned = Regex("""magic|\bmtg\b|gathering|planeswalker""", RegexOption.IGNORE_CASE)
 
     /** Unit tests run in the module directory (android/app) */
     private val main = File("src/main")
@@ -60,6 +60,6 @@ class UserVisibleTextTest {
         } + listOf(main.resolve("AndroidManifest.xml")).flatMap { file ->
             file.readLines().filter { banned.containsMatchIn(it.substringBefore("<!--")) }.map { "${file.name}: $it" }
         }
-        assertTrue("user-visible text names Magic, its publisher or a Template pack:\n" + hits.joinToString("\n"), hits.isEmpty())
+        assertTrue("user-visible text names Magic or a Template pack:\n" + hits.joinToString("\n"), hits.isEmpty())
     }
 }

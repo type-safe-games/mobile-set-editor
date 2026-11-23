@@ -1,4 +1,4 @@
-// Mobile Set Editor - the start screen: the Working copies, Open Set, Templates
+// Mobile Set Editor - the start screen: the Working copies, Open Set, Templates, About
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 package io.github.type_safe_games.mobileseteditor
@@ -34,14 +34,17 @@ import androidx.compose.ui.unit.dp
 import io.github.type_safe_games.mobileseteditor.core.WorkingCopies
 import io.github.type_safe_games.mobileseteditor.core.WorkingCopy
 
-/** The Working copies (name, when last edited, unsaved or not), Open Set, Templates and New Set */
+/** The Working copies (name, when last edited, unsaved or not), Open Set, Templates, New Set and About */
 @Composable
-fun StartScreen(onOpenSet: () -> Unit, onOpenCopy: (WorkingCopy) -> Unit, onTemplates: () -> Unit, onNewSet: () -> Unit = {}) {
+fun StartScreen(onOpenSet: () -> Unit, onOpenCopy: (WorkingCopy) -> Unit, onTemplates: () -> Unit, onNewSet: () -> Unit = {}, onAbout: () -> Unit = {}) {
     val context = LocalContext.current
     var copies by remember { mutableStateOf(WorkingCopies.list(context)) }
     var removing by remember { mutableStateOf<WorkingCopy?>(null) }
     Column(Modifier.fillMaxSize().safeDrawingPadding().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text("Mobile Set Editor", style = MaterialTheme.typography.headlineSmall)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Mobile Set Editor", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f))
+            TextButton(onClick = onAbout, modifier = Modifier.testTag("about-button")) { Text("About") }
+        }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(onClick = onOpenSet, modifier = Modifier.testTag("open-set")) { Text("Open Set") }
             OutlinedButton(onClick = onTemplates) { Text("Templates") }
