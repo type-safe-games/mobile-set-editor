@@ -10,6 +10,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.viewModels
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -56,6 +57,9 @@ class MainActivity : ComponentActivity() {
     private val setModel: SetViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // the app draws under the system bars (Android 15+ does so anyway); this picks their icons'
+        // colour for the light screens, now that no dark action bar sits under them (#85)
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         // after the process was killed: back to the Set that was open, from its Working copy
         setModel.restore()
