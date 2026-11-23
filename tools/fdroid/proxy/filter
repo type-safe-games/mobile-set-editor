@@ -1,0 +1,16 @@
+^dl\.google\.com$
+^maven\.google\.com$
+^repo\.maven\.apache\.org$
+^repo1\.maven\.org$
+^plugins\.gradle\.org$
+^services\.gradle\.org$
+^downloads\.gradle\.org$
+^github\.com$
+^release-assets\.githubusercontent\.com$
+^objects\.githubusercontent\.com$
+^gitlab\.com$
+^deb\.debian\.org$
+^security\.debian\.org$
+^f-droid\.github\.io$
+^fdroid\.gitlab\.io$
+^raw\.githubusercontent\.com$
