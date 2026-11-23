@@ -4,7 +4,7 @@
 # The JNI layer (src/main/cpp/mse_jni.cpp) finds these classes, constructors and methods by name:
 # the result classes it builds, NativeCore's native methods and the listener it calls back. Keep
 # the whole package as it is rather than list each signature.
--keep class org.mobileseteditor.core.** { *; }
+-keep class io.github.type_safe_games.mobileseteditor.core.** { *; }
 -keepclasseswithmembernames,includedescriptorclasses class * {
     native <methods>;
 }

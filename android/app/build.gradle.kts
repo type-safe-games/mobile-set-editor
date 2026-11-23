@@ -22,14 +22,15 @@ val releaseBuild = gradle.startParameter.taskNames.any { it.contains("Release", 
 val baseVersionCode = appVersion.split('.').map(String::toInt).let { (major, minor, patch) -> major * 10000 + minor * 100 + patch }
 
 android {
-    // Provisional names; the app is named in #76 (and keeps "Magic" out of them).
-    namespace = "org.mobileseteditor"
+    // After the GitHub owner type-safe-games (#53), with "_" for "-", which package names can't have.
+    // The applicationId is permanent once on F-Droid (#76).
+    namespace = "io.github.type_safe_games.mobileseteditor"
     compileSdk = 36
     buildToolsVersion = "36.1.0"
     ndkVersion = "29.0.14206865"
 
     defaultConfig {
-        applicationId = "org.mobileseteditor"
+        applicationId = "io.github.type_safe_games.mobileseteditor"
         minSdk = 26 // ADR 0006
         targetSdk = 36
         versionCode = baseVersionCode * 10
@@ -56,6 +57,10 @@ android {
 
     buildTypes {
         // F-Droid builds and signs releases itself: no signing config here (#77)
+        // a debug build installs beside a release one
+        debug {
+            applicationIdSuffix = ".debug"
+        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true

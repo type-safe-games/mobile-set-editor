@@ -1,11 +1,11 @@
 // Mobile Set Editor - the JNI layer over the facade (ADR 0006, ADR 0009)
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// The functions of org.mobileseteditor.core.NativeCore. Each is a thin call into the facade
-// (facade/facade.hpp), which runs on the one core thread the Kotlin side owns (Core.kt) and
-// returns its queued messages. Strings cross as real UTF-8 (ADR 0002), through String(byte[],
-// UTF-8) and String.getBytes(UTF-8) rather than JNI's modified UTF-8. No C++ exception crosses
-// JNI: anything that escapes becomes a Failed result.
+// The functions of io.github.type_safe_games.mobileseteditor.core.NativeCore. Each is a thin call
+// into the facade (facade/facade.hpp), which runs on the one core thread the Kotlin side owns
+// (Core.kt) and returns its queued messages. Strings cross as real UTF-8 (ADR 0002), through
+// String(byte[], UTF-8) and String.getBytes(UTF-8) rather than JNI's modified UTF-8. No C++
+// exception crosses JNI: anything that escapes becomes a Failed result.
 //
 // This is the subset M3 needs; the rest of the facade comes with M4.
 
@@ -32,7 +32,11 @@ namespace {
 
 // ----------------------------------------------------------------------------- : Classes
 
-constexpr const char* PKG = "org/mobileseteditor/core/";
+constexpr const char* PKG = "io/github/type_safe_games/mobileseteditor/core/";
+
+/// The JNI name of NativeCore's native method `name`. Each "_" in the package is escaped as "_1"
+/// (io.github.type_safe_games.mobileseteditor, after the GitHub owner type-safe-games: #76).
+#define MSE_JNI(name) Java_io_github_type_1safe_1games_mobileseteditor_core_NativeCore_##name
 
 struct Classes {
   jclass string, message, result, open_result, card_list_result, card_size_result, field_region, render_result;
@@ -276,8 +280,8 @@ JNIEXPORT jint JNI_OnLoad(JavaVM* vm, void*) {
 }
 
 JNIEXPORT jobject JNICALL
-Java_org_mobileseteditor_core_NativeCore_init(JNIEnv* env, jobject, jstring template_dir, jstring font_store_dir,
-                                             jstring program_data_dir, jstring locale) {
+MSE_JNI(init)(JNIEnv* env, jobject, jstring template_dir, jstring font_store_dir,
+             jstring program_data_dir, jstring locale) {
   F::InitOptions options;
   options.template_dir     = from_java(env, template_dir);
   options.font_store_dir   = from_java(env, font_store_dir);
@@ -293,12 +297,12 @@ Java_org_mobileseteditor_core_NativeCore_init(JNIEnv* env, jobject, jstring temp
 }
 
 JNIEXPORT jobject JNICALL
-Java_org_mobileseteditor_core_NativeCore_shutdown(JNIEnv* env, jobject) {
+MSE_JNI(shutdown)(JNIEnv* env, jobject) {
   return to_java(env, guarded<F::Result>([] { return F::shutdown(); }));
 }
 
 JNIEXPORT jobject JNICALL
-Java_org_mobileseteditor_core_NativeCore_openSessionFd(JNIEnv* env, jobject, jint fd, jstring working_copy_dir) {
+MSE_JNI(openSessionFd)(JNIEnv* env, jobject, jint fd, jstring working_copy_dir) {
   std::string work = from_java(env, working_copy_dir);
   F::OpenResult r = guarded<F::OpenResult>([&] {
     if (work.empty()) return failed<F::OpenResult>("a working copy directory is needed", F::Status::InvalidArgument);
@@ -322,7 +326,7 @@ Java_org_mobileseteditor_core_NativeCore_openSessionFd(JNIEnv* env, jobject, jin
 }
 
 JNIEXPORT jobject JNICALL
-Java_org_mobileseteditor_core_NativeCore_newSession(JNIEnv* env, jobject, jstring game, jstring stylesheet, jstring working_copy_dir) {
+MSE_JNI(newSession)(JNIEnv* env, jobject, jstring game, jstring stylesheet, jstring working_copy_dir) {
   std::string g = from_java(env, game), st = from_java(env, stylesheet), work = from_java(env, working_copy_dir);
   F::OpenResult r = guarded<F::OpenResult>([&] { return F::newSession(g, st, work); });
   jobject result = to_java(env, r);
@@ -332,7 +336,7 @@ Java_org_mobileseteditor_core_NativeCore_newSession(JNIEnv* env, jobject, jstrin
 }
 
 JNIEXPORT jobject JNICALL
-Java_org_mobileseteditor_core_NativeCore_openWorkingCopy(JNIEnv* env, jobject, jstring working_copy_dir, jboolean unsaved) {
+MSE_JNI(openWorkingCopy)(JNIEnv* env, jobject, jstring working_copy_dir, jboolean unsaved) {
   std::string work = from_java(env, working_copy_dir);
   F::OpenResult r = guarded<F::OpenResult>([&] { return F::openWorkingCopy(work, unsaved == JNI_TRUE); });
   jobject result = to_java(env, r);
@@ -342,17 +346,17 @@ Java_org_mobileseteditor_core_NativeCore_openWorkingCopy(JNIEnv* env, jobject, j
 }
 
 JNIEXPORT jobject JNICALL
-Java_org_mobileseteditor_core_NativeCore_flush(JNIEnv* env, jobject, jlong session) {
+MSE_JNI(flush)(JNIEnv* env, jobject, jlong session) {
   return to_java(env, guarded<F::Result>([&] { return F::flush(session); }));
 }
 
 JNIEXPORT jobject JNICALL
-Java_org_mobileseteditor_core_NativeCore_saveToFd(JNIEnv* env, jobject, jlong session, jint fd) {
+MSE_JNI(saveToFd)(JNIEnv* env, jobject, jlong session, jint fd) {
   return to_java(env, guarded<F::ActionResult>([&] { return F::saveTo(session, (int)fd); }));
 }
 
 JNIEXPORT jobject JNICALL
-Java_org_mobileseteditor_core_NativeCore_sessionInfo(JNIEnv* env, jobject, jlong session) {
+MSE_JNI(sessionInfo)(JNIEnv* env, jobject, jlong session) {
   F::SessionInfo r = guarded<F::SessionInfo>([&] { return F::sessionInfo(session); });
   jobject result = to_java(env, r);
   jstring game = to_java(env, r.game), stylesheet = to_java(env, r.stylesheet);
@@ -363,7 +367,7 @@ Java_org_mobileseteditor_core_NativeCore_sessionInfo(JNIEnv* env, jobject, jlong
 }
 
 JNIEXPORT jobject JNICALL
-Java_org_mobileseteditor_core_NativeCore_getValue(JNIEnv* env, jobject, jlong session, jint kind, jstring card_uid, jstring field) {
+MSE_JNI(getValue)(JNIEnv* env, jobject, jlong session, jint kind, jstring card_uid, jstring field) {
   F::Target target = target_from(env, kind, card_uid);
   std::string f = from_java(env, field);
   F::ValueResult r = guarded<F::ValueResult>([&] { return F::getValue(session, target, f); });
@@ -375,15 +379,15 @@ Java_org_mobileseteditor_core_NativeCore_getValue(JNIEnv* env, jobject, jlong se
 }
 
 JNIEXPORT jobject JNICALL
-Java_org_mobileseteditor_core_NativeCore_setValue(JNIEnv* env, jobject, jlong session, jint kind, jstring card_uid,
-                                                 jstring field, jstring value) {
+MSE_JNI(setValue)(JNIEnv* env, jobject, jlong session, jint kind, jstring card_uid,
+                 jstring field, jstring value) {
   F::Target target = target_from(env, kind, card_uid);
   std::string f = from_java(env, field), v = from_java(env, value);
   return to_java(env, guarded<F::ActionResult>([&] { return F::setValue(session, target, f, v); }));
 }
 
 JNIEXPORT jobject JNICALL
-Java_org_mobileseteditor_core_NativeCore_listFields(JNIEnv* env, jobject, jlong session, jint kind, jstring card_uid) {
+MSE_JNI(listFields)(JNIEnv* env, jobject, jlong session, jint kind, jstring card_uid) {
   F::Target target = target_from(env, kind, card_uid);
   F::FieldList r = guarded<F::FieldList>([&] { return F::listFields(session, target); });
   std::vector<std::string> names, types;
@@ -440,7 +444,7 @@ static jintArray to_java_ints(JNIEnv* env, const std::vector<jint>& v) {
 }
 
 JNIEXPORT jobject JNICALL
-Java_org_mobileseteditor_core_NativeCore_symbolMenu(JNIEnv* env, jobject, jlong session, jint kind, jstring card_uid, jstring field) {
+MSE_JNI(symbolMenu)(JNIEnv* env, jobject, jlong session, jint kind, jstring card_uid, jstring field) {
   F::Target target = target_from(env, kind, card_uid);
   std::string f = from_java(env, field);
   F::SymbolMenu r = guarded<F::SymbolMenu>([&] { return F::symbolMenu(session, target, f); });
@@ -465,8 +469,8 @@ Java_org_mobileseteditor_core_NativeCore_symbolMenu(JNIEnv* env, jobject, jlong 
 }
 
 JNIEXPORT jobject JNICALL
-Java_org_mobileseteditor_core_NativeCore_symbolPreview(JNIEnv* env, jobject, jlong session, jint kind, jstring card_uid,
-                                                      jstring field, jint item_id, jint size) {
+MSE_JNI(symbolPreview)(JNIEnv* env, jobject, jlong session, jint kind, jstring card_uid,
+                      jstring field, jint item_id, jint size) {
   F::Target target = target_from(env, kind, card_uid);
   std::string f = from_java(env, field);
   F::ImageData r = guarded<F::ImageData>([&] { return F::symbolPreview(session, target, f, item_id, size); });
@@ -485,15 +489,15 @@ Java_org_mobileseteditor_core_NativeCore_symbolPreview(JNIEnv* env, jobject, jlo
 }
 
 JNIEXPORT jobject JNICALL
-Java_org_mobileseteditor_core_NativeCore_getText(JNIEnv* env, jobject, jlong session, jint kind, jstring card_uid, jstring field) {
+MSE_JNI(getText)(JNIEnv* env, jobject, jlong session, jint kind, jstring card_uid, jstring field) {
   F::Target target = target_from(env, kind, card_uid);
   std::string f = from_java(env, field);
   return to_java(env, guarded<F::TextResult>([&] { return F::getText(session, target, f); }));
 }
 
 JNIEXPORT jobject JNICALL
-Java_org_mobileseteditor_core_NativeCore_replaceRange(JNIEnv* env, jobject, jlong session, jint kind, jstring card_uid,
-                                                     jstring field, jint start, jint end, jstring text, jboolean as_symbol) {
+MSE_JNI(replaceRange)(JNIEnv* env, jobject, jlong session, jint kind, jstring card_uid,
+                     jstring field, jint start, jint end, jstring text, jboolean as_symbol) {
   F::Target target = target_from(env, kind, card_uid);
   std::string f = from_java(env, field), t = from_java(env, text);
   return to_java(env, guarded<F::TextResult>([&] {
@@ -523,30 +527,30 @@ static jobject new_cards_to_java(JNIEnv* env, const F::NewCardsResult& r) {
 }
 
 JNIEXPORT jobject JNICALL
-Java_org_mobileseteditor_core_NativeCore_addCard(JNIEnv* env, jobject, jlong session, jint position) {
+MSE_JNI(addCard)(JNIEnv* env, jobject, jlong session, jint position) {
   return new_cards_to_java(env, guarded<F::NewCardsResult>([&] { return F::addCard(session, (int)position); }));
 }
 
 JNIEXPORT jobject JNICALL
-Java_org_mobileseteditor_core_NativeCore_duplicateCards(JNIEnv* env, jobject, jlong session, jobjectArray card_uids) {
+MSE_JNI(duplicateCards)(JNIEnv* env, jobject, jlong session, jobjectArray card_uids) {
   std::vector<std::string> uids = from_java_strings(env, card_uids);
   return new_cards_to_java(env, guarded<F::NewCardsResult>([&] { return F::duplicateCards(session, uids); }));
 }
 
 JNIEXPORT jobject JNICALL
-Java_org_mobileseteditor_core_NativeCore_removeCards(JNIEnv* env, jobject, jlong session, jobjectArray card_uids) {
+MSE_JNI(removeCards)(JNIEnv* env, jobject, jlong session, jobjectArray card_uids) {
   std::vector<std::string> uids = from_java_strings(env, card_uids);
   return to_java(env, guarded<F::ActionResult>([&] { return F::removeCards(session, uids); }));
 }
 
 JNIEXPORT jobject JNICALL
-Java_org_mobileseteditor_core_NativeCore_moveCards(JNIEnv* env, jobject, jlong session, jobjectArray card_uids, jint position) {
+MSE_JNI(moveCards)(JNIEnv* env, jobject, jlong session, jobjectArray card_uids, jint position) {
   std::vector<std::string> uids = from_java_strings(env, card_uids);
   return to_java(env, guarded<F::ActionResult>([&] { return F::moveCards(session, uids, (int)position); }));
 }
 
 JNIEXPORT jobject JNICALL
-Java_org_mobileseteditor_core_NativeCore_listKeywords(JNIEnv* env, jobject, jlong session) {
+MSE_JNI(listKeywords)(JNIEnv* env, jobject, jlong session) {
   F::KeywordList r = guarded<F::KeywordList>([&] { return F::listKeywords(session); });
   jsize n = (jsize)r.keywords.size();
   std::vector<jlong> ids;
@@ -582,7 +586,7 @@ Java_org_mobileseteditor_core_NativeCore_listKeywords(JNIEnv* env, jobject, jlon
 }
 
 JNIEXPORT jobject JNICALL
-Java_org_mobileseteditor_core_NativeCore_addKeyword(JNIEnv* env, jobject, jlong session) {
+MSE_JNI(addKeyword)(JNIEnv* env, jobject, jlong session) {
   F::NewKeywordResult r = guarded<F::NewKeywordResult>([&] { return F::addKeyword(session); });
   jobject action = to_java(env, static_cast<const F::ActionResult&>(r));
   jobject out = env->NewObject(cls.new_keyword_result, cls.new_keyword_result_init, action, (jlong)r.id);
@@ -591,21 +595,21 @@ Java_org_mobileseteditor_core_NativeCore_addKeyword(JNIEnv* env, jobject, jlong 
 }
 
 JNIEXPORT jobject JNICALL
-Java_org_mobileseteditor_core_NativeCore_removeKeyword(JNIEnv* env, jobject, jlong session, jlong keyword) {
+MSE_JNI(removeKeyword)(JNIEnv* env, jobject, jlong session, jlong keyword) {
   return to_java(env, guarded<F::ActionResult>([&] { return F::removeKeyword(session, (F::KeywordId)keyword); }));
 }
 
 JNIEXPORT jobject JNICALL
-Java_org_mobileseteditor_core_NativeCore_insertKeywordParameter(JNIEnv* env, jobject, jlong session, jlong keyword,
-                                                               jint start, jint end, jstring type) {
+MSE_JNI(insertKeywordParameter)(JNIEnv* env, jobject, jlong session, jlong keyword,
+                               jint start, jint end, jstring type) {
   std::string t = from_java(env, type);
   return to_java(env, guarded<F::TextResult>([&] { return F::insertKeywordParameter(session, (F::KeywordId)keyword, start, end, t); }));
 }
 
 /// A card as the finished PNG; zoom <= 0 and bleed < 0 leave those to the desktop's defaults
 JNIEXPORT jobject JNICALL
-Java_org_mobileseteditor_core_NativeCore_exportCardImage(JNIEnv* env, jobject, jlong session, jstring card_uid, jdouble zoom,
-                                                        jint bleed, jboolean metadata) {
+MSE_JNI(exportCardImage)(JNIEnv* env, jobject, jlong session, jstring card_uid, jdouble zoom,
+                        jint bleed, jboolean metadata) {
   std::string uid = from_java(env, card_uid);
   F::ExportOptions options;
   if (zoom > 0) options.zoom = (double)zoom;
@@ -622,25 +626,25 @@ Java_org_mobileseteditor_core_NativeCore_exportCardImage(JNIEnv* env, jobject, j
 }
 
 JNIEXPORT jobject JNICALL
-Java_org_mobileseteditor_core_NativeCore_setCardStyle(JNIEnv* env, jobject, jlong session, jstring card_uid, jstring stylesheet) {
+MSE_JNI(setCardStyle)(JNIEnv* env, jobject, jlong session, jstring card_uid, jstring stylesheet) {
   std::string uid = from_java(env, card_uid), st = from_java(env, stylesheet);
   return to_java(env, guarded<F::ActionResult>([&] { return F::setCardStyle(session, uid, st); }));
 }
 
 JNIEXPORT jobject JNICALL
-Java_org_mobileseteditor_core_NativeCore_setSetStyle(JNIEnv* env, jobject, jlong session, jstring stylesheet) {
+MSE_JNI(setSetStyle)(JNIEnv* env, jobject, jlong session, jstring stylesheet) {
   std::string st = from_java(env, stylesheet);
   return to_java(env, guarded<F::ActionResult>([&] { return F::setSetStyle(session, st); }));
 }
 
 JNIEXPORT jobject JNICALL
-Java_org_mobileseteditor_core_NativeCore_setCardOwnStyling(JNIEnv* env, jobject, jlong session, jstring card_uid, jboolean own) {
+MSE_JNI(setCardOwnStyling)(JNIEnv* env, jobject, jlong session, jstring card_uid, jboolean own) {
   std::string uid = from_java(env, card_uid);
   return to_java(env, guarded<F::ActionResult>([&] { return F::setCardOwnStyling(session, uid, own == JNI_TRUE); }));
 }
 
 JNIEXPORT jobject JNICALL
-Java_org_mobileseteditor_core_NativeCore_listLinkTypes(JNIEnv* env, jobject, jlong session) {
+MSE_JNI(listLinkTypes)(JNIEnv* env, jobject, jlong session) {
   F::LinkTypeList r = guarded<F::LinkTypeList>([&] { return F::listLinkTypes(session); });
   std::vector<std::string> selected, linked;
   for (const F::LinkType& t : r.types) { selected.push_back(t.selected); linked.push_back(t.linked); }
@@ -652,36 +656,36 @@ Java_org_mobileseteditor_core_NativeCore_listLinkTypes(JNIEnv* env, jobject, jlo
 }
 
 JNIEXPORT jobject JNICALL
-Java_org_mobileseteditor_core_NativeCore_link(JNIEnv* env, jobject, jlong session, jstring card_uid, jstring other_uid,
-                                             jstring relation, jstring other_relation) {
+MSE_JNI(link)(JNIEnv* env, jobject, jlong session, jstring card_uid, jstring other_uid,
+             jstring relation, jstring other_relation) {
   std::string a = from_java(env, card_uid), b = from_java(env, other_uid);
   std::string ra = from_java(env, relation), rb = from_java(env, other_relation);
   return to_java(env, guarded<F::ActionResult>([&] { return F::link(session, a, b, ra, rb); }));
 }
 
 JNIEXPORT jobject JNICALL
-Java_org_mobileseteditor_core_NativeCore_unlink(JNIEnv* env, jobject, jlong session, jstring card_uid, jstring other_uid) {
+MSE_JNI(unlink)(JNIEnv* env, jobject, jlong session, jstring card_uid, jstring other_uid) {
   std::string a = from_java(env, card_uid), b = from_java(env, other_uid);
   return to_java(env, guarded<F::ActionResult>([&] { return F::unlink(session, a, b); }));
 }
 
 JNIEXPORT jobject JNICALL
-Java_org_mobileseteditor_core_NativeCore_undo(JNIEnv* env, jobject, jlong session) {
+MSE_JNI(undo)(JNIEnv* env, jobject, jlong session) {
   return to_java(env, guarded<F::ActionResult>([&] { return F::undo(session); }));
 }
 
 JNIEXPORT jobject JNICALL
-Java_org_mobileseteditor_core_NativeCore_redo(JNIEnv* env, jobject, jlong session) {
+MSE_JNI(redo)(JNIEnv* env, jobject, jlong session) {
   return to_java(env, guarded<F::ActionResult>([&] { return F::redo(session); }));
 }
 
 JNIEXPORT jobject JNICALL
-Java_org_mobileseteditor_core_NativeCore_closeSession(JNIEnv* env, jobject, jlong session) {
+MSE_JNI(closeSession)(JNIEnv* env, jobject, jlong session) {
   return to_java(env, guarded<F::Result>([&] { return F::closeSession(session); }));
 }
 
 JNIEXPORT jobject JNICALL
-Java_org_mobileseteditor_core_NativeCore_listCards(JNIEnv* env, jobject, jlong session) {
+MSE_JNI(listCards)(JNIEnv* env, jobject, jlong session) {
   F::CardList r = guarded<F::CardList>([&] { return F::listCards(session); });
   std::vector<std::string> uids, names, stylesheets;
   jbooleanArray own_stylesheet = env->NewBooleanArray((jsize)r.cards.size()), own_styling = env->NewBooleanArray((jsize)r.cards.size());
@@ -715,7 +719,7 @@ Java_org_mobileseteditor_core_NativeCore_listCards(JNIEnv* env, jobject, jlong s
 }
 
 JNIEXPORT jobject JNICALL
-Java_org_mobileseteditor_core_NativeCore_cardSize(JNIEnv* env, jobject, jlong session, jstring card_uid) {
+MSE_JNI(cardSize)(JNIEnv* env, jobject, jlong session, jstring card_uid) {
   std::string uid = from_java(env, card_uid);
   F::CardSize r = guarded<F::CardSize>([&] { return F::cardSize(session, uid); });
   jobject result = to_java(env, r);
@@ -725,7 +729,7 @@ Java_org_mobileseteditor_core_NativeCore_cardSize(JNIEnv* env, jobject, jlong se
 }
 
 JNIEXPORT jobject JNICALL
-Java_org_mobileseteditor_core_NativeCore_fieldAt(JNIEnv* env, jobject, jlong session, jstring card_uid, jdouble x, jdouble y, jint width) {
+MSE_JNI(fieldAt)(JNIEnv* env, jobject, jlong session, jstring card_uid, jdouble x, jdouble y, jint width) {
   std::string uid = from_java(env, card_uid);
   F::FieldAt r = guarded<F::FieldAt>([&] { return F::fieldAt(session, uid, x, y, (int)width); });
   jobject result = to_java(env, r);
@@ -736,7 +740,7 @@ Java_org_mobileseteditor_core_NativeCore_fieldAt(JNIEnv* env, jobject, jlong ses
 }
 
 JNIEXPORT jobject JNICALL
-Java_org_mobileseteditor_core_NativeCore_renderCard(JNIEnv* env, jobject, jlong session, jstring card_uid, jobject bitmap) {
+MSE_JNI(renderCard)(JNIEnv* env, jobject, jlong session, jstring card_uid, jobject bitmap) {
   std::string uid = from_java(env, card_uid);
   F::RenderResult r = guarded<F::RenderResult>([&] {
     AndroidBitmapInfo info;
@@ -773,7 +777,7 @@ Java_org_mobileseteditor_core_NativeCore_renderCard(JNIEnv* env, jobject, jlong 
 // ----------------------------------------------------------------------------- : Templates
 
 JNIEXPORT jobject JNICALL
-Java_org_mobileseteditor_core_NativeCore_listTemplates(JNIEnv* env, jobject) {
+MSE_JNI(listTemplates)(JNIEnv* env, jobject) {
   F::TemplateList r = guarded<F::TemplateList>([] { return F::listTemplates(); });
   jobjectArray list = env->NewObjectArray((jsize)r.templates.size(), cls.template_info, nullptr);
   for (size_t i = 0 ; i < r.templates.size() ; ++i) {
@@ -793,7 +797,7 @@ Java_org_mobileseteditor_core_NativeCore_listTemplates(JNIEnv* env, jobject) {
 }
 
 JNIEXPORT jobject JNICALL
-Java_org_mobileseteditor_core_NativeCore_refreshTemplates(JNIEnv* env, jobject) {
+MSE_JNI(refreshTemplates)(JNIEnv* env, jobject) {
   return to_java(env, guarded<F::Result>([] { return F::refreshTemplates(); }));
 }
 
@@ -801,7 +805,7 @@ Java_org_mobileseteditor_core_NativeCore_refreshTemplates(JNIEnv* env, jobject) 
 // it on a background thread.
 
 JNIEXPORT jobject JNICALL
-Java_org_mobileseteditor_core_NativeCore_scanTemplatesFd(JNIEnv* env, jobject, jint fd) {
+MSE_JNI(scanTemplatesFd)(JNIEnv* env, jobject, jint fd) {
   F::ImportScan r = guarded<F::ImportScan>([&] { return F::scanTemplates((int)fd); });
   jobjectArray packages = env->NewObjectArray((jsize)r.packages.size(), cls.scanned_package, nullptr);
   for (size_t i = 0 ; i < r.packages.size() ; ++i) {
@@ -828,8 +832,8 @@ Java_org_mobileseteditor_core_NativeCore_scanTemplatesFd(JNIEnv* env, jobject, j
 }
 
 JNIEXPORT jobject JNICALL
-Java_org_mobileseteditor_core_NativeCore_installTemplatesFd(JNIEnv* env, jobject, jint fd, jobjectArray names,
-                                                           jboolean fonts, jboolean dictionaries, jobject listener) {
+MSE_JNI(installTemplatesFd)(JNIEnv* env, jobject, jint fd, jobjectArray names,
+                           jboolean fonts, jboolean dictionaries, jobject listener) {
   F::ImportSelection selection;
   selection.fonts = fonts == JNI_TRUE;
   selection.dictionaries = dictionaries == JNI_TRUE;
