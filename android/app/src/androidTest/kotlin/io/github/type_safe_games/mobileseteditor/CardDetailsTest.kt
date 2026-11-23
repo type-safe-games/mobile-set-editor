@@ -11,6 +11,8 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -117,5 +119,31 @@ class CardDetailsTest {
         compose.onNodeWithTag("style-fixture-standard.mse-style").performClick()
         compose.waitUntil(10_000) { model.state.value.cardStyles.getOrNull(0)?.stylesheet == "fixture-standard.mse-style" }
         compose.waitUntil(30_000) { model.state.value.card?.regions?.any { it.field == "level" } == true }
+    }
+
+    @Test
+    fun styleFirstAndTheFieldsOnTheCardFolded() {
+        val model = SetViewModel(TestFixture.app.applicationContext as Application)
+        compose.setContent { CardEditorScreen(model, onBack = {}) }
+        model.open(Uri.fromFile(TestFixture.zip("details-order.mse-set", TestFixture.assetFiles("sets/fixture-cards.mse-set"))))
+        compose.waitUntil(30_000) { model.state.value.card != null }
+        assertTrue(model.state.value.card!!.regions.any { it.field == "name" && it.editable })
+        compose.onNodeWithTag("details").performClick()
+        waitForTag("card-details")
+        // the Card's Style is the first thing, no scrolling needed (#88)
+        waitForTag("change-style")
+        compose.onNodeWithTag("change-style").assertIsDisplayed()
+        // the name has a spot on the Card: folded away until asked for
+        scrollTo("details-on-card")
+        assertTrue(compose.onAllNodesWithTag("details-name").fetchSemanticsNodes().isEmpty())
+        compose.onNodeWithTag("details-on-card").performClick()
+        scrollTo("details-name")
+        compose.onNodeWithTag("details-on-card").performClick()
+        compose.waitUntil(5_000) { compose.onAllNodesWithTag("details-name").fetchSemanticsNodes().isEmpty() }
+        // searching shows it again
+        scrollTo("details-find")
+        compose.onNodeWithTag("details-find").performTextInput("name")
+        scrollTo("details-name")
+        compose.onNodeWithTag("details-name").assertIsDisplayed()
     }
 }

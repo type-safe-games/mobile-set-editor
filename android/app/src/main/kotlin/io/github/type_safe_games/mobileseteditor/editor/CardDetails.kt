@@ -14,6 +14,10 @@ import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material3.Icon
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -55,9 +59,10 @@ import io.github.type_safe_games.mobileseteditor.render.RenderKey
 private data class FieldRow(val info: FieldInfo, val kind: TargetKind, val summary: String)
 
 /**
- * Every field of a Card in one list (#17): first those with no spot on the Card to tap (no
- * editable region in its render), then those on it, in the Game's order; then its Style, whether
- * it has its own style options, and those options. Picking a field opens its editor ([onEdit]).
+ * Every field of a Card in one list (#17), ordered by what the sheet is for (#88): the Card's
+ * Style first, then the fields with no spot on the Card to tap (no editable region in its render),
+ * then those on it (folded away: they're edited by tapping the Card), then whether it has its own
+ * style options, and those (folded when there are many). Picking a field opens its editor ([onEdit]).
  * Also the way to edit a Card without tapping it (TalkBack, small fields).
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -72,8 +77,11 @@ fun CardDetailsSheet(model: SetViewModel, uid: String, revision: Int, onEdit: (E
     var styleFields by remember(uid) { mutableStateOf<List<FieldRow>>(emptyList()) }
     var styles by remember { mutableStateOf<List<TemplateInfo>>(emptyList()) }
     var picking by remember { mutableStateOf(false) }
-    // a magic Card has over a hundred fields: find one by name
+    // a Card can have over a hundred fields: find one by name
     var query by remember { mutableStateOf("") }
+    val searching = query.isNotBlank()
+    var showOnCard by remember(uid) { mutableStateOf(false) }
+    var showOptions by remember(uid) { mutableStateOf(false) }
     val regions = model.observe(RenderKey(uid, model.renderWidth))?.collectAsState()?.value?.regions
     // read again after every change (to the Card, its Style, its styling)
     var error by remember(uid) { mutableStateOf("") }
@@ -109,19 +117,6 @@ fun CardDetailsSheet(model: SetViewModel, uid: String, revision: Int, onEdit: (E
                     modifier = Modifier.semantics { heading() },
                 )
             }
-            item {
-                OutlinedTextField(
-                    query, { query = it },
-                    label = { Text("Find a field") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth().testTag("details-find"),
-                )
-            }
-            if (error.isNotEmpty()) item { Text(error, color = MaterialTheme.colorScheme.error) }
-            if (all != null) {
-                section("Not on the card", all.filter { it.info.name !in onCard }, onEdit, uid)
-                section("On the card", all.filter { it.info.name in onCard }, onEdit, uid)
-            }
             item { Header("Style") }
             item {
                 Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
@@ -141,6 +136,22 @@ fun CardDetailsSheet(model: SetViewModel, uid: String, revision: Int, onEdit: (E
                 }
             }
             item {
+                OutlinedTextField(
+                    query, { query = it },
+                    label = { Text("Find a field") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp).testTag("details-find"),
+                )
+            }
+            if (error.isNotEmpty()) item { Text(error, color = MaterialTheme.colorScheme.error) }
+            if (all != null) {
+                section("Not on the card", all.filter { it.info.name !in onCard }, onEdit, uid)
+                // the fields on the card are edited by tapping it: here they're the fallback, so folded
+                // away unless asked for or searched (#88)
+                val shown = all.filter { it.info.name in onCard }
+                section("Fields on the card", shown, onEdit, uid, open = searching || showOnCard, onToggle = { showOnCard = !showOnCard }, tag = "details-on-card")
+            }
+            item {
                 Row(
                     Modifier.fillMaxWidth().clickable { scope.launch { model.setOwnStyling(uid, style?.ownStyling != true) } }.padding(vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -156,6 +167,7 @@ fun CardDetailsSheet(model: SetViewModel, uid: String, revision: Int, onEdit: (E
             section(
                 if (style?.ownStyling == true) "Style options (this Card's own)" else "Style options (the Set's, for every Card in this Style)",
                 options, onEdit, uid,
+                open = searching || showOptions || options.size <= FOLD_OVER, onToggle = { showOptions = !showOptions }, tag = "details-options",
             )
             item { Row(Modifier.padding(bottom = 24.dp)) {} }
         }
@@ -186,23 +198,57 @@ private fun Header(text: String) {
     }
 }
 
-private fun LazyListScope.section(title: String, rows: List<FieldRow>, onEdit: (EditTarget) -> Unit, uid: String) {
+/** More style options than this are folded away until asked for (#88) */
+private const val FOLD_OVER = 6
+
+/**
+ * A heading and its fields, one compact row each (#88): the name and a short value on one line,
+ * a text value under its name on up to two. With [onToggle] the heading folds the rows away when
+ * not [open], showing how many there are.
+ */
+private fun LazyListScope.section(
+    title: String,
+    rows: List<FieldRow>,
+    onEdit: (EditTarget) -> Unit,
+    uid: String,
+    open: Boolean = true,
+    onToggle: (() -> Unit)? = null,
+    tag: String? = null,
+) {
     if (rows.isEmpty()) return
-    item(key = title) { Header(title) }
+    item(key = title) {
+        if (onToggle == null) Header(title)
+        else Column(
+            Modifier.fillMaxWidth().clickable(onClick = onToggle).padding(top = 16.dp, bottom = 4.dp).then(if (tag != null) Modifier.testTag(tag) else Modifier),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("$title (${rows.size})", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f).semantics { heading() })
+                Icon(if (open) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown, contentDescription = if (open) "Fold" else "Show")
+            }
+            HorizontalDivider()
+        }
+    }
+    if (!open) return
     items(rows, key = { "${it.kind}/${it.info.name}" }) { row ->
         val editable = row.info.editable
-        Column(
-            Modifier.fillMaxWidth()
-                .clickable(enabled = editable) { onEdit(EditTarget(uid, row.info.name, row.kind)) }
-                .padding(vertical = 8.dp)
-                .testTag("details-${if (row.kind == TargetKind.CardStyle) "style-" else ""}${row.info.name}"),
-        ) {
-            Text(
-                displayName(row.info.name).replaceFirstChar { it.uppercase() } + if (editable) "" else " (not editable)",
-                style = MaterialTheme.typography.bodyLarge,
-            )
-            if (row.summary.isNotEmpty()) {
-                Text(row.summary, style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        val name = displayName(row.info.name).replaceFirstChar { it.uppercase() } + if (editable) "" else " (not editable)"
+        val long = row.info.type == "text" && row.info.multiLine
+        val modifier = Modifier.fillMaxWidth()
+            .clickable(enabled = editable) { onEdit(EditTarget(uid, row.info.name, row.kind)) }
+            .padding(vertical = 6.dp)
+            .testTag("details-${if (row.kind == TargetKind.CardStyle) "style-" else ""}${row.info.name}")
+        if (long) {
+            Column(modifier) {
+                Text(name, style = MaterialTheme.typography.bodyLarge)
+                if (row.summary.isNotEmpty()) Text(row.summary, style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            }
+        } else {
+            Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(name, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+                Text(
+                    row.summary, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false),
+                )
             }
         }
     }
