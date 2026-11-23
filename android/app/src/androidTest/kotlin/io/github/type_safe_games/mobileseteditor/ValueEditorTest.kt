@@ -14,6 +14,7 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import java.io.File
 import kotlinx.coroutines.runBlocking
@@ -133,7 +134,7 @@ class ValueEditorTest {
     @Test
     fun imagePickedAndCropped() {
         // a wide green image to pick
-        val file = File(TestFixture.work, "picked.png")
+        val file = File(TestFixture.work.apply { mkdirs() }, "picked.png")
         Bitmap.createBitmap(600, 200, Bitmap.Config.ARGB_8888).apply { eraseColor(0xFF00C000.toInt()) }
             .also { b -> file.outputStream().use { b.compress(Bitmap.CompressFormat.PNG, 100, it) } }
         picked = Uri.fromFile(file)
@@ -143,6 +144,8 @@ class ValueEditorTest {
         waitForTag("pick-image")
         compose.onNodeWithTag("pick-image").performClick()
         waitForTag("crop-frame")
+        // Use is enabled once the picked image is decoded, which can take a while on a busy device
+        compose.waitUntil(30_000) { runCatching { compose.onNodeWithTag("crop-use").assertIsEnabled() }.isSuccess }
         compose.onNodeWithTag("crop-use").performClick()
         compose.waitUntil(10_000) { value("picture") != original }
         // the middle of the picture is the picked green

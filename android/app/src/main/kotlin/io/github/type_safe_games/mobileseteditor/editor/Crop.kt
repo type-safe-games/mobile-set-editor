@@ -160,7 +160,11 @@ fun CropDialog(uri: Uri, aspect: Float, onCropped: (File) -> Unit, onCancel: () 
                             val frameW = min(constraints.maxWidth.toFloat(), constraints.maxHeight * safeAspect)
                             val frameH = frameW / safeAspect
                             val s = state?.takeIf { it.frameW == frameW && it.frameH == frameH }
-                                ?: CropState.initial(bitmap.width, bitmap.height, frameW, frameH).also { state = it }
+                                ?: CropState.initial(bitmap.width, bitmap.height, frameW, frameH)
+                            // stored from an effect, not during composition: this is laid out by
+                            // BoxWithConstraints, and a write while it measures didn't always
+                            // recompose the buttons that read it (Use stayed disabled)
+                            LaunchedEffect(s) { if (state !== s) state = s }
                             val shown = remember(bitmap) { bitmap.asImageBitmap() }
                             val frameColor = MaterialTheme.colorScheme.primary
                             Box(
