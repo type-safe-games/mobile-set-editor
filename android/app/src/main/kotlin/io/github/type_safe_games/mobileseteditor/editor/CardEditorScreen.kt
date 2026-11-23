@@ -6,7 +6,7 @@ package io.github.type_safe_games.mobileseteditor.editor
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -66,6 +66,21 @@ import io.github.type_safe_games.mobileseteditor.core.TargetKind
 import io.github.type_safe_games.mobileseteditor.core.SymbolMenuResult
 import io.github.type_safe_games.mobileseteditor.core.TextResult
 import io.github.type_safe_games.mobileseteditor.render.RenderKey
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.ui.input.pointer.PointerInputScope
+import androidx.compose.ui.input.pointer.PointerInputChange
+import androidx.compose.ui.input.pointer.changedToUp
+import kotlinx.coroutines.withTimeoutOrNull
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import io.github.type_safe_games.mobileseteditor.AddCardMenu
+import io.github.type_safe_games.mobileseteditor.StylePickerDialog
+import io.github.type_safe_games.mobileseteditor.rememberGameStyles
+import io.github.type_safe_games.mobileseteditor.styleLabel
 
 /** A field's name (or an undo step's, which may contain one) as people read it: "card_color" is "card color" */
 fun displayName(name: String) = name.replace('_', ' ')
@@ -91,6 +106,9 @@ fun CardEditorScreen(model: SetViewModel, onBack: () -> Unit) {
     // the Card details sheet, for this Card (#67)
     var details by remember { mutableStateOf<String?>(null) }
     val export = io.github.type_safe_games.mobileseteditor.rememberCardExport(model)
+    val styles = rememberGameStyles(model)
+    var adding by remember { mutableStateOf(false) }
+    var pickingStyle by remember { mutableStateOf(false) }
     BackHandler { if (editing != null) editing = null else onBack() }
     val pager = rememberPagerState(initialPage = state.index.coerceIn(0, maxOf(0, state.cardUids.size - 1))) { state.cardUids.size }
 
@@ -101,12 +119,36 @@ fun CardEditorScreen(model: SetViewModel, onBack: () -> Unit) {
             horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             OutlinedButton(onClick = onBack, modifier = Modifier.testTag("back-to-cards")) { Text("‹ Cards") }
-            Text(
-                if (state.cardUids.isEmpty()) "" else "${state.index + 1} / ${state.cardUids.size}  ${state.cardNames.getOrElse(state.index) { "" }}",
-                modifier = Modifier.weight(1f).testTag("card-position"),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            // ‹ › to the neighbouring Cards, besides swiping (#89)
+            IconButton(
+                onClick = { scope.launch { pager.animateScrollToPage(pager.currentPage - 1) } },
+                enabled = editing == null && pager.currentPage > 0,
+                modifier = Modifier.testTag("previous-card"),
+            ) { Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "Previous Card") }
+            Column(Modifier.weight(1f)) {
+                Text(
+                    if (state.cardUids.isEmpty()) "" else "${state.index + 1} / ${state.cardUids.size}  ${state.cardNames.getOrElse(state.index) { "" }}",
+                    modifier = Modifier.testTag("card-position"),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                // the Card's Style, to change it here rather than at the bottom of Details (#87)
+                state.cardStyles.getOrNull(state.index)?.let { cardStyle ->
+                    Text(
+                        styleLabel(styles, cardStyle.stylesheet) + " ▾",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.clickable(enabled = editing == null) { pickingStyle = true }.testTag("card-style-chip"),
+                    )
+                }
+            }
+            IconButton(
+                onClick = { scope.launch { pager.animateScrollToPage(pager.currentPage + 1) } },
+                enabled = editing == null && pager.currentPage < state.cardUids.size - 1,
+                modifier = Modifier.testTag("next-card"),
+            ) { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Next Card") }
             TextButton(
                 onClick = { scope.launch { model.undo(); revision++ } },
                 enabled = state.canUndo,
@@ -124,15 +166,15 @@ fun CardEditorScreen(model: SetViewModel, onBack: () -> Unit) {
                     onClick = { details = state.cardUids.getOrNull(pager.currentPage) },
                     modifier = Modifier.padding(start = 8.dp).testTag("details"),
                 ) { Text("Details") }
-                TextButton(
-                    onClick = {
+                Box {
+                    TextButton(onClick = { adding = true }, modifier = Modifier.testTag("add-card-here")) { Text("Add") }
+                    AddCardMenu(model, styles, adding, onDismiss = { adding = false }) { style ->
                         scope.launch {
-                            val added = model.addCard(pager.currentPage)
+                            val added = model.addCard(pager.currentPage, style)
                             if (added >= 0) pager.scrollToPage(added)
                         }
-                    },
-                    modifier = Modifier.testTag("add-card-here"),
-                ) { Text("Add") }
+                    }
+                }
                 TextButton(
                     onClick = { state.cardUids.getOrNull(pager.currentPage)?.let { export.start(listOf(it)) } },
                     modifier = Modifier.testTag("export-card"),
@@ -174,6 +216,7 @@ fun CardEditorScreen(model: SetViewModel, onBack: () -> Unit) {
                         selected = editing?.takeIf { it.uid == uid && it.kind == TargetKind.Card }?.field,
                         onTap = { editing = EditTarget(uid, it) },
                         onLongPress = { details = uid },
+                        scrolling = { pager.isScrollInProgress },
                     )
                 }
             }
@@ -190,6 +233,12 @@ fun CardEditorScreen(model: SetViewModel, onBack: () -> Unit) {
         }
     }
     io.github.type_safe_games.mobileseteditor.CardExportUi(export)
+    if (pickingStyle) {
+        StylePickerDialog("The Card's Style", styles, onDismiss = { pickingStyle = false }) { picked ->
+            pickingStyle = false
+            state.cardUids.getOrNull(pager.currentPage)?.let { uid -> scope.launch { model.setCardStyle(uid, picked.name) } }
+        }
+    }
     details?.let { uid ->
         CardDetailsSheet(
             model, uid, revision,
@@ -210,6 +259,7 @@ private fun CardPage(
     selected: String?,
     onTap: (String) -> Unit,
     onLongPress: () -> Unit,
+    scrolling: () -> Boolean,
 ) {
     val scope = rememberCoroutineScope()
     val flow = remember(key) { model.observe(key) }
@@ -247,7 +297,7 @@ private fun CardPage(
                 .fillMaxWidth()
                 .aspectRatio(image.width.toFloat() / image.height)
                 .pointerInput(rendered) {
-                    detectTapGestures(onLongPress = { onLongPress() }) { at ->
+                    detectTapsNotSwipes(onLongPress = onLongPress, ignore = scrolling) { at ->
                         // the core picks the field, as the desktop does (masks included)
                         val s = image.width / size.width.toDouble()
                         scope.launch {
@@ -453,3 +503,39 @@ private fun KeywordParameterBar(session: Long, onInsert: (String) -> Unit) {
         }
     }
 }
+
+/**
+ * Taps and long presses, but never the start or end of a swipe (#89). detectTapGestures only cancels
+ * a tap when something else consumes the movement, so a slow or short swipe the pager doesn't take
+ * still ended as a tap and opened a field. Here any movement past the touch slop cancels it, and so
+ * does a tap while [ignore] says the pager is still moving.
+ */
+private suspend fun PointerInputScope.detectTapsNotSwipes(onLongPress: () -> Unit, ignore: () -> Boolean, onTap: (Offset) -> Unit) =
+    awaitEachGesture {
+        val down = awaitFirstDown(requireUnconsumed = false)
+        if (ignore()) return@awaitEachGesture
+        val slop = viewConfiguration.touchSlop
+        var swiped = false
+        var up: PointerInputChange? = null
+        // null: still held when the long-press timeout ran out
+        val ended = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
+            while (true) {
+                val change = awaitPointerEvent().changes.firstOrNull { it.id == down.id } ?: break
+                if ((change.position - down.position).getDistance() > slop) swiped = true
+                if (change.changedToUp()) { up = change; break }
+                if (!change.pressed) break
+            }
+            true
+        }
+        if (swiped) return@awaitEachGesture
+        if (ended == null) {
+            onLongPress()
+            // swallow the rest of the press
+            do {
+                val event = awaitPointerEvent()
+                event.changes.forEach { if (it.id == down.id) it.consume() }
+            } while (event.changes.any { it.id == down.id && it.pressed })
+        } else {
+            up?.let { if (!ignore()) onTap(it.position) }
+        }
+    }

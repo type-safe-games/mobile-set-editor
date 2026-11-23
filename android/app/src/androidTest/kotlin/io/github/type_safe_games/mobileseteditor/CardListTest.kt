@@ -14,6 +14,9 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.performScrollToNode
+import org.junit.Assert.assertTrue
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.assertEquals
 import org.junit.BeforeClass
@@ -53,8 +56,10 @@ class CardListTest {
             compose.waitUntil(10_000) { uids() == expected }
         }
 
-        // add: at the end, and opened
+        // add: at the end, in the Set's Style (#87), and opened
         compose.onNodeWithTag("add-card").performClick()
+        waitForTag("add-in-set-style")
+        compose.onNodeWithTag("add-in-set-style").performClick()
         compose.waitUntil(10_000) { uids().size == 4 }
         compose.waitUntil(10_000) { opened == 3 }
         assertEquals(original, uids().take(3))
@@ -104,4 +109,35 @@ class CardListTest {
 
     private fun androidx.compose.ui.test.junit4.ComposeContentTestRule.onAllNodesWithText(text: String) =
         onAllNodes(androidx.compose.ui.test.hasText(text))
+
+    @Test
+    fun addACardInAnotherStyleAndChangeOneFromTheEditor() {
+        val model = SetViewModel(TestFixture.app.applicationContext as Application)
+        var opened = -1
+        compose.setContent {
+            SetHomeScreen(model, rememberLazyGridState(), onOpenCard = { opened = it }, onSaveAs = {}, onClosed = {})
+        }
+        model.open(Uri.fromFile(TestFixture.zip("card-styles.mse-set", TestFixture.assetFiles("sets/fixture-cards.mse-set"))))
+        compose.waitUntil(30_000) { model.state.value.cardUids.size == 3 }
+        // the Set is in the standard Style; add a Card in the alternate one (#87)
+        compose.onNodeWithTag("add-card").performClick()
+        waitForTag("add-in-other-style")
+        compose.onNodeWithTag("add-in-other-style").performClick()
+        waitForTag("style-fixture-alternate.mse-style")
+        compose.onNodeWithTag("style-fixture-alternate.mse-style").performClick()
+        compose.waitUntil(10_000) { model.state.value.cardUids.size == 4 }
+        compose.waitUntil(10_000) { opened == 3 }
+        val added = model.state.value.cardStyles[3]
+        assertEquals("fixture-alternate.mse-style", added.stylesheet)
+        assertTrue(added.own)
+        // the grid says so, and the menu now offers that Style directly
+        val uid = model.state.value.cardUids[3]
+        compose.onNodeWithTag("card-grid").performScrollToNode(hasTestTag("thumbnail-$uid"))
+        compose.waitUntil(10_000) { compose.onAllNodesWithTag("own-style-$uid", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("add-card").performClick()
+        waitForTag("add-in-fixture-alternate.mse-style")
+        compose.onNodeWithTag("add-in-fixture-alternate.mse-style").performClick()
+        compose.waitUntil(10_000) { model.state.value.cardUids.size == 5 }
+        assertEquals("fixture-alternate.mse-style", model.state.value.cardStyles[4].stylesheet)
+    }
 }

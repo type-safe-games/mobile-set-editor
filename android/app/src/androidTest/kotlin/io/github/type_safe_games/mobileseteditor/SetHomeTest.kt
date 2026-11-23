@@ -17,6 +17,8 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -79,5 +81,31 @@ class SetHomeTest {
         compose.onNodeWithTag("back-to-cards").performClick()
         compose.onNodeWithTag("card-grid").assertIsDisplayed()
         assertNotNull(model.renders)
+    }
+
+    @Test
+    fun theAppBarHasUndoRedoSaveAndAMenu() {
+        val model = SetViewModel(TestFixture.app.applicationContext as Application)
+        var savedAs = false
+        var closed = false
+        compose.setContent { SetHomeScreen(model, rememberLazyGridState(), onOpenCard = {}, onSaveAs = { savedAs = true }, onClosed = { closed = true }) }
+        model.open(Uri.fromFile(TestFixture.zip("app-bar.mse-set", TestFixture.assetFiles("sets/fixture-cards.mse-set"))))
+        compose.waitUntil(30_000) { model.state.value.session != 0L }
+        compose.onNodeWithTag("set-name").assertTextContains("app-bar")
+        compose.onNodeWithTag("home-undo").assertIsDisplayed().assertIsNotEnabled()
+        compose.onNodeWithTag("home-redo").assertIsDisplayed().assertIsNotEnabled()
+        // nothing to save until an edit
+        assertTrue(compose.onAllNodesWithTag("save").fetchSemanticsNodes().isEmpty())
+        model.testEdit()
+        compose.waitUntil(10_000) { model.state.value.dirty }
+        compose.onNodeWithText("Unsaved changes").assertIsDisplayed()
+        compose.onNodeWithTag("save").assertIsDisplayed()
+        compose.onNodeWithTag("home-undo").assertIsEnabled()
+        // Save as, Export all and Close are in the menu
+        compose.onNodeWithTag("set-menu").performClick()
+        for (item in listOf("Save", "Save as…", "Export all…", "Close")) compose.onNodeWithText(item).assertIsDisplayed()
+        compose.onNodeWithText("Save as…").performClick()
+        assertTrue(savedAs)
+        assertTrue(!closed)
     }
 }

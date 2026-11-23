@@ -19,6 +19,8 @@ import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextInputSelection
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.test.assertIsNotEnabled
+import org.junit.Assert.assertTrue
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -97,5 +99,59 @@ class CardEditorTest {
             runCatching { compose.onNodeWithTag("field-text").assertTextEquals(original, includeEditableText = true) }.isSuccess
         }
         compose.onNodeWithTag("redo").assertIsDisplayed()
+    }
+
+    @Test
+    fun arrowsMoveBetweenCardsAndADragOverAFieldDoesNotOpenIt() {
+        val model = SetViewModel(TestFixture.app.applicationContext as Application)
+        compose.setContent { CardEditorScreen(model, onBack = {}) }
+        model.open(Uri.fromFile(TestFixture.zip("arrows.mse-set", TestFixture.assetFiles("sets/fixture-cards.mse-set"))))
+        compose.waitUntil(30_000) { model.state.value.card != null }
+        val uids = model.state.value.cardUids
+        // the arrows (#89): none before the first Card, none after the last
+        compose.onNodeWithTag("previous-card").assertIsNotEnabled()
+        compose.onNodeWithTag("next-card").performClick()
+        compose.waitUntil(10_000) { model.state.value.index == 1 }
+        compose.onNodeWithTag("card-position").assertTextContains("2 / 3", substring = true)
+        compose.onNodeWithTag("next-card").performClick()
+        compose.waitUntil(10_000) { model.state.value.index == 2 }
+        compose.onNodeWithTag("next-card").assertIsNotEnabled()
+        compose.onNodeWithTag("previous-card").performClick()
+        compose.waitUntil(10_000) { model.state.value.index == 1 }
+
+        // a short drag that starts on a field, too short for the pager to turn the page, opens nothing
+        compose.waitUntil(30_000) { model.state.value.card?.uid == uids[1] }
+        val card = model.state.value.card!!
+        val name = card.regions.first { it.field == "name" }
+        compose.onNodeWithTag("card-${uids[1]}").performTouchInput {
+            val scale = width.toFloat() / card.bitmap.width
+            val at = Offset(((name.x + name.width / 2) * scale).toFloat(), ((name.y + name.height / 2) * scale).toFloat())
+            down(at)
+            for (step in 1..6) moveBy(Offset(-viewConfiguration.touchSlop / 2, 0f), delayMillis = 30)
+            up()
+        }
+        compose.waitForIdle()
+        assertTrue(compose.onAllNodesWithTag("field-sheet").fetchSemanticsNodes().isEmpty())
+        // while a plain tap there still does
+        compose.onNodeWithTag("card-${uids[1]}").performTouchInput {
+            val scale = width.toFloat() / card.bitmap.width
+            click(Offset(((name.x + name.width / 2) * scale).toFloat(), ((name.y + name.height / 2) * scale).toFloat()))
+        }
+        waitForTag("field-sheet")
+    }
+
+    @Test
+    fun theStyleChipChangesTheCardsStyle() {
+        val model = SetViewModel(TestFixture.app.applicationContext as Application)
+        compose.setContent { CardEditorScreen(model, onBack = {}) }
+        model.open(Uri.fromFile(TestFixture.zip("style-chip.mse-set", TestFixture.assetFiles("sets/fixture-cards.mse-set"))))
+        compose.waitUntil(30_000) { model.state.value.card != null }
+        assertEquals(false, model.state.value.cardStyles[0].own)
+        waitForTag("card-style-chip")
+        compose.onNodeWithTag("card-style-chip").performClick()
+        waitForTag("style-fixture-alternate.mse-style")
+        compose.onNodeWithTag("style-fixture-alternate.mse-style").performClick()
+        compose.waitUntil(10_000) { model.state.value.cardStyles[0].stylesheet == "fixture-alternate.mse-style" }
+        assertTrue(model.state.value.cardStyles[0].own)
     }
 }

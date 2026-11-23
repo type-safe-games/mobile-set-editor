@@ -342,12 +342,15 @@ class SetViewModel(app: Application) : AndroidViewModel(app) {
     // ------------------------------------------------------------------- Changing the card list
 
     /** Add a new Card after [after] (an index; -1: at the start), one undo step; its index, or -1 */
-    suspend fun addCard(after: Int): Int {
+    /** Add a Card after [after], in [stylesheet] ("" for the Set's Style; #87). Returns its index, or -1. */
+    suspend fun addCard(after: Int, stylesheet: String = ""): Int {
         val session = _state.value.session.takeIf { it != 0L } ?: return -1
         val r = Core.addCard(session, (after + 1).coerceIn(0, _state.value.cardUids.size))
         edited(r.action)
+        val uid = r.uids.firstOrNull()
+        if (uid != null && stylesheet.isNotEmpty()) edited(Core.setCardStyle(session, uid, stylesheet))
         reloadCards()
-        return r.uids.firstOrNull()?.let { _state.value.cardUids.indexOf(it) } ?: -1
+        return uid?.let { _state.value.cardUids.indexOf(it) } ?: -1
     }
 
     /** Duplicate Cards, one undo step; the copies' uids */

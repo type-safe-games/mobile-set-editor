@@ -6,7 +6,6 @@ package io.github.type_safe_games.mobileseteditor
 import android.content.pm.ApplicationInfo
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.text.KeyboardOptions
@@ -20,7 +19,6 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
@@ -38,10 +36,8 @@ import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
@@ -49,14 +45,14 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
@@ -65,9 +61,20 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.ui.res.painterResource
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import io.github.type_safe_games.mobileseteditor.core.StyleSupport
+import io.github.type_safe_games.mobileseteditor.core.TemplateInfo
 import io.github.type_safe_games.mobileseteditor.core.Support
 import io.github.type_safe_games.mobileseteditor.editor.EditTarget
 import io.github.type_safe_games.mobileseteditor.editor.FieldSheet
@@ -76,8 +83,8 @@ import io.github.type_safe_games.mobileseteditor.render.RenderKey
 private enum class SetTab(val title: String) { Cards("Cards"), SetInfo("Set info"), Keywords("Keywords") }
 
 /**
- * The open Set's home (#17): a top bar with its name, unsaved state, Save, Save as and Close, and
- * three tabs. Cards is a grid of thumbnails; tapping one opens that Card. [grid] is kept by the
+ * The open Set's home (#17): a top app bar with its name, unsaved state, Undo/Redo, Save and a menu
+ * (Save as, Export all, Close; #85), and three tabs. Cards is a grid of thumbnails; tapping one opens that Card. [grid] is kept by the
  * caller, so coming back from a Card finds the grid where it was.
  */
 @Composable
@@ -101,51 +108,33 @@ fun SetHomeScreen(
     var selected by remember { mutableStateOf<Set<String>?>(null) }
     var moving by remember { mutableStateOf(false) }
     val snackbar = remember { SnackbarHostState() }
+    var adding by remember { mutableStateOf(false) }
+    val styles = rememberGameStyles(model)
     val export = rememberCardExport(model)
     val close: () -> Unit = { if (state.dirty) askClose = true else { model.close(CloseChoice.Keep, onClosed) } }
     BackHandler { if (editing != null) editing = null else if (selected != null) selected = null else close() }
 
     Box(Modifier.fillMaxSize()) {
     Column(Modifier.fillMaxSize().safeDrawingPadding()) {
-        // the top bar
-        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            val copy = state.workingCopy
-            Text(
-                (copy?.name ?: "Opening…") + if (state.dirty) " · unsaved changes" else "",
-                style = MaterialTheme.typography.titleMedium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.testTag("set-name"),
-            )
-            // (scrolls sideways when the buttons don't fit)
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(
-                    onClick = { scope.launch { if (!model.save()) onSaveAs() } },
-                    enabled = copy != null && !state.saving && (state.dirty || copy.uri == null),
-                    modifier = Modifier.testTag("save"),
-                ) { Text("Save") }
-                OutlinedButton(onClick = onSaveAs, enabled = copy != null && !state.saving) { Text("Save as…") }
-                OutlinedButton(onClick = close, enabled = !state.saving) { Text("Close") }
-                TextButton(
-                    onClick = { scope.launch { model.undo(); revision++ } },
-                    enabled = state.canUndo,
-                    modifier = Modifier.testTag("home-undo"),
-                ) { Text("Undo") }
-                TextButton(
-                    onClick = { scope.launch { model.redo(); revision++ } },
-                    enabled = state.canRedo,
-                    modifier = Modifier.testTag("home-redo"),
-                ) { Text("Redo") }
-                OutlinedButton(
-                    onClick = { export.startZip() },
-                    enabled = state.cardUids.isNotEmpty(),
-                    modifier = Modifier.testTag("export-all"),
-                ) { Text("Export all…") }
-                if (debuggable && copy != null) {
-                    TextButton(onClick = { model.testEdit() }, modifier = Modifier.testTag("test-edit")) { Text("Test edit") }
-                }
-            }
-        }
+        // the top bar (#85): the Set's name, Undo and Redo, Save while there is something to save,
+        // and the rest in the overflow menu
+        SetTopBar(
+            name = state.workingCopy?.name,
+            dirty = state.dirty,
+            canSave = state.workingCopy != null && !state.saving && (state.dirty || state.workingCopy?.uri == null),
+            canSaveAs = state.workingCopy != null && !state.saving,
+            canUndo = state.canUndo,
+            canRedo = state.canRedo,
+            canExport = state.cardUids.isNotEmpty(),
+            canClose = !state.saving,
+            onSave = { scope.launch { if (!model.save()) onSaveAs() } },
+            onSaveAs = onSaveAs,
+            onUndo = { scope.launch { model.undo(); revision++ } },
+            onRedo = { scope.launch { model.redo(); revision++ } },
+            onExportAll = { export.startZip() },
+            onClose = close,
+            onTestEdit = if (debuggable && state.workingCopy != null) ({ model.testEdit() }) else null,
+        )
         selected?.let { picked ->
             SelectionBar(
                 count = picked.size,
@@ -173,7 +162,7 @@ fun SetHomeScreen(
         when (tab) {
             SetTab.Cards -> Box(Modifier.weight(1f)) {
                 CardsGrid(
-                    model, state, grid, selected,
+                    model, state, grid, selected, styles,
                     onOpenCard = { index ->
                         val picked = selected
                         if (picked == null) onOpenCard(index)
@@ -182,10 +171,13 @@ fun SetHomeScreen(
                     onSelect = { index -> state.cardUids.getOrNull(index)?.let { selected = (selected ?: emptySet()) + it } },
                 )
                 if (selected == null && state.session != 0L) {
-                    ExtendedFloatingActionButton(
-                        onClick = { scope.launch { model.addCard(state.cardUids.size - 1).takeIf { it >= 0 }?.let(onOpenCard) } },
-                        modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp).testTag("add-card"),
-                    ) { Text("Add Card") }
+                    // in which Style: the Set's, one its Cards use, or another (#87)
+                    Box(Modifier.align(Alignment.BottomEnd).padding(16.dp)) {
+                        ExtendedFloatingActionButton(onClick = { adding = true }, modifier = Modifier.testTag("add-card")) { Text("Add Card") }
+                        AddCardMenu(model, styles, adding, onDismiss = { adding = false }) { style ->
+                            scope.launch { model.addCard(state.cardUids.size - 1, style).takeIf { it >= 0 }?.let(onOpenCard) }
+                        }
+                    }
                 }
             }
             SetTab.SetInfo -> Box(Modifier.weight(1f)) { SetInfoTab(model, state, revision) { editing = it } }
@@ -249,6 +241,7 @@ private fun CardsGrid(
     state: SetState,
     grid: LazyGridState,
     selected: Set<String>?,
+    styles: List<TemplateInfo>,
     onOpenCard: (Int) -> Unit,
     onSelect: (Int) -> Unit,
 ) {
@@ -282,8 +275,10 @@ private fun CardsGrid(
         ) {
             itemsIndexed(state.cardUids, key = { _, uid -> uid }) { index, uid ->
                 val linked = state.cardLinks.getOrElse(index) { emptyList() }.isNotEmpty()
+                // a Card in a Style of its own says which (#87)
+                val ownStyle = state.cardStyles.getOrNull(index)?.takeIf { it.own }?.let { styleLabel(styles, it.stylesheet) }
                 Thumbnail(
-                    model, RenderKey(uid, cellWidthPx), state.cardNames.getOrElse(index) { "" }, state.aspect, linked,
+                    model, RenderKey(uid, cellWidthPx), state.cardNames.getOrElse(index) { "" }, state.aspect, linked, ownStyle,
                     picked = selected?.contains(uid),
                     onClick = { onOpenCard(index) },
                     onLongClick = { onSelect(index) },
@@ -300,6 +295,7 @@ private fun Thumbnail(
     name: String,
     aspect: Float,
     linked: Boolean,
+    ownStyle: String?,
     picked: Boolean?,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
@@ -329,6 +325,12 @@ private fun Thumbnail(
             // Linked cards get a small badge
             if (linked) Text("🔗 ", style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag("linked-${key.uid}"))
             Text(name, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        if (ownStyle != null) {
+            Text(
+                ownStyle, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary,
+                maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.testTag("own-style-${key.uid}"),
+            )
         }
     }
 }
@@ -405,5 +407,76 @@ private fun UnsupportedNotice(state: SetState) {
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.error,
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp).testTag("unsupported-notice"),
+    )
+}
+
+/** The Set home's app bar (#85). [onTestEdit] is the debug build's "Test edit" (null: not shown). */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SetTopBar(
+    name: String?,
+    dirty: Boolean,
+    canSave: Boolean,
+    canSaveAs: Boolean,
+    canUndo: Boolean,
+    canRedo: Boolean,
+    canExport: Boolean,
+    canClose: Boolean,
+    onSave: () -> Unit,
+    onSaveAs: () -> Unit,
+    onUndo: () -> Unit,
+    onRedo: () -> Unit,
+    onExportAll: () -> Unit,
+    onClose: () -> Unit,
+    onTestEdit: (() -> Unit)?,
+) {
+    var menu by remember { mutableStateOf(false) }
+    TopAppBar(
+        title = {
+            Column {
+                Text(
+                    (name ?: "Opening…").removeSuffix(".mse-set"),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.testTag("set-name"),
+                )
+                if (dirty) Text("Unsaved changes", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
+            }
+        },
+        navigationIcon = {
+            IconButton(onClick = onClose, enabled = canClose, modifier = Modifier.testTag("close")) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Close")
+            }
+        },
+        actions = {
+            IconButton(onClick = onUndo, enabled = canUndo, modifier = Modifier.testTag("home-undo")) {
+                Icon(painterResource(R.drawable.ic_undo), contentDescription = "Undo")
+            }
+            IconButton(onClick = onRedo, enabled = canRedo, modifier = Modifier.testTag("home-redo")) {
+                Icon(painterResource(R.drawable.ic_redo), contentDescription = "Redo")
+            }
+            if (canSave) {
+                IconButton(onClick = onSave, modifier = Modifier.testTag("save")) {
+                    Icon(painterResource(R.drawable.ic_save), contentDescription = "Save")
+                }
+            }
+            Box {
+                IconButton(onClick = { menu = true }, modifier = Modifier.testTag("set-menu")) {
+                    Icon(Icons.Filled.MoreVert, contentDescription = "More")
+                }
+                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                    DropdownMenuItem(text = { Text("Save") }, enabled = canSave, onClick = { menu = false; onSave() })
+                    DropdownMenuItem(text = { Text("Save as…") }, enabled = canSaveAs, onClick = { menu = false; onSaveAs() })
+                    DropdownMenuItem(
+                        text = { Text("Export all…") }, enabled = canExport,
+                        onClick = { menu = false; onExportAll() }, modifier = Modifier.testTag("export-all"),
+                    )
+                    DropdownMenuItem(text = { Text("Close") }, enabled = canClose, onClick = { menu = false; onClose() })
+                    if (onTestEdit != null) {
+                        DropdownMenuItem(text = { Text("Test edit") }, onClick = { menu = false; onTestEdit() }, modifier = Modifier.testTag("test-edit"))
+                    }
+                }
+            }
+        },
     )
 }
