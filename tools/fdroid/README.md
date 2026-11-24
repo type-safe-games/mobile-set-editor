@@ -101,3 +101,29 @@ $ANDROID_HOME/build-tools/36.1.0/apksigner sign --ks /tmp/t.jks --ks-pass pass:t
     --out /tmp/mse.apk out/fdroid/data/unsigned/io.github.type_safe_games.mobileseteditor_1002.apk
 adb -s emulator-5554 install /tmp/mse.apk
 ```
+
+## The private repo on the tailnet (#93)
+
+Test builds go to a private F-Droid repo before anything is public, so the "official" app can be
+installed and updated on a phone with Droid-ify or the F-Droid client, the way users will.
+
+- **Keys** (`~/.config/mse-release/`, never in git): `release.p12` holds `release`, the long-term key
+  the APKs are signed with, and `repo`, which signs the repo's index; `keystore-password` is its
+  password. **Back both files up**: an update signed with any other key won't install over the app.
+- **The repo** (`~/mse-fdroid/`): `config.yml` (reads the password from the environment), `metadata/`
+  (the recipe and the fastlane listing, copied in on each publish), `repo/` (what is served).
+
+To publish a test build of a commit:
+
+```sh
+tools/fdroid/local.sh setup <commit>     # the source, at a test tag
+tools/fdroid/local.sh scan
+tools/fdroid/local.sh build              # unsigned APKs in out/fdroid/data/unsigned
+tools/fdroid/private-repo.sh publish     # signed with the release key, index updated
+tools/fdroid/private-repo.sh serve       # once: tailscale serve (needs `sudo tailscale set --operator=$USER` once)
+tools/fdroid/private-repo.sh info        # the URL and fingerprint to add in Droid-ify
+```
+
+A phone only offers an update for a higher versionCode, so a new test build needs `appVersion`
+bumped in `android/app/build.gradle.kts` (and `baseVersionCode` with it).
+

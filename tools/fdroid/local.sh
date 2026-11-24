@@ -109,6 +109,8 @@ build() {
   start_proxy
   for vc in "${vcs[@]}"; do
     echo "fdroid/local.sh: building $APP:$vc (log: $W/build-$vc.log)"
+    # fdroid skips a build whose APK is already there: a stale one would be kept silently
+    rm -f "$W/data/unsigned/${APP}_$vc.apk"
     docker run --rm --network "$NET" -e PROXY="http://$PROXY:8888" -e APP="$APP" -e VC="$vc" \
       $(mounts "$W/data") -v "$W/gradlew-fdroid:/home/vagrant/gradlew-fdroid:ro" \
       --entrypoint bash "$IMG" -c "$build_script" > "$W/build-$vc.log" 2>&1 ||
