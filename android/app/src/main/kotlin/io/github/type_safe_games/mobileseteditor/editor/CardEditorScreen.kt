@@ -304,8 +304,14 @@ private fun CardPage(
     // the field's carets on this render, when editing it on the Card (#83)
     var carets by remember(key) { mutableStateOf<List<Caret>>(emptyList()) }
     LaunchedEffect(rendered, selected, onCard) {
-        carets = if (onCard != null && selected != null && rendered != null)
-            Core.textCarets(model.state.value.session, key.uid, selected, rendered.image.width) else emptyList()
+        carets = if (onCard != null && selected != null && rendered != null) {
+            // laid out at the card's own size, not the screen's: the core lays the whole card out
+            // and draws it for this, so at full width it cost as much as a render, every keystroke
+            val session = model.state.value.session
+            val natural = Core.cardSize(session, key.uid).width.toInt().coerceAtLeast(1)
+            val scale = rendered.image.width.toDouble() / natural
+            Core.textCarets(session, key.uid, selected, natural).map { Caret(it.x * scale, it.top * scale, it.bottom * scale) }
+        } else emptyList()
     }
     val caretColor = MaterialTheme.colorScheme.primary
     // keep the field being edited in view, also when the sheet and the keyboard take space
