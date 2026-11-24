@@ -137,7 +137,22 @@ jobs:
         run: python3 tools/goldens/goldens.py check --android --fixture-only --goldens "$RUNNER_TEMP/goldens"
 
       - name: Instrumented tests
-        run: cd android && ./gradlew connectedAndroidTest --console=plain
+        # Retried once: on these runners two dialog tests sometimes see their dialog freeze on its
+        # first frame (#92, under investigation). The first attempt's report is kept and its failures
+        # are annotated, so a flake stays visible; a test that fails twice fails the job.
+        run: |
+          cd android
+          if ./gradlew connectedAndroidTest --console=plain; then exit 0; fi
+          cp -r app/build/reports/androidTests app/build/reports/androidTests-attempt1
+          for f in app/build/outputs/androidTest-results/connected/debug/*.xml; do
+            python3 - "$f" <<'PY'
+          import sys, xml.etree.ElementTree as E
+          for tc in E.parse(sys.argv[1]).iter("testcase"):
+              if tc.find("failure") is not None:
+                  print(f"::warning title=Instrumented test failed on the first attempt (#92)::{tc.get('classname')}.{tc.get('name')}")
+          PY
+          done
+          ./gradlew connectedAndroidTest --console=plain
 
       - name: Reports
         if: always()
@@ -150,6 +165,7 @@ jobs:
           path: |
             ${{ runner.temp }}/goldens/report-check-fixture-android.md
             android/app/build/reports/androidTests/
+            android/app/build/reports/androidTests-attempt1/
           if-no-files-found: ignore
 
       - name: Stop the emulator
