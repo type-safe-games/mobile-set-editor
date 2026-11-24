@@ -57,6 +57,17 @@ if(MSE_DESKTOP)
   )
   set_tests_properties(layout-dump PROPERTIES ENVIRONMENT "${fixture_env}")
 
+  # Non-ASCII commands on stdin are read as UTF-8, not left to the C locale (which made --cli loop
+  # forever on the first non-ASCII byte: #55)
+  add_test(
+    NAME cli-non-ascii-stdin
+    COMMAND ${CMAKE_COMMAND} -DMSE=$<TARGET_FILE:magicseteditor> -DSET=${fixture_set}
+            "-DEXPECT=Ψω and café"
+            -DCOMMANDS=${test_dir}/cli/non-ascii.mse-cli -DWORKDIR=${PROJECT_BINARY_DIR}/test-output
+            -P ${test_dir}/run_cli.cmake
+  )
+  set_tests_properties(cli-non-ascii-stdin PROPERTIES ENVIRONMENT "${fixture_env}" TIMEOUT 30)
+
   # The facade (ADR 0009), headless on the desktop host, against the fixture. Renders are also compared
   # with the fixture's Golden images when the private goldens are there (ADR 0008, ADR 0010).
   add_test(

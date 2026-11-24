@@ -1,5 +1,6 @@
 # Run `magicseteditor --cli` on a set with commands from a file, and fail on any warning or error.
-# Usage: cmake -DMSE=<exe> -DSET=<set> -DCOMMANDS=<file> [-DWORKDIR=<dir>] -P run_cli.cmake
+# Usage: cmake -DMSE=<exe> -DSET=<set> -DCOMMANDS=<file> [-DWORKDIR=<dir>] [-DEXPECT=<text>] -P run_cli.cmake
+# With EXPECT, the output must also contain that text.
 if(NOT WORKDIR)
   set(WORKDIR ${CMAKE_CURRENT_BINARY_DIR})
 endif()
@@ -19,4 +20,10 @@ if(NOT rc EQUAL 0)
 endif()
 if(out MATCHES "WARNING|ERROR")
   message(FATAL_ERROR "magicseteditor reported warnings or errors")
+endif()
+if(DEFINED EXPECT)
+  string(FIND "${out}" "${EXPECT}" found)
+  if(found EQUAL -1)
+    message(FATAL_ERROR "the output doesn't contain '${EXPECT}'")
+  endif()
 endif()

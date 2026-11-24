@@ -82,7 +82,9 @@ bool TextIOHandler::haveConsole() const {
 TextIOHandler& TextIOHandler::operator << (const Char* str) {
   if ((escapes && !raw_mode) || str[0] != 27) {
     if (have_console && !raw_mode) {
-      IF_UNICODE(fwprintf,fprintf)(stream,str);
+      // UTF-8 bytes, as raw mode writes them: fwprintf went through the C locale (non-ASCII came
+      // out transliterated or as '?', #55) and took the text as its format string
+      fputs(encode_utf8(str).c_str(), stream);
     } else {
       buffer += str;
     }
@@ -108,23 +110,22 @@ void TextIOHandler::flush() {
 // ----------------------------------------------------------------------------- : Input
 
 String TextIOHandler::getLine() {
-  String result;
-  Char buffer[2048];
-  while (!feof(stdin)) {
-    if (!IF_UNICODE(fgetws,fgets)(buffer, 2048, stdin)) {
-      return result; // error
-    }
-    result += buffer;
-    if (result[result.size()-1] == _('\n')) {
-      // drop newline, done
-      result.resize(result.size() - 1);
-      return result;
+  // Bytes, decoded as UTF-8 here: fgetws decodes with the C locale, which nothing sets, and on the
+  // first non-ASCII byte it failed without reaching the end of the input, so the command loop
+  // asked for the next line forever (#55). Bytes that aren't UTF-8 are read as Latin-1.
+  std::string line;
+  char buffer[2048];
+  while (fgets(buffer, sizeof(buffer), stdin)) {
+    line += buffer;
+    if (!line.empty() && line.back() == '\n') {
+      line.pop_back(); // drop newline, done
+      break;
     }
   }
-  return result;
+  return decode_utf8_or_latin1(line.data(), line.size());
 }
 bool TextIOHandler::canGetLine() {
-  return !feof(stdin);
+  return !feof(stdin) && !ferror(stdin);
 }
 
 // ----------------------------------------------------------------------------- : Raw mode
