@@ -226,6 +226,9 @@ String singular_form(const String&);
  *
  *  Returns -1 if a < b, 0 if they are equal, and 1 if a > b
  */
+/// A lowercase character without its accent, for smart_compare: Latin-1, Latin Extended-A and -B,
+/// and Latin Extended Additional are folded to a base letter; anything else is returned lowercased
+Char remove_accents(Char c);
 int smart_compare(const String&, const String&);
 /// Compare two strings, is the first less than the first?
 bool smart_less(const String&, const String&);

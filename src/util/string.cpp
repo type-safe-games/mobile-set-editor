@@ -230,13 +230,15 @@ Char remove_accents(Char c) {
   if (c >= 0xC0) {
     if (c <= 0xFF) { // Latin 1
       dec = latin_1[c - 0xC0];
-    } else if (c <= 0x17E) { // Latin extended A
+    } else if (c <= 0x17F) { // Latin extended A
       dec = latin_A[c - 0x100];
-    } else if (c <= 0x180 && c <= 0x240) { // Latin extended B
+    } else if (c <= 0x24F) { // Latin extended B
       dec = latin_B[c - 0x180];
-    } else if (c <= 0x1E00 && c <= 0x1EFF) { // Latin additional
+    } else if (c >= 0x1E00 && c <= 0x1EFF) { // Latin additional
       dec = latin_E[c - 0x1E00];
     }
+    // (until #54 these ranges were off: everything from U+0181 to U+1DFF read latin_E at a
+    // negative index, so non-Latin text sorted by whatever bytes lay before the table)
   }
   return dec == ' ' ? toLower(c) : dec;
 }

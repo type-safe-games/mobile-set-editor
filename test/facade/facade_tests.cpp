@@ -396,6 +396,25 @@ TEST(symbol_menu_and_previews) {
   CHECK_OK(F::closeSession(s));
 }
 
+TEST(remove_accents_stays_in_its_tables) {
+  // #54: each Latin block folds to its base letter, at both ends of its table
+  CHECK_EQ(remove_accents(0xE0), (Char)'a');   // à, Latin-1
+  CHECK_EQ(remove_accents(0x101), (Char)'a');  // ā, Latin Extended-A
+  CHECK_EQ(remove_accents(0x17F), (Char)'s');  // ſ long s, the last of Extended-A
+  CHECK_EQ(remove_accents(0x180), (Char)'b');  // ƀ, the first of Extended-B
+  CHECK_EQ(remove_accents(0x1E5), (Char)'g');  // ǥ
+  CHECK_EQ(remove_accents(0x24F), (Char)'y');  // ɏ, the last of Extended-B
+  CHECK_EQ(remove_accents(0x1EA1), (Char)'a'); // ạ, Latin Extended Additional
+  // and everything outside them is left alone (this read far outside latin_E)
+  CHECK_EQ(remove_accents(0x3C9), (Char)0x3C9);   // ω omega
+  CHECK_EQ(remove_accents(0x436), (Char)0x436);   // ж Cyrillic zhe
+  CHECK_EQ(remove_accents(0x663), (Char)0x663);   // ٣ Arabic-Indic three
+  CHECK_EQ(remove_accents(0x1DFF), (Char)0x1DFF);
+  CHECK_EQ(remove_accents(0x1F00), (Char)0x1F00); // ἀ, Greek Extended
+  // so sorting non-Latin text is stable: ψ before ω
+  CHECK_EQ(smart_compare(String(1, (Char)0x3C8), String(1, (Char)0x3C9)), -1);
+}
+
 TEST(visible_text_and_separators) {
   // the core side of replaceRange's positions: atoms show as their contents and are locked
   VisibleText vt = visible_text(_("a<sep> - </sep>b<atom-reminder>(x)</atom-reminder>"));
