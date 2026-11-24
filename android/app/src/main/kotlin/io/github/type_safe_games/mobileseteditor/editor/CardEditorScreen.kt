@@ -86,6 +86,7 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.draw.alpha
 import androidx.compose.foundation.layout.size
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 
 /** A field's name (or an undo step's, which may contain one) as people read it: "card_color" is "card color" */
 fun displayName(name: String) = name.replace('_', ' ')
@@ -206,10 +207,6 @@ fun CardEditorScreen(model: SetViewModel, onBack: () -> Unit) {
                     onClick = { state.cardUids.getOrNull(pager.currentPage)?.let { export.start(listOf(it)) } },
                     modifier = Modifier.testTag("export-card"),
                 ) { Text("Export") }
-                TextButton(
-                    onClick = { onCardMode = !onCardMode; prefs.edit().putBoolean("on-card-editing", onCardMode).apply(); editing = null },
-                    modifier = Modifier.testTag("on-card-toggle"),
-                ) { Text(if (onCardMode) "On card ✓" else "On card") }
                 Box(Modifier.weight(1f)) {
                     LinkBar(model, state, pager.currentPage) { target -> scope.launch { pager.animateScrollToPage(target) } }
                 }
@@ -254,7 +251,12 @@ fun CardEditorScreen(model: SetViewModel, onBack: () -> Unit) {
             }
         }
         editing?.let { target ->
-            FieldSheet(model, target, revision, onField = { editing = target.copy(field = it) }, onClose = { editing = null }, inline = onCard.takeIf { onCardMode })
+            FieldSheet(
+                model, target, revision, onField = { editing = target.copy(field = it) }, onClose = { editing = null },
+                inline = onCard.takeIf { onCardMode },
+                onCardMode = onCardMode,
+                onToggleOnCard = { onCardMode = !onCardMode; prefs.edit().putBoolean("on-card-editing", onCardMode).apply() },
+            )
         }
         if (state.messages.isNotEmpty()) {
             Column(Modifier.fillMaxWidth().padding(horizontal = 8.dp).testTag("messages")) {
@@ -380,7 +382,7 @@ private fun CardPage(
 
 /** The sheet below the Card: the field's name, ‹ › to the Card's other editable fields, and its editor */
 @Composable
-fun FieldSheet(model: SetViewModel, target: EditTarget, revision: Int, onField: (String) -> Unit, onClose: () -> Unit, inline: OnCardEditing? = null) {
+fun FieldSheet(model: SetViewModel, target: EditTarget, revision: Int, onField: (String) -> Unit, onClose: () -> Unit, inline: OnCardEditing? = null, onCardMode: Boolean = false, onToggleOnCard: (() -> Unit)? = null) {
     val session = model.state.collectAsState().value.session
     var fields by remember(target.uid, target.kind) { mutableStateOf<List<FieldInfo>?>(null) }
     LaunchedEffect(target.uid, target.kind, revision) { fields = Core.listFields(session, target.kind, target.uid).fields }
@@ -406,7 +408,13 @@ fun FieldSheet(model: SetViewModel, target: EditTarget, revision: Int, onField: 
                     maxLines = 1,
                 )
                 TextButton(onClick = { onField(textFields[at + 1]) }, enabled = at in 0 until textFields.size - 1, modifier = Modifier.testTag("next-field")) { Text("›") }
-                TextButton(onClick = onClose, modifier = Modifier.testTag("done")) { Text("Done") }
+                // editing text on the Card or in this sheet (#83); only where it makes a difference
+                if (onToggleOnCard != null && info?.type == "text" && info.editable && target.kind == TargetKind.Card) {
+                    TextButton(onClick = onToggleOnCard, modifier = Modifier.testTag("on-card-toggle")) { Text(if (onCardMode) "On card ✓" else "On card") }
+                }
+                // Done also puts the keyboard away, so the whole Card is there to tap again
+                val keyboard = LocalSoftwareKeyboardController.current
+                TextButton(onClick = { keyboard?.hide(); onClose() }, modifier = Modifier.testTag("done")) { Text("Done") }
             }
             when {
                 info == null -> CircularProgressIndicator(Modifier.padding(8.dp))

@@ -73,6 +73,8 @@ class SymbolBarTest {
 
         // the rules: insert the red symbol at the start, then the blue one from the submenu
         tap("rules")
+        // editing on the Card (#83) keeps the symbols behind a button
+        if (compose.onAllNodesWithTag("symbols-toggle").fetchSemanticsNodes().isNotEmpty()) compose.onNodeWithTag("symbols-toggle").performClick()
         waitForTag("symbol-bar")
         compose.onNodeWithTag("field-text").performTextInputSelection(TextRange(0))
         compose.onNodeWithTag("symbol-${red.label}").performClick()
