@@ -64,6 +64,9 @@ public:
   void addDirectory(const String& dir, FontSource source);
   /// Add the fonts inside the Template packages (*.mse-*) in a directory of installed Templates
   void addTemplateDirectory(const String& dir);
+  /// Forget every face from these sources (e.g. when Templates or stored fonts were removed), so a
+  /// later add scans them again from what is on disk
+  void forget(const set<FontSource>& sources);
 
   /// The face for a family name, bold and italic.
   /** This copies how Pango and fontconfig choose a font for the desktop reference (ADR 0004):
@@ -93,6 +96,7 @@ private:
   struct Entry {
     FontFaceP  face;
     FontSource source;
+    String     path;
   };
   std::mutex                    mutex;
   vector<PendingSource>         pending;   ///< sources not scanned yet
@@ -104,6 +108,7 @@ private:
 
   void scanPending();
   void scanFile(const String& path, FontSource source);
+  void index(size_t i);
   void scanDirectory(const String& dir, FontSource source);
 };
 

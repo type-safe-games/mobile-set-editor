@@ -264,15 +264,33 @@ void FontRegistry::scanDirectory(const String& dir, FontSource source) {
 void FontRegistry::scanFile(const String& path, FontSource source) {
   if (!known_files.insert(path).second) return;
   for (FontFace& f : read_font_faces(path)) {
-    size_t i = entries.size();
-    entries.push_back(Entry{make_shared<FontFace>(f), source});
-    const FontFace& face = *entries.back().face;
-    // index each face once per distinct lower case name
-    set<String> families;
-    for (const String& n : face.family_names) families.insert(to_lower(n));
-    for (const String& n : families) by_family[n].push_back(i);
-    primary_families.insert(to_lower(face.primary_family));
+    entries.push_back(Entry{make_shared<FontFace>(f), source, path});
+    index(entries.size() - 1);
   }
+}
+
+void FontRegistry::index(size_t i) {
+  const FontFace& face = *entries[i].face;
+  // index each face once per distinct lower case name
+  set<String> families;
+  for (const String& n : face.family_names) families.insert(to_lower(n));
+  for (const String& n : families) by_family[n].push_back(i);
+  primary_families.insert(to_lower(face.primary_family));
+}
+
+void FontRegistry::forget(const set<FontSource>& sources) {
+  std::lock_guard<std::mutex> lock(mutex);
+  pending.erase(std::remove_if(pending.begin(), pending.end(), [&](const PendingSource& p) { return sources.count(p.source) > 0; }), pending.end());
+  vector<Entry> kept;
+  for (Entry& e : entries) {
+    if (sources.count(e.source)) known_files.erase(e.path);
+    else kept.push_back(std::move(e));
+  }
+  entries.swap(kept);
+  by_family.clear();
+  primary_families.clear();
+  cache.clear();
+  for (size_t i = 0 ; i < entries.size() ; ++i) index(i);
 }
 
 // ----------------------------------------------------------------------------- : FontRegistry : resolving

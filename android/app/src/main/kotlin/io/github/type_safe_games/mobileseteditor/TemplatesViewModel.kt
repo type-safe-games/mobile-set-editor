@@ -22,6 +22,9 @@ import io.github.type_safe_games.mobileseteditor.core.ScanResult
 import io.github.type_safe_games.mobileseteditor.core.Stores
 import io.github.type_safe_games.mobileseteditor.core.TemplateImport
 import io.github.type_safe_games.mobileseteditor.core.TemplateInfo
+import io.github.type_safe_games.mobileseteditor.core.TemplateRemoval
+import kotlinx.coroutines.Dispatchers
+import java.io.File
 
 /** Where an import is */
 sealed interface ImportState {
@@ -54,6 +57,35 @@ class TemplatesViewModel(app: Application) : AndroidViewModel(app) {
 
     private suspend fun refreshList() {
         installed.value = Core.listTemplates().templates.toList()
+    }
+
+    // ----- removing Templates (#96)
+
+    /** What removing [chosen] (package names) takes with it */
+    suspend fun planRemoval(chosen: Set<String>): TemplateRemoval.Plan = withContext(Dispatchers.IO) {
+        TemplateRemoval.plan(TemplateRemoval.references(Stores.templates(getApplication())), chosen)
+    }
+
+    /** Remove these installed packages (a plan's [TemplateRemoval.Plan.all]) */
+    suspend fun remove(names: Set<String>) {
+        withContext(Dispatchers.IO) {
+            val store = Stores.templates(getApplication())
+            for (name in names) File(store, name).takeIf { it.parentFile == store && name.contains(".mse-") }?.deleteRecursively()
+        }
+        Core.refreshTemplates()
+        refreshList()
+    }
+
+    /** Remove every Template, and the stored fonts and dictionaries; the fallback font comes back */
+    suspend fun removeAll() {
+        withContext(Dispatchers.IO) {
+            val app = getApplication<Application>()
+            Stores.templates(app).listFiles()?.forEach { it.deleteRecursively() }
+            Stores.fonts(app).listFiles()?.forEach { it.deleteRecursively() }
+            Stores.addFallbackFonts(app)
+        }
+        Core.refreshTemplates()
+        refreshList()
     }
 
     /** The user picked a zip: scan it */

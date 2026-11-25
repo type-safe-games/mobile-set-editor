@@ -343,6 +343,8 @@ Result shutdown() {
 Result refreshTemplates() {
   return guarded<Result>("", "", [&](Result&) {
     package_manager.reset();
+    // Templates and stored fonts may have been removed as well as added (#96): scan them afresh
+    font_registry().forget({FontSource::TEMPLATE, FontSource::FONT_STORE});
     if (!template_dir_.empty()) font_registry().addTemplateDirectory(from_utf8(template_dir_));
     add_font_store();
   });

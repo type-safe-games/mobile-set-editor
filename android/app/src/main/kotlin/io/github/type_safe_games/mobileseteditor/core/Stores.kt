@@ -44,7 +44,7 @@ object Stores {
      * (#91). Copied into the font store when missing or changed; a Template import may bring its
      * own copy, which is the same family.
      */
-    private fun addFallbackFonts(context: Context) {
+    fun addFallbackFonts(context: Context) {
         val store = fonts(context)
         for (name in context.assets.list(FALLBACK_FONTS).orEmpty().filter { it.endsWith(".ttf") }) {
             val to = File(store, name)

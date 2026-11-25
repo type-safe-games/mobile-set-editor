@@ -52,6 +52,13 @@ import io.github.type_safe_games.mobileseteditor.core.TemplateInfo
 import io.github.type_safe_games.mobileseteditor.core.Verdict
 import androidx.compose.material3.Switch
 import androidx.compose.runtime.saveable.rememberSaveable
+import io.github.type_safe_games.mobileseteditor.core.TemplateRemoval
+import androidx.compose.material3.AlertDialog
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.text.font.FontWeight
 
 /** The installed Templates by type, and "Import Templates" from a zip with a picker (ADR 0005) */
 @Composable
@@ -63,6 +70,13 @@ fun TemplatesScreen(
 ) {
     val installed by model.installed.collectAsState()
     val state by model.import.collectAsState()
+    val scope = rememberCoroutineScope()
+    // removing Templates (#96): picking them, then confirming the plan (or removing all)
+    var removing by rememberSaveable { mutableStateOf(false) }
+    var chosen by remember { mutableStateOf(setOf<String>()) }
+    var plan by remember { mutableStateOf<TemplateRemoval.Plan?>(null) }
+    var askAll by remember { mutableStateOf(false) }
+    var busy by remember { mutableStateOf(false) }
     val pick = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) model.picked(uri)
     }
@@ -84,8 +98,42 @@ fun TemplatesScreen(
             if (hasSet) OutlinedButton(onClick = onShowSet) { Text("Back to the Set") }
         }
         ImportPanel(state, onCancel = model::cancel, onDismiss = model::dismiss)
+        plan?.let { p ->
+            RemoveDialog(p, installed, onDismiss = { plan = null }, onConfirm = {
+                plan = null
+                scope.launch { busy = true; model.remove(p.all); busy = false; removing = false; chosen = emptySet() }
+            })
+        }
+        if (askAll) {
+            AlertDialog(
+                onDismissRequest = { askAll = false },
+                title = { Text("Remove all ${installed.size} Templates?") },
+                text = { Text("Their fonts and dictionaries go too. Sets that use them won't open until you import Templates again.") },
+                confirmButton = {
+                    TextButton(onClick = { askAll = false; scope.launch { busy = true; model.removeAll(); busy = false } }, modifier = Modifier.testTag("remove-all-confirm")) { Text("Remove all") }
+                },
+                dismissButton = { TextButton(onClick = { askAll = false }) { Text("Cancel") } },
+            )
+        }
         HorizontalDivider()
-        Text("${installed.size} installed", style = MaterialTheme.typography.titleSmall, modifier = Modifier.testTag("installed-count"))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("${installed.size} installed", style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f).testTag("installed-count"))
+            val canRemove = installed.isNotEmpty() && !hasSet && !busy && state !is ImportState.Installing
+            if (removing) {
+                TextButton(
+                    onClick = { scope.launch { busy = true; plan = model.planRemoval(chosen); busy = false } },
+                    enabled = chosen.isNotEmpty() && !busy,
+                    modifier = Modifier.testTag("remove-chosen"),
+                ) { Text("Remove ${chosen.size}…") }
+                TextButton(onClick = { removing = false; chosen = emptySet() }) { Text("Cancel") }
+            } else {
+                TextButton(onClick = { removing = true }, enabled = canRemove, modifier = Modifier.testTag("remove-some")) { Text("Remove…") }
+                TextButton(onClick = { askAll = true }, enabled = canRemove, modifier = Modifier.testTag("remove-all")) { Text("Remove all") }
+            }
+        }
+        if (hasSet && installed.isNotEmpty()) {
+            Text("Close the open Set to remove Templates: it uses them.", style = MaterialTheme.typography.bodySmall)
+        }
         // by type: Games first, then Styles, symbol fonts, ...
         val byType = installed.groupBy { it.type }.toSortedMap(compareBy({ typeOrder(it) }, { it }))
         LazyColumn(Modifier.fillMaxWidth().testTag("installed")) {
@@ -97,10 +145,43 @@ fun TemplatesScreen(
                         modifier = Modifier.padding(top = 12.dp, bottom = 4.dp).semantics { heading() },
                     )
                 }
-                items(list, key = { it.name }) { TemplateRow(it) }
+                items(list, key = { it.name }) { t ->
+                    if (removing) {
+                        Row(
+                            Modifier.fillMaxWidth().clickable { chosen = if (t.name in chosen) chosen - t.name else chosen + t.name }.testTag("remove-pick-${t.name}"),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Checkbox(checked = t.name in chosen, onCheckedChange = { on -> chosen = if (on) chosen + t.name else chosen - t.name })
+                            TemplateRow(t)
+                        }
+                    } else {
+                        TemplateRow(t)
+                    }
+                }
             }
         }
     }
+}
+
+/** Confirm removing Templates: what was chosen, and what goes with it (#96) */
+@Composable
+private fun RemoveDialog(plan: TemplateRemoval.Plan, installed: List<TemplateInfo>, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    val names = installed.associate { it.name to it.fullName.ifEmpty { it.name } }
+    fun list(set: Set<String>) = set.map { names[it] ?: it }.sorted().joinToString(", ")
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Remove ${plan.all.size} Template${if (plan.all.size == 1) "" else "s"}?") },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Chosen: " + list(plan.chosen))
+                if (plan.dependents.isNotEmpty()) Text("And what needs them: " + list(plan.dependents), fontWeight = FontWeight.Bold)
+                if (plan.orphans.isNotEmpty()) Text("And ${plan.orphans.size} supporting files nothing else needs.")
+                Text("Sets that use them won't open until they're imported again.", style = MaterialTheme.typography.bodySmall)
+            }
+        },
+        confirmButton = { TextButton(onClick = onConfirm, modifier = Modifier.testTag("remove-confirm")) { Text("Remove") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
 }
 
 private fun typeOrder(type: String) = listOf("game", "style", "symbol-font", "include", "export-template", "locale").indexOf(type).let { if (it < 0) 99 else it }
