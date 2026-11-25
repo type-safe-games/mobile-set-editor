@@ -17,7 +17,7 @@ jobs:
   desktop:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Submodules
         run: git submodule update --init third_party/minizip-ng
@@ -44,7 +44,7 @@ jobs:
         if: always()
         run: cat "$RUNNER_TEMP/goldens/report-check-fixture.md" || true
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         if: always()
         with:
           name: desktop-report
@@ -59,12 +59,12 @@ jobs:
       NDK_VERSION: 29.0.14206865
       SYSTEM_IMAGE: system-images;android-36;default;x86_64
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Submodules
         run: git submodule update --init --jobs 8 third_party
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 21
@@ -92,7 +92,7 @@ jobs:
           git submodule status third_party/skia third_party/gn third_party/skia-deps > skia-cache-key
           cat tools/skia/build.sh >> skia-cache-key
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: out/skia
           key: skia-${{ runner.os }}-${{ hashFiles('skia-cache-key') }}
@@ -158,7 +158,7 @@ jobs:
         if: always()
         run: cat "$RUNNER_TEMP/goldens/report-check-fixture-android.md" || true
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         if: always()
         with:
           name: android-reports
