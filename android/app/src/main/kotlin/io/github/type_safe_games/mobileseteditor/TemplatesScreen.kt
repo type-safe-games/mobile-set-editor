@@ -50,6 +50,8 @@ import io.github.type_safe_games.mobileseteditor.core.Outcome
 import io.github.type_safe_games.mobileseteditor.core.ScannedPackage
 import io.github.type_safe_games.mobileseteditor.core.TemplateInfo
 import io.github.type_safe_games.mobileseteditor.core.Verdict
+import androidx.compose.material3.Switch
+import androidx.compose.runtime.saveable.rememberSaveable
 
 /** The installed Templates by type, and "Import Templates" from a zip with a picker (ADR 0005) */
 @Composable
@@ -125,8 +127,12 @@ private fun ImportPicker(choice: ImportChoice, onChange: ((ImportChoice) -> Impo
     val scan = choice.scan
     var query by remember { mutableStateOf("") }
     var open by remember { mutableStateOf(setOf<String>()) }
+    // the Styles only, unless asked: the rest are supporting files, picked when a Style needs them
+    val hasStyles = scan.packages.any { ImportChoice.isStyle(it) }
+    var showAll by rememberSaveable { mutableStateOf(false) }
+    val listed: (ScannedPackage) -> Boolean = { showAll || !hasStyles || ImportChoice.isStyle(it) }
     val q = query.trim().lowercase()
-    val shown = scan.packages.filter { q.isEmpty() || q in it.fullName.lowercase() || q in it.name.lowercase() || q in it.installerGroup.lowercase() }
+    val shown = scan.packages.filter { listed(it) && (q.isEmpty() || q in it.fullName.lowercase() || q in it.name.lowercase() || q in it.installerGroup.lowercase()) }
     val groups = shown.groupBy { it.installerGroup }.toSortedMap()
     Column(Modifier.fillMaxSize().testTag("scan"), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         val counts = scan.packages.groupingBy { it.verdict }.eachCount()
@@ -135,15 +141,21 @@ private fun ImportPicker(choice: ImportChoice, onChange: ((ImportChoice) -> Impo
                 "${counts[Verdict.SkipNotNewer] ?: 0} already installed, ${counts[Verdict.Refuse] ?: 0} can't be installed",
             style = MaterialTheme.typography.bodyMedium,
         )
+        val chosenStyles = choice.packages.count { name -> scan.packages.any { it.name == name && ImportChoice.isStyle(it) } }
         Text(
-            "${choice.packages.size} chosen · ${size(choice.size)} when installed",
+            (if (showAll || !hasStyles) "${choice.packages.size} chosen"
+            else "$chosenStyles Styles chosen, with ${choice.packages.size - chosenStyles} supporting files") +
+                " · ${size(choice.size)} when installed",
             style = MaterialTheme.typography.titleSmall,
             modifier = Modifier.testTag("install-size"),
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(onClick = onConfirm, enabled = !choice.isEmpty, modifier = Modifier.testTag("confirm")) { Text("Install") }
             OutlinedButton(onClick = onCancel) { Text("Cancel") }
-            TextButton(onClick = { onChange { ImportChoice.everything(scan) } }, modifier = Modifier.testTag("choose-all")) { Text("All new") }
+            TextButton(
+                onClick = { onChange { if (showAll || !hasStyles) ImportChoice.everything(scan) else ImportChoice.styles(scan) } },
+                modifier = Modifier.testTag("choose-all"),
+            ) { Text("All new") }
             TextButton(onClick = { onChange { ImportChoice.nothing(scan) } }, modifier = Modifier.testTag("choose-none")) { Text("None") }
         }
         OutlinedTextField(
@@ -152,8 +164,21 @@ private fun ImportPicker(choice: ImportChoice, onChange: ((ImportChoice) -> Impo
             singleLine = true,
             modifier = Modifier.fillMaxWidth().testTag("import-search"),
         )
+        if (hasStyles) {
+            Row(
+                Modifier.fillMaxWidth().clickable { showAll = !showAll }.testTag("import-show-all"),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    "Show supporting files (Games, symbol fonts, exporters, fonts…)",
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.weight(1f),
+                )
+                Switch(checked = showAll, onCheckedChange = { showAll = it })
+            }
+        }
         LazyColumn(Modifier.fillMaxWidth().weight(1f).testTag("import-groups")) {
-            if (scan.fontCount > 0 || scan.dictionaryCount > 0) item(key = "fonts") {
+            if ((showAll || !hasStyles) && (scan.fontCount > 0 || scan.dictionaryCount > 0)) item(key = "fonts") {
                 Row(
                     Modifier.fillMaxWidth().clickable { onChange { it.copy(fonts = !it.fonts) } }.testTag("import-fonts"),
                     verticalAlignment = Alignment.CenterVertically,
@@ -190,7 +215,7 @@ private fun ImportPicker(choice: ImportChoice, onChange: ((ImportChoice) -> Impo
                                 picked == installable.size -> ToggleableState.On
                                 else -> ToggleableState.Indeterminate
                             },
-                            onClick = { onChange { if (picked == installable.size) it.clearGroup(group) else it.selectGroup(group) } },
+                            onClick = { onChange { if (picked == installable.size) it.clearGroup(group, listed) else it.selectGroup(group, listed) } },
                             enabled = installable.isNotEmpty(),
                             modifier = Modifier.testTag("group-box-$group"),
                         )

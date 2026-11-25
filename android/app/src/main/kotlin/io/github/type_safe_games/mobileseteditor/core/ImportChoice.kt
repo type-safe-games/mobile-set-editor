@@ -37,9 +37,12 @@ data class ImportChoice(val scan: ScanResult, val packages: Set<String>, val fon
 
     fun toggle(name: String) = if (name in packages) clear(name) else select(name)
 
-    /** Pick or clear every installable package of an installer group, and of the groups under it ("magic/M15 Frames" has "magic/M15 Frames/Standard") */
-    fun selectGroup(group: String) = scan.packages.filter { inGroup(it.installerGroup, group) }.fold(this) { c, p -> c.select(p.name) }
-    fun clearGroup(group: String) = scan.packages.filter { inGroup(it.installerGroup, group) }.fold(this) { c, p -> c.clear(p.name) }
+    /** Pick or clear every installable package of an installer group, and of the groups under it ("magic/M15 Frames" has "magic/M15 Frames/Standard"),
+     *  of those [shown] (what the picker lists: the Styles, by default) */
+    fun selectGroup(group: String, shown: (ScannedPackage) -> Boolean = { true }) =
+        scan.packages.filter { inGroup(it.installerGroup, group) && shown(it) }.fold(this) { c, p -> c.select(p.name) }
+    fun clearGroup(group: String, shown: (ScannedPackage) -> Boolean = { true }) =
+        scan.packages.filter { inGroup(it.installerGroup, group) && shown(it) }.fold(this) { c, p -> c.clear(p.name) }
 
     /** Bytes the choice would extract */
     val size: Long get() = byName.let { all -> packages.sumOf { all[it]?.size ?: 0 } } + if (fonts) scan.newFontsSize else 0
@@ -52,6 +55,18 @@ data class ImportChoice(val scan: ScanResult, val packages: Set<String>, val fon
 
         /** Everything that can be installed */
         fun everything(scan: ScanResult) = ImportChoice(scan, scan.packages.filter { it.installable }.map { it.name }.toSet(), true)
+
+        /** A Style: what the picker lists by default; the rest (Games, includes, symbol fonts, exporters,
+         *  translations) are supporting files, picked when a Style needs them */
+        fun isStyle(p: ScannedPackage) = p.type == "style"
+
+        /** Every installable Style, with what they need, and the fonts; everything when the zip has no
+         *  Style to install (e.g. a symbol font on its own) */
+        fun styles(scan: ScanResult): ImportChoice {
+            val styles = scan.packages.filter { it.installable && isStyle(it) }
+            if (styles.isEmpty()) return everything(scan)
+            return styles.fold(nothing(scan).copy(fonts = true)) { c, p -> c.select(p.name) }
+        }
         fun nothing(scan: ScanResult) = ImportChoice(scan, emptySet(), false)
     }
 }

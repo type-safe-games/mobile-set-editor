@@ -83,8 +83,11 @@ class ImportPickerTest {
         val choice = (model.import.value as ImportState.Scanned).choice
         assertEquals(setOf("pick-style.mse-style", "pick-game.mse-game"), choice.packages)
         assertTrue(choice.size > 0)
-        // the refused one can't be chosen
+        // the refused one can't be chosen. It's a symbol font: not listed until the supporting files are
         search("pick-new")
+        compose.waitForIdle()
+        assertTrue(compose.onAllNodesWithTag("package-pick-new.mse-symbol-font").fetchSemanticsNodes().isEmpty())
+        compose.onNodeWithTag("import-show-all").performClick()
         waitForTag("package-pick-new.mse-symbol-font")
         compose.onNodeWithTag("package-pick-new.mse-symbol-font").assertIsNotEnabled()
 

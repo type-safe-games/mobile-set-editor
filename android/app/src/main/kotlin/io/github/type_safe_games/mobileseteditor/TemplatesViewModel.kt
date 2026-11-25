@@ -72,7 +72,7 @@ class TemplatesViewModel(app: Application) : AndroidViewModel(app) {
             }
             zip = fd
             val scan = TemplateImport.scan(fd)
-            _import.value = if (scan.result.ok) ImportState.Scanned(scan, ImportChoice.everything(scan)) else ImportState.Failed(scan.result.error)
+            _import.value = if (scan.result.ok) ImportState.Scanned(scan, ImportChoice.styles(scan)) else ImportState.Failed(scan.result.error)
         }
     }
 

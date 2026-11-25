@@ -11,7 +11,7 @@ class ImportChoiceTest {
     private val ok = CoreResult(0, "", "", emptyArray())
 
     private fun pkg(name: String, group: String, size: Long, verdict: Verdict, vararg deps: String) =
-        ScannedPackage(name, name.substringAfterLast('.'), name, "1", "", group, size, verdict.ordinal, "", arrayOf(*deps))
+        ScannedPackage(name, name.substringAfterLast(".mse-"), name, "1", "", group, size, verdict.ordinal, "", arrayOf(*deps))
 
     private val scan = ScanResult(
         ok,
@@ -54,5 +54,22 @@ class ImportChoiceTest {
         val all = ImportChoice.everything(scan)
         assertEquals(setOf("magic.mse-game", "magic-mana.mse-symbol-font", "magic-m15.mse-style"), all.packages)
         assertEquals(160L + 20, all.size) // with the new fonts
+    }
+
+    @Test
+    fun byDefaultTheStylesWithWhatTheyNeedButNotTheRest() {
+        val c = ImportChoice.styles(scan)
+        // both installable Styles... (magic-old is already installed, broken is refused)
+        assertEquals(setOf("magic-m15.mse-style", "magic.mse-game", "magic-mana.mse-symbol-font"), c.packages)
+        assertTrue(c.fonts)
+        // and a group's box picks only what the picker shows
+        val styles = ImportChoice.nothing(scan).selectGroup("magic", ImportChoice::isStyle)
+        assertEquals(setOf("magic-m15.mse-style", "magic.mse-game", "magic-mana.mse-symbol-font"), styles.packages)
+    }
+
+    @Test
+    fun aZipWithNoStyleToInstallOffersEverything() {
+        val fontOnly = ScanResult(ok, arrayOf(pkg("other-mana.mse-symbol-font", "magic/fonts", 10, Verdict.Install)), 1, 10, 0, 0, 0, 0)
+        assertEquals(setOf("other-mana.mse-symbol-font"), ImportChoice.styles(fontOnly).packages)
     }
 }
