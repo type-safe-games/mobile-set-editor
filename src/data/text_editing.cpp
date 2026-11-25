@@ -226,12 +226,14 @@ VisibleText visible_text(const String& str) {
   out.text.reserve(str.size());
   // one atom: its untagged contents, locked
   auto add_atom = [&](size_t i) -> size_t {
+    bool sep = is_substr(str, i, _("<sep"));
     size_t close = match_close_tag(str, i);
     size_t open_end = min(skip_tag(str, i), close);
     size_t end = match_close_tag_end(str, i);
     String shown = close == String::npos ? String() : untag(str.substr(open_end, close - open_end));
     out.cursor_pos.push_back(out.text.size());
     if (!shown.empty()) out.locked.emplace_back(out.text.size(), out.text.size() + shown.size());
+    if (sep) out.separators.emplace_back(out.text.size(), out.text.size() + shown.size());
     out.text += shown;
     return end;
   };

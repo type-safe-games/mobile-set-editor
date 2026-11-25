@@ -126,7 +126,7 @@ bool load_classes(JNIEnv* env) {
   cls.field_list_result_init = env->GetMethodID(cls.field_list_result, "<init>",
     ("(" + result_sig + "[Ljava/lang/String;[Ljava/lang/String;[Z[Z[[Ljava/lang/String;[[Ljava/lang/String;[[Ljava/lang/String;[Z)V").c_str());
   cls.text_result_init      = env->GetMethodID(cls.text_result, "<init>",
-    ("(L" + p + "ActionResult;Ljava/lang/String;II[I[I)V").c_str());
+    ("(L" + p + "ActionResult;Ljava/lang/String;II[I[I[I[I)V").c_str());
   jstring utf8 = env->NewStringUTF("UTF-8");
   cls.utf8 = (jstring)env->NewGlobalRef(utf8);
   env->DeleteLocalRef(utf8);
@@ -226,9 +226,15 @@ jobject to_java(JNIEnv* env, const F::TextResult& r) {
   jintArray js = env->NewIntArray(n), je = env->NewIntArray(n);
   env->SetIntArrayRegion(js, 0, n, starts.data());
   env->SetIntArrayRegion(je, 0, n, ends.data());
+  jsize m = (jsize)r.separators.size();
+  std::vector<jint> sep_starts(m), sep_ends(m);
+  for (jsize i = 0 ; i < m ; ++i) { sep_starts[i] = r.separators[i].start; sep_ends[i] = r.separators[i].end; }
+  jintArray ss = env->NewIntArray(m), se = env->NewIntArray(m);
+  env->SetIntArrayRegion(ss, 0, m, sep_starts.data());
+  env->SetIntArrayRegion(se, 0, m, sep_ends.data());
   jobject out = env->NewObject(cls.text_result, cls.text_result_init, action, text, (jint)r.selection_start,
-                               (jint)r.selection_end, js, je);
-  for (jobject o : {action, (jobject)text, (jobject)js, (jobject)je}) env->DeleteLocalRef(o);
+                               (jint)r.selection_end, js, je, ss, se);
+  for (jobject o : {action, (jobject)text, (jobject)js, (jobject)je, (jobject)ss, (jobject)se}) env->DeleteLocalRef(o);
   return out;
 }
 

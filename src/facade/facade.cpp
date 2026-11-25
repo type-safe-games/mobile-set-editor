@@ -1006,6 +1006,7 @@ static void text_state(const TextValue& value, size_t sel_start, size_t sel_end,
   r.selection_start = (int)vt.toVisible(sel_start);
   r.selection_end   = (int)vt.toVisible(sel_end);
   for (auto& span : vt.locked) r.locked.push_back(TextSpan{(int)span.first, (int)span.second});
+  for (auto& span : vt.separators) r.separators.push_back(TextSpan{(int)span.first, (int)span.second});
 }
 
 static TextValueP text_value(const FieldRef& ref, const std::string& field) {

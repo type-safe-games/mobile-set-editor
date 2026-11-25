@@ -101,6 +101,7 @@ struct VisibleText {
   String text;                           ///< what is shown
   vector<size_t> cursor_pos;             ///< for each cursor position (0 ... #cursor positions), its offset in text
   vector<pair<size_t,size_t>> locked;    ///< [start,end) ranges of text that are one atom
+  vector<pair<size_t,size_t>> separators; ///< those of them that are separators (<sep>), between the parts of a combined field
 
   /// The cursor position for an offset in text, a position inside an atom snaps to its nearest edge
   size_t toCursor(size_t visible_pos) const;

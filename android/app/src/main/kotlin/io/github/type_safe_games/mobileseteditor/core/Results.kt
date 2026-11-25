@@ -338,6 +338,17 @@ class TextResult(
     val selectionEnd: Int,
     lockedStarts: IntArray,
     lockedEnds: IntArray,
+    separatorStarts: IntArray = IntArray(0),
+    separatorEnds: IntArray = IntArray(0),
 ) {
     val locked: List<IntRange> = lockedStarts.indices.map { lockedStarts[it] until lockedEnds[it] }
+    /** The separators between the parts of a combined field (e.g. rules and flavor text) */
+    val separators: List<IntRange> = separatorStarts.indices.map { separatorStarts[it] until separatorEnds[it] }
+
+    /** The parts a combined field's separators divide its text into ([start, end) in code points); one part if none */
+    val parts: List<IntRange> get() {
+        val length = text.codePointCount(0, text.length)
+        val bounds = listOf(0) + separators.flatMap { listOf(it.first, it.last + 1) } + listOf(length)
+        return bounds.chunked(2).map { (a, b) -> a until b }
+    }
 }

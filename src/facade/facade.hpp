@@ -313,6 +313,7 @@ struct TextResult : ActionResult {
   int selection_start = 0;   ///< the selection after the call, in visible text; the caret is selection_end
   int selection_end   = 0;
   std::vector<TextSpan> locked; ///< spans that can't be edited inside (each is replaced or removed as a whole)
+  std::vector<TextSpan> separators; ///< of those, the separators between the parts of a combined field (e.g. rules and flavor text)
 };
 
 /// The visible text of a text field, with the caret at its end

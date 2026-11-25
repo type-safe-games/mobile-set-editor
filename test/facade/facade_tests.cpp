@@ -435,6 +435,9 @@ TEST(visible_text_and_separators) {
   VisibleText vt = visible_text(_("a<sep> - </sep>b<atom-reminder>(x)</atom-reminder>"));
   CHECK(vt.text == _("a - b(x)"));
   CHECK_EQ(vt.locked.size(), (size_t)2);
+  // of which the separator divides the field's parts (rules / flavor, #83); the atom doesn't
+  CHECK_EQ(vt.separators.size(), (size_t)1);
+  if (!vt.separators.empty()) { CHECK_EQ(vt.separators[0].first, (size_t)1); CHECK_EQ(vt.separators[0].second, (size_t)4); }
   CHECK_EQ(vt.toCursor(0), (size_t)0);
   CHECK_EQ(vt.toCursor(1), (size_t)1);
   CHECK_EQ(vt.toCursor(2), (size_t)1); // inside the separator: nearest edge

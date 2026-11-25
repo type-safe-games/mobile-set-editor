@@ -91,6 +91,7 @@ import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.layout.layout
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.material3.FilterChip
 
 /** A field's name (or an undo step's, which may contain one) as people read it: "card_color" is "card color" */
 fun displayName(name: String) = name.replace('_', ' ')
@@ -488,9 +489,12 @@ private fun TextEditor(model: SetViewModel, session: Long, target: EditTarget, m
     val holder = remember(target) { CoreText() }
     var value by remember(target) { mutableStateOf<TextFieldValue?>(null) }
     val focus = remember { FocusRequester() }
+    // a combined field's parts (Magic's text: rules, then flavor; #83)
+    var parts by remember(target) { mutableStateOf<List<IntRange>>(emptyList()) }
     fun show(t: TextResult) {
         holder.sync.answered(t.text, t.selectionEnd)
         holder.locked = t.locked
+        parts = t.parts
         value = TextFieldValue(t.text, TextRange(CodePoints.toUtf16(t.text, t.selectionStart), CodePoints.toUtf16(t.text, t.selectionEnd)))
     }
     LaunchedEffect(target, revision) {
@@ -591,6 +595,26 @@ private fun TextEditor(model: SetViewModel, session: Long, target: EditTarget, m
             }
         }
     }
+    // the parts of a combined field, to put the caret in one: an empty flavor text has no place on
+    // the Card to tap, so this is the way into it
+    if (parts.size > 1) {
+        val caret = CodePoints.fromUtf16(current.text, current.selection.end)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.testTag("text-parts")) {
+            for ((i, part) in parts.withIndex()) {
+                FilterChip(
+                    selected = caret in part.first..part.last + 1,
+                    onClick = {
+                        val shown = value ?: return@FilterChip
+                        val at = CodePoints.toUtf16(shown.text, part.last + 1)
+                        value = shown.copy(selection = TextRange(at))
+                        focus.requestFocus()
+                    },
+                    label = { Text(partLabel(target.field, i, parts.size)) },
+                    modifier = Modifier.testTag("text-part-$i"),
+                )
+            }
+        }
+    }
     // on the Card the symbols wait behind a button, so the Card keeps the space (#83)
     var showSymbols by remember(target) { mutableStateOf(onCard == null) }
     if (onCard != null && symbols?.hasSymbols == true) {
@@ -609,6 +633,10 @@ private fun TextEditor(model: SetViewModel, session: Long, target: EditTarget, m
     // (once the field is there to take it)
     LaunchedEffect(target) { focus.requestFocus() }
 }
+
+/** A combined field's part: Magic's text field is rules then flavor; other fields' parts are numbered */
+fun partLabel(field: String, index: Int, count: Int): String =
+    if (field == "text" && count == 2) listOf("Rules", "Flavor")[index] else "Part ${index + 1}"
 
 /** The text as the core last answered it, which edits are diffed against */
 private class CoreText {
