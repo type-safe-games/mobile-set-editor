@@ -53,6 +53,22 @@ class LinkTypeListResult(val result: CoreResult, selected: Array<String>, linked
 
 class CardSizeResult(val result: CoreResult, val width: Double, val height: Double)
 
+/** The card list as a table (#86): columns as the Game sets them, and each card's values as text */
+data class CardTable(val columns: List<Column>, val rows: List<List<String>>) {
+    data class Column(val field: String, val title: String, val width: Int)
+
+    companion object {
+        /** From the JNI's flat form: C, then field/title/width per column, then the rows' C values each */
+        fun parse(flat: Array<String>): CardTable? {
+            val n = flat.firstOrNull()?.toIntOrNull() ?: return null
+            if (flat.size < 1 + 3 * n) return null
+            val columns = (0 until n).map { Column(flat[1 + 3 * it], flat[2 + 3 * it], flat[3 + 3 * it].toIntOrNull() ?: 0) }
+            val cells = flat.drop(1 + 3 * n)
+            return CardTable(columns, if (n == 0) emptyList() else cells.chunked(n))
+        }
+    }
+}
+
 /** A caret in a rendered text field, in render pixels (#83) */
 data class Caret(val x: Double, val top: Double, val bottom: Double)
 

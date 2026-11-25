@@ -79,6 +79,15 @@ import io.github.type_safe_games.mobileseteditor.core.Support
 import io.github.type_safe_games.mobileseteditor.editor.EditTarget
 import io.github.type_safe_games.mobileseteditor.editor.FieldSheet
 import io.github.type_safe_games.mobileseteditor.render.RenderKey
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.material3.FilterChip
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.layout.width
+import io.github.type_safe_games.mobileseteditor.core.CardTable
+import io.github.type_safe_games.mobileseteditor.core.Core
+import androidx.compose.material3.HorizontalDivider
 
 private enum class SetTab(val title: String) { Cards("Cards"), SetInfo("Set info"), Keywords("Keywords") }
 
@@ -109,6 +118,8 @@ fun SetHomeScreen(
     var moving by remember { mutableStateOf(false) }
     val snackbar = remember { SnackbarHostState() }
     var adding by remember { mutableStateOf(false) }
+    val prefs = context.getSharedPreferences("views", android.content.Context.MODE_PRIVATE)
+    var asList by remember { mutableStateOf(prefs.getBoolean("cards-as-list", false)) }
     val styles = rememberGameStyles(model)
     val export = rememberCardExport(model)
     val close: () -> Unit = { if (state.dirty) askClose = true else { model.close(CloseChoice.Keep, onClosed) } }
@@ -161,15 +172,23 @@ fun SetHomeScreen(
         }
         when (tab) {
             SetTab.Cards -> Box(Modifier.weight(1f)) {
-                CardsGrid(
-                    model, state, grid, selected, styles,
-                    onOpenCard = { index ->
-                        val picked = selected
-                        if (picked == null) onOpenCard(index)
-                        else state.cardUids.getOrNull(index)?.let { uid -> selected = if (uid in picked) picked - uid else picked + uid }
-                    },
-                    onSelect = { index -> state.cardUids.getOrNull(index)?.let { selected = (selected ?: emptySet()) + it } },
-                )
+                val open: (Int) -> Unit = { index ->
+                    val picked = selected
+                    if (picked == null) onOpenCard(index)
+                    else state.cardUids.getOrNull(index)?.let { uid -> selected = if (uid in picked) picked - uid else picked + uid }
+                }
+                val select: (Int) -> Unit = { index -> state.cardUids.getOrNull(index)?.let { selected = (selected ?: emptySet()) + it } }
+                Column(Modifier.fillMaxSize()) {
+                    // the Cards as a grid of images or as a list of their values (#86)
+                    Row(Modifier.padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilterChip(selected = !asList, onClick = { asList = false; prefs.edit().putBoolean("cards-as-list", false).apply() }, label = { Text("Grid") }, modifier = Modifier.testTag("cards-grid-view"))
+                        FilterChip(selected = asList, onClick = { asList = true; prefs.edit().putBoolean("cards-as-list", true).apply() }, label = { Text("List") }, modifier = Modifier.testTag("cards-list-view"))
+                    }
+                    Box(Modifier.weight(1f)) {
+                        if (asList) CardsList(state, selected, onOpenCard = open, onSelect = select)
+                        else CardsGrid(model, state, grid, selected, styles, onOpenCard = open, onSelect = select)
+                    }
+                }
                 if (selected == null && state.session != 0L) {
                     // in which Style: the Set's, one its Cards use, or another (#87)
                     Box(Modifier.align(Alignment.BottomEnd).padding(16.dp)) {
@@ -331,6 +350,54 @@ private fun Thumbnail(
                 ownStyle, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary,
                 maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.testTag("own-style-${key.uid}"),
             )
+        }
+    }
+}
+
+/**
+ * The Cards as a list (#86): a row each, with the values of the columns the Game shows in its card
+ * list (desktop MSE's), scrolling sideways together under their header. Tap opens, long press
+ * selects, as in the grid.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun CardsList(state: SetState, selected: Set<String>?, onOpenCard: (Int) -> Unit, onSelect: (Int) -> Unit) {
+    var table by remember { mutableStateOf<CardTable?>(null) }
+    LaunchedEffect(state.session, state.cardUids, state.cardNames, state.dirty, state.cardStyles) {
+        if (state.session != 0L) table = Core.cardListTable(state.session)
+    }
+    val t = table
+    if (t == null) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+        return
+    }
+    // a Game with no card list columns still shows the names
+    val columns = t.columns.ifEmpty { listOf(CardTable.Column("", "Name", 200)) }
+    val rows = if (t.columns.isEmpty()) state.cardNames.map { listOf(it) } else t.rows
+    fun width(c: CardTable.Column) = c.width.coerceIn(48, 240).dp
+    val sideways = rememberScrollState()
+    LazyColumn(Modifier.fillMaxSize().testTag("card-list")) {
+        stickyHeader(key = "header") {
+            Row(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceVariant).horizontalScroll(sideways).padding(horizontal = 12.dp, vertical = 8.dp)) {
+                for (c in columns) Text(c.title, style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.width(width(c)).padding(end = 8.dp))
+            }
+        }
+        itemsIndexed(state.cardUids, key = { _, uid -> uid }) { index, uid ->
+            val row = rows.getOrNull(index).orEmpty()
+            val picked = selected?.contains(uid) == true
+            Row(
+                Modifier.fillMaxWidth()
+                    .background(if (picked) MaterialTheme.colorScheme.primaryContainer else Color.Transparent)
+                    .combinedClickable(onClick = { onOpenCard(index) }, onLongClick = { onSelect(index) }, onLongClickLabel = "Select")
+                    .horizontalScroll(sideways)
+                    .padding(horizontal = 12.dp, vertical = 10.dp)
+                    .testTag("list-row-$uid"),
+            ) {
+                for ((i, c) in columns.withIndex()) {
+                    Text(row.getOrElse(i) { "" }, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.width(width(c)).padding(end = 8.dp))
+                }
+            }
+            HorizontalDivider()
         }
     }
 }

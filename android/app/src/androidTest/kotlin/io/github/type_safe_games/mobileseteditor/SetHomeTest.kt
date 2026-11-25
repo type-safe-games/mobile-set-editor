@@ -19,6 +19,8 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.longClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -107,5 +109,30 @@ class SetHomeTest {
         compose.onNodeWithText("Save as…").performClick()
         assertTrue(savedAs)
         assertTrue(!closed)
+    }
+
+    @Test
+    fun theCardsAsAList() {
+        val model = SetViewModel(TestFixture.app.applicationContext as Application)
+        var opened = -1
+        compose.setContent { SetHomeScreen(model, rememberLazyGridState(), onOpenCard = { opened = it }, onSaveAs = {}, onClosed = {}) }
+        model.open(Uri.fromFile(TestFixture.zip("list.mse-set", TestFixture.assetFiles("sets/fixture-cards.mse-set"))))
+        compose.waitUntil(30_000) { model.state.value.session != 0L }
+        val uids = model.state.value.cardUids
+        compose.onNodeWithTag("cards-list-view").performClick()
+        try {
+            // the fixture's Game shows the name in its card list (#86)
+            compose.waitUntil(30_000) { compose.onAllNodesWithTag("list-row-${uids[1]}").fetchSemanticsNodes().isNotEmpty() }
+            compose.onNodeWithText("Name").assertIsDisplayed()
+            compose.onNodeWithTag("list-row-${uids[0]}").assertTextContains("Long Wrapping Text")
+            compose.onNodeWithTag("list-row-${uids[1]}").performClick()
+            compose.waitUntil(10_000) { opened == 1 }
+            // a long press selects, as in the grid
+            compose.onNodeWithTag("list-row-${uids[2]}").performTouchInput { longClick() }
+            compose.waitUntil(10_000) { compose.onAllNodesWithTag("selection-bar").fetchSemanticsNodes().isNotEmpty() }
+        } finally {
+            // (the choice is remembered: back to the grid for the other tests)
+            compose.onNodeWithTag("cards-grid-view").performClick()
+        }
     }
 }

@@ -108,6 +108,21 @@ static bool contains(const std::vector<std::string>& v, const std::string& x) {
 
 // ----------------------------------------------------------------------------- : Sessions and cards
 
+TEST(card_list_table) {
+  // #86: the Game's card list columns (the fixture shows only the name) and each card's values
+  F::SessionHandle s = open_fixture();
+  F::CardListTable t = F::cardListTable(s);
+  REQUIRE_OK(t);
+  CHECK_EQ(t.columns.size(), (size_t)1);
+  if (!t.columns.empty()) CHECK_EQ(t.columns[0].field, "name");
+  CHECK_EQ(t.rows.size(), (size_t)3);
+  if (t.rows.size() == 3 && !t.rows[0].empty()) {
+    CHECK_EQ(t.rows[0][0], "Long Wrapping Text");
+    CHECK_EQ(t.rows[1][0], "Front Face");
+  }
+  F::closeSession(s);
+}
+
 TEST(open_and_list_cards) {
   F::SessionHandle s = open_fixture();
   F::CardList cards = F::listCards(s);

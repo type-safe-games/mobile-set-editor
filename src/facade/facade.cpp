@@ -499,6 +499,29 @@ CardList listCards(SessionHandle h) {
   });
 }
 
+CardListTable cardListTable(SessionHandle h) {
+  return guarded<CardListTable>("", "", [&](CardListTable& r) {
+    Session& s = get_session(h);
+    // as the desktop's card list: visible, allowed fields, by column
+    vector<FieldP> fields;
+    for (const FieldP& f : s.set->game->card_fields) {
+      if (f->card_list_visible && f->card_list_allow) fields.push_back(f);
+    }
+    std::stable_sort(fields.begin(), fields.end(), [](const FieldP& a, const FieldP& b) { return a->card_list_column < b->card_list_column; });
+    for (const FieldP& f : fields) {
+      r.columns.push_back(CardListColumn{to_utf8(f->name), to_utf8(f->card_list_name.get()), (int)f->card_list_width});
+    }
+    for (const CardP& c : s.set->cards) {
+      std::vector<std::string> row;
+      for (const FieldP& f : fields) {
+        ValueP v = c->data[f];
+        row.push_back(v ? to_utf8(untag(v->toString())) : std::string());
+      }
+      r.rows.push_back(std::move(row));
+    }
+  });
+}
+
 // ----------------------------------------------------------------------------- : Changing the card list
 
 /// The cards with the given uids, in the Set's order

@@ -54,6 +54,7 @@ internal object NativeCore {
     external fun redo(session: Long): ActionResult
     external fun listCards(session: Long): CardListResult
     external fun cardSize(session: Long, cardUid: String): CardSizeResult
+    external fun cardListTable(session: Long): Array<String>
     external fun textCarets(session: Long, cardUid: String, field: String, width: Int): DoubleArray
     /** Draw a card into an ARGB_8888 bitmap, scaled to its width */
     external fun symbolMenu(session: Long, kind: Int, cardUid: String, field: String): SymbolMenuResult

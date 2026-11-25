@@ -136,6 +136,9 @@ object Core {
     suspend fun cardSize(session: Long, cardUid: String): CardSizeResult =
         withContext(dispatcher) { NativeCore.cardSize(session, cardUid) }
 
+    /** The card list as a table (#86): the Game's card list columns and each card's values; null if it failed */
+    suspend fun cardListTable(session: Long): CardTable? = withContext(dispatcher) { CardTable.parse(NativeCore.cardListTable(session)) }
+
     /** Where the caret goes at each visible text position of a text field on a render [width] wide:
      *  x, top and bottom, flat (#83, a prototype). Empty if it isn't a visible text field. */
     suspend fun textCarets(session: Long, cardUid: String, field: String, width: Int): List<Caret> =

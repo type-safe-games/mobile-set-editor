@@ -170,6 +170,20 @@ struct CardList : Result {
 };
 CardList listCards(SessionHandle session);
 
+/// A column of the card list (#86), as desktop MSE's card list shows it by default
+struct CardListColumn {
+  std::string field; ///< the field's name
+  std::string title; ///< its card list name (localized), e.g. "Name", "Cost"
+  int         width = 0; ///< its default width in the desktop's pixels, as a proportion
+};
+struct CardListTable : Result {
+  std::vector<CardListColumn>           columns; ///< the Game's visible card list fields, in its column order
+  std::vector<std::vector<std::string>> rows;    ///< for each card in the Set's order, its values in those columns (plain text)
+};
+/// The card list as a table: the columns the Game shows (its fields' card list settings) and each
+/// card's values in them, as text without tags
+CardListTable cardListTable(SessionHandle session);
+
 // ----------------------------------------------------------------------------- : Changing the card list
 
 // Each call is one undo step, and reports `stale.card_list` (see Stale). Positions are indexes in

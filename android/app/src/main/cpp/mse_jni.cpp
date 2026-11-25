@@ -728,6 +728,20 @@ MSE_JNI(cardSize)(JNIEnv* env, jobject, jlong session, jstring card_uid) {
   return out;
 }
 
+/// The card list table (#86), flat: the column count C, then field, title and width of each column,
+/// then each card's C values; empty if the call failed
+JNIEXPORT jobjectArray JNICALL
+MSE_JNI(cardListTable)(JNIEnv* env, jobject, jlong session) {
+  F::CardListTable r = guarded<F::CardListTable>([&] { return F::cardListTable(session); });
+  std::vector<std::string> flat;
+  if (r.ok()) {
+    flat.push_back(std::to_string(r.columns.size()));
+    for (const F::CardListColumn& c : r.columns) { flat.push_back(c.field); flat.push_back(c.title); flat.push_back(std::to_string(c.width)); }
+    for (const auto& row : r.rows) flat.insert(flat.end(), row.begin(), row.end());
+  }
+  return to_java(env, flat);
+}
+
 /// x, top, bottom of each caret, flat; empty if the call failed (#83, a prototype)
 JNIEXPORT jdoubleArray JNICALL
 MSE_JNI(textCarets)(JNIEnv* env, jobject, jlong session, jstring card_uid, jstring field, jint width) {
