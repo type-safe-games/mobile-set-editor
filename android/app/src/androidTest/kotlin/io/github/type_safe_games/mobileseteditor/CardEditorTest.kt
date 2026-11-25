@@ -70,6 +70,8 @@ class CardEditorTest {
         val original = runBlocking { Core.getText(session, TargetKind.Card, uid, "name").text }
 
         // tap the name on the Card: its editor opens
+        // the Card in the UI, not just in the model: it composes a moment later
+        compose.waitUntil(30_000) { compose.onAllNodesWithTag("card-$uid").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("card-$uid").performTouchInput {
             val scale = width.toFloat() / card.bitmap.width
             click(Offset(((name.x + name.width / 2) * scale).toFloat(), ((name.y + name.height / 2) * scale).toFloat()))
@@ -123,6 +125,8 @@ class CardEditorTest {
         compose.waitUntil(30_000) { model.state.value.card?.uid == uids[1] }
         val card = model.state.value.card!!
         val name = card.regions.first { it.field == "name" }
+        // the Card in the UI, not just in the model: it composes a moment later
+        compose.waitUntil(30_000) { compose.onAllNodesWithTag("card-${uids[1]}").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("card-${uids[1]}").performTouchInput {
             val scale = width.toFloat() / card.bitmap.width
             val at = Offset(((name.x + name.width / 2) * scale).toFloat(), ((name.y + name.height / 2) * scale).toFloat())
@@ -133,6 +137,8 @@ class CardEditorTest {
         compose.waitForIdle()
         assertTrue(compose.onAllNodesWithTag("field-sheet").fetchSemanticsNodes().isEmpty())
         // while a plain tap there still does
+        // the Card in the UI, not just in the model: it composes a moment later
+        compose.waitUntil(30_000) { compose.onAllNodesWithTag("card-${uids[1]}").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("card-${uids[1]}").performTouchInput {
             val scale = width.toFloat() / card.bitmap.width
             click(Offset(((name.x + name.width / 2) * scale).toFloat(), ((name.y + name.height / 2) * scale).toFloat()))

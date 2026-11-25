@@ -60,6 +60,8 @@ class SymbolBarTest {
         // the name has no symbol font: no bar
         fun tap(field: String) {
             val r = card.regions.first { it.field == field }
+            // the Card in the UI, not just in the model: it composes a moment later
+            compose.waitUntil(30_000) { compose.onAllNodesWithTag("card-${card.uid}").fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithTag("card-${card.uid}").performTouchInput {
                 val k = width.toDouble() / card.bitmap.width
                 click(Offset(((r.x + r.width / 2) * k).toFloat(), ((r.y + r.height / 2) * k).toFloat()))

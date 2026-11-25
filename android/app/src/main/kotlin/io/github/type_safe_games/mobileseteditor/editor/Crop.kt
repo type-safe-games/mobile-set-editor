@@ -143,8 +143,13 @@ fun CropDialog(uri: Uri, aspect: Float, onCropped: (File) -> Unit, onCancel: () 
     var failed by remember(uri) { mutableStateOf(false) }
     var state by remember(uri) { mutableStateOf<CropState?>(null) }
     LaunchedEffect(uri) {
-        image = withContext(Dispatchers.IO) { loadPickedImage(context, uri) }
-        failed = image == null
+        val loaded = withContext(Dispatchers.IO) { loadPickedImage(context, uri) }
+        // written on the main thread, between compositions: written from the IO thread, the update
+        // could be lost to the dialog composing meanwhile, and Use stayed disabled (#92)
+        withContext(Dispatchers.Main.immediate) {
+            image = loaded
+            failed = loaded == null
+        }
     }
     Dialog(onDismissRequest = onCancel, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(Modifier.fillMaxSize()) {

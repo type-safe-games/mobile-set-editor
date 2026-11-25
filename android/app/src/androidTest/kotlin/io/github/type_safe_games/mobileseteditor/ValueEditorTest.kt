@@ -73,8 +73,14 @@ class ValueEditorTest {
     }
 
     /** Tap the Card at a point of its Style's own size ([cardWidth] wide), and wait for the sheet */
+    /** No field sheet open (or still closing), so that a tap reaches the Card */
+    private fun waitForNoSheet() = compose.waitUntil(30_000) { compose.onAllNodesWithTag("field-sheet").fetchSemanticsNodes().isEmpty() }
+
     private fun tapCard(x: Double, y: Double, cardWidth: Double) {
+        waitForNoSheet()
         val bitmap = model.state.value.card!!.bitmap
+        // the Card in the UI, not just in the model: it composes a moment later
+        compose.waitUntil(30_000) { compose.onAllNodesWithTag("card-$uid").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("card-$uid").performTouchInput {
             val k = width / cardWidth
             click(Offset((x * k).toFloat(), (y * k).toFloat()))
@@ -84,8 +90,11 @@ class ValueEditorTest {
     }
 
     private fun tapField(field: String) {
+        waitForNoSheet()
         val r = model.state.value.card!!.regions.first { it.field == field }
         val bitmap = model.state.value.card!!.bitmap
+        // the Card in the UI, not just in the model: it composes a moment later
+        compose.waitUntil(30_000) { compose.onAllNodesWithTag("card-$uid").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("card-$uid").performTouchInput {
             val k = width.toDouble() / bitmap.width
             click(Offset(((r.x + r.width / 2) * k).toFloat(), ((r.y + r.height / 2) * k).toFloat()))

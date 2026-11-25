@@ -322,7 +322,12 @@ private fun SymbolFileEditor(value: String, apply: suspend (String) -> Unit) {
     }
     if (fromTemplates) {
         val templates = remember { io.github.type_safe_games.mobileseteditor.core.Stores.templates(context) }
-        val files by androidx.compose.runtime.produceState<List<File>?>(null) { this.value = withContext(Dispatchers.IO) { templateSymbols(templates) } }
+        val files by androidx.compose.runtime.produceState<List<File>?>(null) {
+            val loaded = withContext(Dispatchers.IO) { templateSymbols(templates) }
+            // written on the main thread, between compositions: written from the IO thread, the
+            // update could be lost to the dialog composing meanwhile (#92)
+            withContext(Dispatchers.Main.immediate) { this@produceState.value = loaded }
+        }
         androidx.compose.material3.AlertDialog(
             onDismissRequest = { fromTemplates = false },
             title = { Text("A symbol from a Template") },
