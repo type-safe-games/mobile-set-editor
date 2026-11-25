@@ -92,6 +92,11 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.layout.layout
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.material3.FilterChip
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.keyframes
+import androidx.compose.ui.graphics.Color
 
 /** A field's name (or an undo step's, which may contain one) as people read it: "card_color" is "card color" */
 fun displayName(name: String) = name.replace('_', ' ')
@@ -107,15 +112,28 @@ data class EditTarget(val uid: String, val field: String, val kind: TargetKind =
 class OnCardEditing {
     var caret by mutableIntStateOf(0)
     var tapped by mutableStateOf<Int?>(null)
+    /** the edited field's parts, if it combines several (Magic's text: rules, then flavor) */
+    var parts by mutableStateOf<List<IntRange>>(emptyList())
 }
 
-/** The caret nearest a point: on the line under it, else the nearest line, then the nearest x */
-fun nearestCaret(carets: List<Caret>, x: Double, y: Double): Int =
-    carets.indices.minByOrNull { i ->
+/**
+ * The caret nearest a point: on the line under it, else the nearest line, then the nearest x. In a
+ * combined field it stays in the first part (the rules) unless the point is on or below the first
+ * line of a later part that has text: typing rules by mistake into the flavor text was too easy,
+ * and an empty part is entered with its chip instead.
+ */
+fun nearestCaret(carets: List<Caret>, x: Double, y: Double, parts: List<IntRange> = emptyList()): Int {
+    val part = parts.drop(1).lastOrNull { p -> !p.isEmpty() && carets.getOrNull(p.first)?.let { y >= it.top } == true }
+        ?: parts.firstOrNull()
+    val candidates = if (part == null) carets.indices else (part.first..minOf(part.last + 1, carets.size - 1))
+    // below the part's last line: its end, as a text field does
+    if (!candidates.isEmpty() && candidates.all { y > carets[it].bottom }) return candidates.last
+    return candidates.minByOrNull { i ->
         val c = carets[i]
         val dy = when { y < c.top -> c.top - y; y > c.bottom -> y - c.bottom; else -> 0.0 }
         dy * 1000 + kotlin.math.abs(c.x - x)
     } ?: 0
+}
 
 /** Hold the re-render back this long after a keystroke, so typing doesn't queue a render per key */
 private const val TYPING_RENDER_DELAY = 300L
@@ -347,6 +365,12 @@ private fun CardPage(
         } else emptyList()
     }
     val caretColor = MaterialTheme.colorScheme.primary
+    // the caret blinks, as a text field's does (only while a field is edited on this Card)
+    val blink = if (onCard == null || selected == null) 1f else rememberInfiniteTransition(label = "caret").animateFloat(
+        initialValue = 1f, targetValue = 0f,
+        animationSpec = infiniteRepeatable(keyframes { durationMillis = 1000; 1f at 0; 1f at 499; 0f at 500; 0f at 999 }),
+        label = "blink",
+    ).value
     // keep the field being edited in view, also when the sheet and the keyboard take space
     LaunchedEffect(region?.field, region?.y, viewport) {
         if (region == null) return@LaunchedEffect
@@ -392,7 +416,7 @@ private fun CardPage(
                             val hit = Core.fieldAt(model.state.value.session, key.uid, at.x * s, at.y * s, image.width)
                             if (!hit.result.ok || hit.field.isEmpty()) return@launch
                             // a tap in the field being edited on the Card moves the caret there (#83)
-                            if (onCard != null && hit.field == selected && carets.isNotEmpty()) onCard.tapped = nearestCaret(carets, at.x * s, at.y * s)
+                            if (onCard != null && hit.field == selected && carets.isNotEmpty()) onCard.tapped = nearestCaret(carets, at.x * s, at.y * s, onCard.parts)
                             else onTap(hit.field)
                         }
                     }
@@ -409,10 +433,9 @@ private fun CardPage(
                     }
                     carets.getOrNull(onCard?.caret ?: -1)?.let { c ->
                         val s = size.width / image.width
-                        drawLine(
-                            caretColor, Offset(c.x.toFloat() * s, c.top.toFloat() * s), Offset(c.x.toFloat() * s, c.bottom.toFloat() * s),
-                            strokeWidth = stroke * 0.8f,
-                        )
+                        val top = Offset(c.x.toFloat() * s, c.top.toFloat() * s)
+                        val bottom = Offset(c.x.toFloat() * s, c.bottom.toFloat() * s)
+                        drawLine(caretColor.copy(alpha = blink), top, bottom, strokeWidth = stroke)
                     }
                 }
                 .testTag("card-${key.uid}"),
@@ -449,8 +472,11 @@ fun FieldSheet(model: SetViewModel, target: EditTarget, revision: Int, onField: 
         Column(Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 TextButton(onClick = { onField(textFields[at - 1]) }, enabled = at > 0, modifier = Modifier.testTag("previous-field")) { Text("‹") }
+                // editing a combined field on the Card: say which part the caret is in (Rules text / Flavor text)
+                val inPart = inline?.takeIf { it.parts.size > 1 }?.let { e -> e.parts.indexOfFirst { e.caret in it.first..it.last + 1 } }?.takeIf { it >= 0 }
                 Text(
-                    (when (target.kind) { TargetKind.CardStyle, TargetKind.SetStyle -> "Style option: "; TargetKind.Keyword -> "Keyword: "; else -> "" }) + displayName(target.field).replaceFirstChar { it.uppercase() },
+                    if (inPart != null) partLabel(target.field, inPart, inline.parts.size) + if (target.field == "text") " text" else ""
+                    else (when (target.kind) { TargetKind.CardStyle, TargetKind.SetStyle -> "Style option: "; TargetKind.Keyword -> "Keyword: "; else -> "" }) + displayName(target.field).replaceFirstChar { it.uppercase() },
                     style = MaterialTheme.typography.titleSmall,
                     modifier = Modifier.weight(1f).testTag("editing-field"),
                     maxLines = 1,
@@ -521,7 +547,10 @@ private fun TextEditor(model: SetViewModel, session: Long, target: EditTarget, m
     val current = value ?: return
     if (onCard != null) {
         // the caret on the Card follows this field's, and a tap on the Card moves it (#83)
-        SideEffect { onCard.caret = CodePoints.fromUtf16(current.text, current.selection.end) }
+        SideEffect {
+            onCard.caret = CodePoints.fromUtf16(current.text, current.selection.end)
+            onCard.parts = parts
+        }
         LaunchedEffect(onCard.tapped) {
             val to = onCard.tapped ?: return@LaunchedEffect
             onCard.tapped = null
@@ -557,7 +586,10 @@ private fun TextEditor(model: SetViewModel, session: Long, target: EditTarget, m
                     var r: TextResult? = null
                     for (key in Keystrokes.of(atomic.text)) {
                         val step = Core.replaceRange(session, target.kind, target.uid, target.field, start, end, key, asSymbol)
-                        model.edited(step.action, renderDelayMillis = TYPING_RENDER_DELAY)
+                        // on the Card the render is what shows the typing: at once (a newer keystroke
+                        // supersedes a pending render, so they don't queue up); the sheet's own text
+                        // field shows it, so there the Card can wait for a pause
+                        model.edited(step.action, renderDelayMillis = if (onCard != null) 0 else TYPING_RENDER_DELAY)
                         if (!step.action.result.ok) return@withLock show(Core.getText(session, target.kind, target.uid, target.field))
                         r = step
                         start = step.selectionEnd
