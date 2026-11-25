@@ -48,7 +48,9 @@ class RemoveTemplatesTest {
         val model = TemplatesViewModel(TestFixture.app.applicationContext as Application)
         compose.setContent { TemplatesScreen(model) }
         compose.waitUntil(30_000) { model.installed.value.isNotEmpty() }
-        assertEquals(setOf("fixture.mse-game", "fixture-standard.mse-style", "fixture-alternate.mse-style", "fixture-symbols.mse-symbol-font"), installed())
+        // (other tests' imports may have added packages: only the fixture's matter here)
+        val fixture = setOf("fixture.mse-game", "fixture-standard.mse-style", "fixture-alternate.mse-style", "fixture-symbols.mse-symbol-font")
+        assertTrue(installed().containsAll(fixture))
 
         // one Style: the other Style still needs the Game and the symbol font, so they stay
         compose.onNodeWithTag("remove-some").performClick()
@@ -58,12 +60,13 @@ class RemoveTemplatesTest {
         waitForTag("remove-confirm")
         compose.onNodeWithTag("remove-confirm").performClick()
         compose.waitUntil(30_000) { "fixture-alternate.mse-style" !in installed() }
-        assertEquals(setOf("fixture.mse-game", "fixture-standard.mse-style", "fixture-symbols.mse-symbol-font"), installed())
-        compose.waitUntil(10_000) { model.installed.value.size == 3 }
+        assertEquals(fixture - "fixture-alternate.mse-style", installed().intersect(fixture))
+        compose.waitUntil(10_000) { model.installed.value.none { it.name == "fixture-alternate.mse-style" } }
 
-        // the Game takes what needs it, and then nothing is left to need the symbol font
+        // the Game takes what needs it (the symbol font goes too unless another test's Style uses it)
         val plan = runBlocking { model.planRemoval(setOf("fixture.mse-game")) }
-        assertEquals(setOf("fixture.mse-game", "fixture-standard.mse-style", "fixture-symbols.mse-symbol-font"), plan.all)
+        assertEquals(setOf("fixture.mse-game"), plan.chosen)
+        assertTrue("fixture-standard.mse-style" in plan.dependents)
 
         // all: the store is empty, and of the fonts only the bundled fallback is left
         compose.onNodeWithTag("remove-all").performClick()
