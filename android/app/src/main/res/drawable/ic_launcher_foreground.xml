@@ -1,38 +1,41 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Mobile Set Editor - SPDX-License-Identifier: GPL-3.0-or-later
-     The launcher icon's foreground (#76): a blank card with placeholder blocks (title, art, text)
-     and a pen nib writing on it. Original artwork; nothing from any Template pack. 108dp canvas,
-     everything inside the 66dp safe zone except the end of the nib's collar. -->
+     The launcher icon's foreground (#98): a fanned hand of three cards, the front one with a title,
+     a sunset over hills and text lines. Original artwork; nothing from any Template pack. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <group android:pivotX="54" android:pivotY="54" android:rotation="-8">
-        <!-- the card -->
-        <path
-            android:fillColor="#FFFBF5"
-            android:strokeColor="#2B2560"
-            android:strokeWidth="1.6"
-            android:pathData="M39,29h30a3,3 0,0 1,3 3v44a3,3 0,0 1,-3 3h-30a3,3 0,0 1,-3 -3v-44a3,3 0,0 1,3 -3z" />
-        <!-- title bar -->
-        <path android:fillColor="#CBBDFF" android:pathData="M40.5,32.5h27a1,1 0,0 1,1 1v3a1,1 0,0 1,-1 1h-27a1,1 0,0 1,-1 -1v-3a1,1 0,0 1,1 -1z" />
-        <!-- art box -->
-        <path android:fillColor="#8DB1FF" android:pathData="M39.5,40h29v15h-29z" />
-        <path android:fillColor="#6E92E6" android:pathData="M39.5,55l9,-8 6,5 5,-4 9,7z" />
-        <!-- text lines -->
-        <path android:fillColor="#B9B1CC" android:pathData="M40.5,59h27v2h-27zM40.5,63.5h27v2h-27zM40.5,68h18v2h-18z" />
+    <!-- scaled about the centre so the fanned corners stay inside the 66dp safe zone -->
+    <group android:pivotX="54" android:pivotY="54" android:scaleX="0.84" android:scaleY="0.84" android:translateY="-1">
+    <group android:pivotX="54" android:pivotY="86" android:rotation="-20">
+        <path android:fillColor="#FFFFFFFF" android:pathData="M39.5,30h29a3,3 0,0 1,3,3v43a3,3 0,0 1,-3,3h-29a3,3 0,0 1,-3,-3v-43a3,3 0,0 1,3,-3z" />
+        <path android:fillColor="#FFE9C46A" android:pathData="M40.7,32.2h26.6a2,2 0,0 1,2,2v40.6a2,2 0,0 1,-2,2h-26.6a2,2 0,0 1,-2,-2v-40.6a2,2 0,0 1,2,-2z" />
+        <path android:fillColor="#FFF7F1E3" android:pathData="M40.5,34h27v4.46h-27z" />
+        <path android:fillColor="#FFF7F1E3" android:pathData="M40.5,60.192h27v14.808h-27z" />
+        <path android:fillColor="#FFCFC6B4" android:pathData="M42.5,62.392h23v1.6h-23zM42.5,65.792h23v1.6h-23zM42.5,69.192h14.26v1.6h-14.26z" />
+        <path android:fillColor="#FFF4DE9C" android:pathData="M40.5,39.86h27v18.732h-27z" />
     </group>
-    <!-- the pen nib, its tip on the last text line, its body toward the bottom right -->
-    <group android:translateX="62" android:translateY="66" android:rotation="-45">
-        <path
-            android:fillColor="#F2B84B"
-            android:strokeColor="#2B2560"
-            android:strokeWidth="1.3"
-            android:strokeLineJoin="round"
-            android:pathData="M0,0L5.5,11V19H-5.5V11Z" />
-        <path android:fillColor="#2B2560" android:pathData="M-0.5,0.5h1v9h-1z" />
-        <path android:fillColor="#2B2560" android:pathData="M0,10.3m-1.5,0a1.5,1.5 0,1 0,3 0a1.5,1.5 0,1 0,-3 0" />
-        <path android:fillColor="#2B2560" android:pathData="M-6.5,19h13v4h-13z" />
+    <group android:pivotX="54" android:pivotY="86" android:rotation="18">
+        <path android:fillColor="#FFFFFFFF" android:pathData="M39.5,30h29a3,3 0,0 1,3,3v43a3,3 0,0 1,-3,3h-29a3,3 0,0 1,-3,-3v-43a3,3 0,0 1,3,-3z" />
+        <path android:fillColor="#FF5FA8D3" android:pathData="M40.7,32.2h26.6a2,2 0,0 1,2,2v40.6a2,2 0,0 1,-2,2h-26.6a2,2 0,0 1,-2,-2v-40.6a2,2 0,0 1,2,-2z" />
+        <path android:fillColor="#FFF7F1E3" android:pathData="M40.5,34h27v4.46h-27z" />
+        <path android:fillColor="#FFF7F1E3" android:pathData="M40.5,60.192h27v14.808h-27z" />
+        <path android:fillColor="#FFCFC6B4" android:pathData="M42.5,62.392h23v1.6h-23zM42.5,65.792h23v1.6h-23zM42.5,69.192h14.26v1.6h-14.26z" />
+        <path android:fillColor="#FFA7D3EC" android:pathData="M40.5,39.86h27v18.732h-27z" />
+    </group>
+    <group android:translateY="-2">
+        <path android:fillColor="#FFFFFFFF" android:pathData="M39.5,30h29a3,3 0,0 1,3,3v43a3,3 0,0 1,-3,3h-29a3,3 0,0 1,-3,-3v-43a3,3 0,0 1,3,-3z" />
+        <path android:fillColor="#FF2A2A3C" android:pathData="M40.7,32.2h26.6a2,2 0,0 1,2,2v40.6a2,2 0,0 1,-2,2h-26.6a2,2 0,0 1,-2,-2v-40.6a2,2 0,0 1,2,-2z" />
+        <path android:fillColor="#FFF7F1E3" android:pathData="M40.5,34h27v4.46h-27z" />
+        <path android:fillColor="#FFF7F1E3" android:pathData="M40.5,60.192h27v14.808h-27z" />
+        <path android:fillColor="#FFCFC6B4" android:pathData="M42.5,62.392h23v1.6h-23zM42.5,65.792h23v1.6h-23zM42.5,69.192h14.26v1.6h-14.26z" />
+        <path android:fillColor="#FF7A2E5C" android:pathData="M40.5,39.86h27v18.732h-27z" />
+        <path android:fillColor="#FFF0663F" android:pathData="M40.5,39.86h27v13.487h-27z" />
+        <path android:fillColor="#FFFFB347" android:pathData="M40.5,39.86h27v7.86744h-27z" />
+        <path android:fillColor="#FFFFE9A8" android:pathData="M60.9,44.26m-3,0a3,3 0,1 0,6,0a3,3 0,1 0,-6,0" />
+        <path android:fillColor="#D93B1F3F" android:pathData="M40.5,58.592v-4.5l8,-7 5,4 6,-6 8,8.5v0.5z" />
+    </group>
     </group>
 </vector>

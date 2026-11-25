@@ -10,7 +10,7 @@
 The name is set in Noto Sans, so that font must be installed (fontconfig).
 
 Needs rsvg-convert (librsvg). Understands what the icon's drawables use: <group> with translate,
-rotation and pivot, and <path> with fill and stroke.
+rotation, scale and pivot, and <path> with fill (and its fill type) and stroke.
 """
 from __future__ import annotations
 
@@ -40,13 +40,17 @@ def svg_of(node: ET.Element) -> str:
         if child.tag == "group":
             tx, ty = child.get(A + "translateX", "0"), child.get(A + "translateY", "0")
             rot = child.get(A + "rotation", "0")
+            sx, sy = child.get(A + "scaleX", "1"), child.get(A + "scaleY", "1")
             px, py = child.get(A + "pivotX", "0"), child.get(A + "pivotY", "0")
             # VectorDrawable: scale and rotate about the pivot, then translate
-            out.append(f'<g transform="translate({tx},{ty}) rotate({rot},{px},{py})">{svg_of(child)}</g>')
+            out.append(f'<g transform="translate({tx},{ty}) translate({px},{py}) rotate({rot}) scale({sx},{sy}) '
+                       f'translate(-{px},-{py})">{svg_of(child)}</g>')
         elif child.tag == "path":
             attrs = [f'd="{child.get(A + "pathData")}"']
             fill = child.get(A + "fillColor")
             attrs.append(f"fill={color(fill)}" if fill else 'fill="none"')
+            if child.get(A + "fillType") == "evenOdd":
+                attrs.append('fill-rule="evenodd"')
             stroke = child.get(A + "strokeColor")
             if stroke:
                 attrs.append(f"stroke={color(stroke)}")
@@ -80,7 +84,7 @@ def main() -> None:
         f'<g transform="translate(-30,0) scale({500 / 108})">{fg}</g>'
         f'<text x="450" y="235" font-family="Noto Sans" font-weight="bold" font-size="64" fill="#FFFBF5">Mobile Set</text>'
         f'<text x="450" y="310" font-family="Noto Sans" font-weight="bold" font-size="64" fill="#FFFBF5">Editor</text>'
-        f'<text x="452" y="370" font-family="Noto Sans" font-size="27" fill="#CBBDFF">Design your own cards on your phone</text>'
+        f'<text x="452" y="370" font-family="Noto Sans" font-size="27" fill="#A8E0D8">Design your own cards on your phone</text>'
         f'</svg>',
         1024, 500, out / "featureGraphic.png",
     )
