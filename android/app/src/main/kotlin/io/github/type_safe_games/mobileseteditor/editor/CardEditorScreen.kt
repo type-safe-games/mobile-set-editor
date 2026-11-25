@@ -87,6 +87,10 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.foundation.layout.size
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.material3.SmallFloatingActionButton
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.layout.layout
+import androidx.compose.runtime.saveable.rememberSaveable
 
 /** A field's name (or an undo step's, which may contain one) as people read it: "card_color" is "card color" */
 fun displayName(name: String) = name.replace('_', ' ')
@@ -133,6 +137,8 @@ fun CardEditorScreen(model: SetViewModel, onBack: () -> Unit) {
     val styles = rememberGameStyles(model)
     var adding by remember { mutableStateOf(false) }
     var pickingStyle by remember { mutableStateOf(false) }
+    // the double-wide Cards showing their back face (#90)
+    var backs by rememberSaveable { mutableStateOf(setOf<String>()) }
     // #83's prototype, on by default so it can be tried; the old sheet is a tap away
     val prefs = LocalContext.current.getSharedPreferences("prototypes", android.content.Context.MODE_PRIVATE)
     var onCardMode by remember { mutableStateOf(prefs.getBoolean("on-card-editing", true)) }
@@ -239,14 +245,37 @@ fun CardEditorScreen(model: SetViewModel, onBack: () -> Unit) {
                     modifier = Modifier.fillMaxSize().testTag("card-pager"),
                 ) { page ->
                     val uid = state.cardUids.getOrNull(page) ?: return@HorizontalPager
-                    CardPage(
-                        model, RenderKey(uid, width), state.cardNames.getOrElse(page) { "" }, state.aspect, viewport,
-                        selected = editing?.takeIf { it.uid == uid && it.kind == TargetKind.Card }?.field,
-                        onTap = { editing = EditTarget(uid, it) },
-                        onLongPress = { details = uid },
-                        scrolling = { pager.isScrollInProgress },
-                        onCard = onCard.takeIf { onCardMode },
-                    )
+                    // a double-faced Card (#90): a double-wide Style has both faces side by side in one
+                    // Card, shown a face at a time; a linked Front Face / Back Face is another Card
+                    var doubleWide by remember(uid) { mutableStateOf(false) }
+                    LaunchedEffect(uid, state.cardStyles.getOrNull(page)) {
+                        val size = Core.cardSize(state.session, uid)
+                        doubleWide = size.result.ok && size.height > 0 && size.width / size.height > DOUBLE_WIDE
+                        model.setDoubleWide(uid, doubleWide)
+                    }
+                    val otherFace = state.cardLinks.getOrNull(page).orEmpty()
+                        .firstOrNull { it.relation == "Back Face" || it.relation == "Front Face" }
+                        ?.let { link -> state.cardUids.indexOf(link.uid).takeIf { it >= 0 } }
+                    Box(Modifier.fillMaxSize()) {
+                        CardPage(
+                            model, RenderKey(uid, if (doubleWide) width * 2 else width), state.cardNames.getOrElse(page) { "" }, state.aspect, viewport,
+                            selected = editing?.takeIf { it.uid == uid && it.kind == TargetKind.Card }?.field,
+                            onTap = { editing = EditTarget(uid, it) },
+                            onLongPress = { details = uid },
+                            scrolling = { pager.isScrollInProgress },
+                            onCard = onCard.takeIf { onCardMode },
+                            face = if (!doubleWide) null else if (uid in backs) Face.Back else Face.Front,
+                        )
+                        if (doubleWide || otherFace != null) {
+                            SmallFloatingActionButton(
+                                onClick = {
+                                    if (doubleWide) { backs = if (uid in backs) backs - uid else backs + uid; editing = null }
+                                    else otherFace?.let { scope.launch { pager.animateScrollToPage(it) } }
+                                },
+                                modifier = Modifier.align(Alignment.TopEnd).padding(8.dp).testTag("flip-$uid"),
+                            ) { Text(if (doubleWide && uid in backs) "Front" else "Flip", modifier = Modifier.padding(horizontal = 8.dp)) }
+                        }
+                    }
                 }
             }
         }
@@ -295,6 +324,7 @@ private fun CardPage(
     onLongPress: () -> Unit,
     scrolling: () -> Boolean,
     onCard: OnCardEditing? = null,
+    face: Face? = null,
 ) {
     val scope = rememberCoroutineScope()
     val flow = remember(key) { model.observe(key) }
@@ -338,11 +368,20 @@ private fun CardPage(
             return@Column
         }
         val image = rendered.image
+        // a double-wide Card shows one face: the image is twice the page's width, and the page shows
+        // its left or right half. Taps, the highlight and the caret are in the image's own
+        // coordinates, so they need nothing more
+        val half = if (face == null) Modifier else Modifier.fillMaxWidth().aspectRatio(image.width / 2f / image.height).clipToBounds()
+            .testTag(if (face == Face.Back) "card-face-back" else "card-face-front")
+        Box(half) {
         Image(
             bitmap = image.asImageBitmap(),
             contentDescription = name,
-            modifier = Modifier
-                .fillMaxWidth()
+            modifier = (if (face == null) Modifier.fillMaxWidth() else Modifier.layout { m, c ->
+                    val w = c.maxWidth
+                    val p = m.measure(c.copy(minWidth = 2 * w, maxWidth = 2 * w))
+                    layout(w, p.height) { p.place(if (face == Face.Back) -w else 0, 0) }
+                })
                 .aspectRatio(image.width.toFloat() / image.height)
                 .pointerInput(rendered) {
                     detectTapsNotSwipes(onLongPress = onLongPress, ignore = scrolling) { at ->
@@ -377,8 +416,16 @@ private fun CardPage(
                 }
                 .testTag("card-${key.uid}"),
         )
+        }
     }
 }
+
+/** Which face of a double-wide Card is shown (#90) */
+enum class Face { Front, Back }
+
+/** Wider than this (width / height) is a double-wide Card with both faces side by side (#90); a
+ *  single face is about 0.72 */
+private const val DOUBLE_WIDE = 1.2
 
 /** The sheet below the Card: the field's name, ‹ › to the Card's other editable fields, and its editor */
 @Composable
@@ -388,7 +435,7 @@ fun FieldSheet(model: SetViewModel, target: EditTarget, revision: Int, onField: 
     LaunchedEffect(target.uid, target.kind, revision) { fields = Core.listFields(session, target.kind, target.uid).fields }
     // the fields this Card shows, from its render
     val regions = if (target.kind != TargetKind.Card) null
-    else model.observe(RenderKey(target.uid, model.renderWidth))?.collectAsState()?.value?.regions
+    else model.observe(RenderKey(target.uid, model.renderWidthFor(target.uid)))?.collectAsState()?.value?.regions
     val onCard = regions?.map { it.field }?.toSet()
     val aspect = regions?.firstOrNull { it.field == target.field }?.let { (it.width / it.height).toFloat() } ?: 1f
     val all = fields

@@ -154,4 +154,46 @@ class CardEditorTest {
         compose.waitUntil(10_000) { model.state.value.cardStyles[0].stylesheet == "fixture-alternate.mse-style" }
         assertTrue(model.state.value.cardStyles[0].own)
     }
+
+    @Test
+    fun flipJumpsToTheLinkedFaceAndADoubleWideCardShowsAFaceAtATime() {
+        // a double-wide copy of the fixture's Style: both faces side by side in one Card (#90)
+        val templates = io.github.type_safe_games.mobileseteditor.core.Stores.templates(TestFixture.app)
+        val wide = java.io.File(templates, "fixture-wide.mse-style")
+        wide.deleteRecursively()
+        java.io.File(templates, "fixture-standard.mse-style").copyRecursively(wide)
+        java.io.File(wide, "style").let { it.writeText(it.readText().replace("card width: 300", "card width: 840")) }
+        assertTrue(runBlocking { Core.refreshTemplates() }.ok)
+        try {
+            val model = SetViewModel(TestFixture.app.applicationContext as Application)
+            compose.setContent { CardEditorScreen(model, onBack = {}) }
+            model.open(Uri.fromFile(TestFixture.zip("flip.mse-set", TestFixture.assetFiles("sets/fixture-cards.mse-set"))))
+            compose.waitUntil(30_000) { model.state.value.card != null }
+            val uids = model.state.value.cardUids
+
+            // a Front Face linked to its Back Face: Flip goes there
+            compose.onNodeWithTag("next-card").performClick()
+            compose.waitUntil(10_000) { model.state.value.index == 1 }
+            waitForTag("flip-${uids[1]}")
+            compose.onNodeWithTag("flip-${uids[1]}").performClick()
+            compose.waitUntil(10_000) { model.state.value.index == 2 }
+
+            // the first Card in the double-wide Style: its front, then its back
+            compose.onNodeWithTag("previous-card").performClick()
+            compose.onNodeWithTag("previous-card").performClick()
+            compose.waitUntil(10_000) { model.state.value.index == 0 }
+            runBlocking { model.setCardStyle(uids[0], "fixture-wide.mse-style") }
+            val size = runBlocking { Core.cardSize(model.state.value.session, uids[0]) }
+            compose.waitUntil(10_000) { model.state.value.cardStyles[0].stylesheet == "fixture-wide.mse-style" }
+            assertTrue("size ${size.width} x ${size.height}, ${size.result}; style ${model.state.value.cardStyles[0].stylesheet}", size.width / size.height > 1.2)
+            waitForTag("card-face-front")
+            compose.onNodeWithTag("flip-${uids[0]}").performClick()
+            waitForTag("card-face-back")
+            compose.onNodeWithTag("flip-${uids[0]}").performClick()
+            waitForTag("card-face-front")
+        } finally {
+            wide.deleteRecursively()
+            runBlocking { Core.refreshTemplates() }
+        }
+    }
 }

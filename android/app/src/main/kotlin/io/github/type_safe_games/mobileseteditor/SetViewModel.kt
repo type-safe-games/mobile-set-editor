@@ -608,15 +608,26 @@ class SetViewModel(app: Application) : AndroidViewModel(app) {
     fun showCard() = show()
 
     /** Want the current Card and its neighbours, and show the current one's render */
+    /** Cards with both faces side by side in one Card (#90): rendered twice as wide, a face filling the width */
+    private val doubleWide = mutableSetOf<String>()
+
+    /** The editor found [uid] is (or isn't) double-wide */
+    fun setDoubleWide(uid: String, on: Boolean) {
+        if (if (on) doubleWide.add(uid) else doubleWide.remove(uid)) show()
+    }
+
+    /** The width the editor renders [uid] at */
+    fun renderWidthFor(uid: String) = if (uid in doubleWide) width * 2 else width
+
     private fun show() {
         val s = _state.value
         val service = renders ?: return
         if (s.cardUids.isEmpty() || width <= 0) return
         val index = s.index
-        val key = RenderKey(s.cardUids[index], width)
+        val key = RenderKey(s.cardUids[index], renderWidthFor(s.cardUids[index]))
         val ahead = (1..lookAhead).flatMap { listOf(index + it, index - it) }
             .filter { it in s.cardUids.indices }
-            .map { RenderKey(s.cardUids[it], width) }
+            .map { RenderKey(s.cardUids[it], renderWidthFor(s.cardUids[it])) }
         service.want(listOf(key), ahead)
         observeJob?.cancel()
         observeJob = viewModelScope.launch {

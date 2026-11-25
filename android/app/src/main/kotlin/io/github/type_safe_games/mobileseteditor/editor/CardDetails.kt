@@ -82,7 +82,7 @@ fun CardDetailsSheet(model: SetViewModel, uid: String, revision: Int, onEdit: (E
     val searching = query.isNotBlank()
     var showOnCard by remember(uid) { mutableStateOf(false) }
     var showOptions by remember(uid) { mutableStateOf(false) }
-    val regions = model.observe(RenderKey(uid, model.renderWidth))?.collectAsState()?.value?.regions
+    val regions = model.observe(RenderKey(uid, model.renderWidthFor(uid)))?.collectAsState()?.value?.regions
     // read again after every change (to the Card, its Style, its styling)
     var error by remember(uid) { mutableStateOf("") }
     LaunchedEffect(uid, revision, style) {
