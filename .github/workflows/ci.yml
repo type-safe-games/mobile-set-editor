@@ -132,6 +132,12 @@ jobs:
             sleep 2
           done
           adb shell getprop ro.build.version.sdk
+          # no system animations and the screen kept on, as test devices should be: with animations,
+          # dialogs froze on their first frame far more often under load (#92)
+          for k in window_animation_scale transition_animation_scale animator_duration_scale; do
+            adb shell settings put global "$k" 0
+          done
+          adb shell svc power stayon true
 
       - name: Fixture golden check on the emulator
         run: python3 tools/goldens/goldens.py check --android --fixture-only --goldens "$RUNNER_TEMP/goldens"
