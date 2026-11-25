@@ -1,0 +1,1 @@
+Edit text right on the card, with a Rules | Flavor switch for the text box. A list view of a set's cards. Flip double-faced cards. Remove installed templates. The import picker shows only styles. Plus many smaller fixes.
