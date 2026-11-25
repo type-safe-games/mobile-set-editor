@@ -88,6 +88,7 @@ import androidx.compose.foundation.layout.width
 import io.github.type_safe_games.mobileseteditor.core.CardTable
 import io.github.type_safe_games.mobileseteditor.core.Core
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.animation.core.animateDpAsState
 
 private enum class SetTab(val title: String) { Cards("Cards"), SetInfo("Set info"), Keywords("Keywords") }
 
@@ -156,7 +157,7 @@ fun SetHomeScreen(
                         val n = picked.size
                         if (model.removeCards(inSetOrder(state, picked))) {
                             selected = null
-                            val r = snackbar.showSnackbar("Deleted $n Card${if (n == 1) "" else "s"}", actionLabel = "Undo", duration = SnackbarDuration.Long)
+                            val r = snackbar.showSnackbar("Deleted $n Card${if (n == 1) "" else "s"}", actionLabel = "Undo", duration = SnackbarDuration.Short)
                             if (r == SnackbarResult.ActionPerformed) model.undo()
                         }
                     }
@@ -191,7 +192,9 @@ fun SetHomeScreen(
                 }
                 if (selected == null && state.session != 0L) {
                     // in which Style: the Set's, one its Cards use, or another (#87)
-                    Box(Modifier.align(Alignment.BottomEnd).padding(16.dp)) {
+                    // above the "Deleted … Undo" bar while it shows, rather than under it
+                    val lift by animateDpAsState(if (snackbar.currentSnackbarData != null) 72.dp else 0.dp, label = "fab")
+                    Box(Modifier.align(Alignment.BottomEnd).padding(16.dp).padding(bottom = lift)) {
                         ExtendedFloatingActionButton(onClick = { adding = true }, modifier = Modifier.testTag("add-card")) { Text("Add Card") }
                         AddCardMenu(model, styles, adding, onDismiss = { adding = false }) { style ->
                             scope.launch { model.addCard(state.cardUids.size - 1, style).takeIf { it >= 0 }?.let(onOpenCard) }
