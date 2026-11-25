@@ -147,6 +147,12 @@ private fun TemplateRow(t: TemplateInfo, modifier: Modifier, support: Support? =
                     color = MaterialTheme.colorScheme.error,
                     modifier = Modifier.testTag("unsupported-${t.name}"),
                 )
+                Support.TemplateBug -> Text(
+                    "Known template bug: some Cards show an error, in the desktop editor too",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.testTag("template-bug-${t.name}"),
+                )
                 Support.Untested -> Text(
                     "Untested in this version",
                     style = MaterialTheme.typography.labelSmall,

@@ -58,11 +58,17 @@ int render_set(const std::string& set_path, const fs::path& out_dir) {
   }
   F::CardList cards = F::listCards(open.session);
   error |= log_messages(log, cards);
+  // Every Layout dump first, then every image, in the order tools/goldens has the desktop CLI
+  // write them: a Style's state is shared by the Set's Cards, and some Styles (a field sized from its
+  // own content) lay out differently on each pass, so the passes must come in the same order (#38).
   for (size_t n = 0 ; n < cards.cards.size() ; ++n) {
     const std::string& uid = cards.cards[n].uid;
     F::TextOutput dump = F::layoutDump(open.session, uid);
     error |= log_messages(log, dump);
     if (dump.ok()) write_file(out_dir / (std::to_string(n) + ".json"), dump.text.data(), dump.text.size());
+  }
+  for (size_t n = 0 ; n < cards.cards.size() ; ++n) {
+    const std::string& uid = cards.cards[n].uid;
     // as write_image_file(card, file: ...) with its defaults: natural size, upright, no bleed, one face
     F::ExportOptions export_options;
     export_options.zoom = 1.0;

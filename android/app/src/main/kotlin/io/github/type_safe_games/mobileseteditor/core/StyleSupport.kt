@@ -11,6 +11,11 @@ enum class Support {
     Supported,
     /** it failed it: it may not look as on the desktop (it can still be used) */
     Unsupported,
+    /**
+     * it renders as the desktop editor does, but some Cards hit a Template bug: an error the
+     * reference desktop editor has too, reported upstream (ADR 0010, #38)
+     */
+    TemplateBug,
     /** not in the golden corpus, or another version than the one tested */
     Untested,
 }
@@ -18,13 +23,14 @@ enum class Support {
 /**
  * The Style support status this version was tested with: the asset style-status.tsv, written by
  * an Android golden run (tools/goldens/goldens.py --android --status-out). Lines are
- * "package \t version \t supported|unsupported"; '#' starts a comment.
+ * "package \t version \t supported|template-bug|unsupported"; '#' starts a comment, and any
+ * other status reads as unsupported.
  */
-class StyleSupport(private val tested: Map<String, Pair<String, Boolean>>) {
+class StyleSupport(private val tested: Map<String, Pair<String, Support>>) {
     fun of(style: String, version: String): Support {
-        val (testedVersion, supported) = tested[style] ?: return Support.Untested
+        val (testedVersion, support) = tested[style] ?: return Support.Untested
         if (testedVersion.isNotEmpty() && version.isNotEmpty() && testedVersion != version) return Support.Untested
-        return if (supported) Support.Supported else Support.Unsupported
+        return support
     }
 
     fun of(t: TemplateInfo) = of(t.name, t.version)
@@ -35,9 +41,15 @@ class StyleSupport(private val tested: Map<String, Pair<String, Boolean>>) {
         fun parse(text: String) = StyleSupport(
             text.lineSequence().map { it.trim() }.filter { it.isNotEmpty() && !it.startsWith("#") }.mapNotNull { line ->
                 val f = line.split('\t')
-                if (f.size < 3) null else f[0] to (f[1] to (f[2] == "supported"))
+                if (f.size < 3) null else f[0] to (f[1] to status(f[2]))
             }.toMap(),
         )
+
+        private fun status(s: String) = when (s) {
+            "supported" -> Support.Supported
+            "template-bug" -> Support.TemplateBug
+            else -> Support.Unsupported
+        }
 
         @Volatile private var loaded: StyleSupport? = null
 

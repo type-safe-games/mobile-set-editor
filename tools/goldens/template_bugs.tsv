@@ -1,0 +1,12 @@
+# Template bugs (ADR 0010, #38): Golden render errors that the reference desktop editor (the pack's
+# own mse.com, 2.6.3, under Wine) reports the same way, so they are bugs in the Template, not in this
+# port. A Style whose every render error is listed here for its version, and whose Layout dumps
+# match, has status "template-bug" instead of "unsupported". A new Style version drops out of the
+# record until it is checked again. Fixes go upstream, never into the pack (ADR 0005).
+#
+# style	version	case	error (a substring of the ERROR line)	upstream report
+magic-doomtown	2024-05-30	two-color	collection has no member '0'	-
+magic-m15-loyalty	2024-06-07	two-color	File not found: 'multicolor_blend_pt.png'	-
+magic-m15-ttk-frames	2024-01-28	two-color	File not found: 'multicolor_blend_pt.png'	-
+magic-m15classic-nyx	2024-05-27	two-color	(image is 110x53, mask is 98x53)	-
+magic-m15classic-walker	2024-05-27	two-color	(one is 92x52, the other is 98x53)	-

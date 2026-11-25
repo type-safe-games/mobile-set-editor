@@ -1,6 +1,6 @@
 # Style support for this app version: an Android golden run (tools/goldens/goldens.py --android
-# --status-out, ADR 0010). package, version tested, supported/unsupported. Styles not listed
-# (or of another version) are untested.
+# --status-out, ADR 0010). package, version tested, supported/template-bug/unsupported. Styles
+# not listed (or of another version) are untested.
 magic-DayNight.mse-style	2024-05-30	supported
 magic-agclassic.mse-style	2024-05-30	supported
 magic-agclassic-snow.mse-style	2024-05-30	supported
@@ -31,7 +31,7 @@ magic-counter-sheet_744.mse-style	2024-05-20	supported
 magic-crystal.mse-style	2024-05-30	supported
 magic-crystal-cave.mse-style	2026-09-06	supported
 magic-deckbox.mse-style	2021-09-06	supported
-magic-doomtown.mse-style	2024-05-30	unsupported
+magic-doomtown.mse-style	2024-05-30	template-bug
 magic-dox-sokrates_750.mse-style	2026-09-06	supported
 magic-duplex.mse-style	2024-05-30	supported
 magic-dynamic.mse-style	2024-05-30	supported
@@ -125,7 +125,7 @@ magic-m15-jinx.mse-style	2024-06-07	supported
 magic-m15-kamigawa-full-art-basics.mse-style	2026-09-06	supported
 magic-m15-keyword.mse-style	2024-06-07	supported
 magic-m15-leveler.mse-style	2024-06-07	supported
-magic-m15-loyalty.mse-style	2024-06-07	unsupported
+magic-m15-loyalty.mse-style	2024-06-07	template-bug
 magic-m15-mainframe-battles.mse-style	2026-09-13	supported
 magic-m15-mainframe-dfc.mse-style	2026-09-17	supported
 magic-m15-mainframe-planes.mse-style	2026-09-18	supported
@@ -231,14 +231,14 @@ magic-m15-textless-land.mse-style	2024-09-01	supported
 magic-m15-token.mse-style	2015-12-20	supported
 magic-m15-token-invention.mse-style	2024-06-07	supported
 magic-m15-treasure-maps.mse-style	2026-09-06	supported
-magic-m15-ttk-frames.mse-style	2024-01-28	unsupported
+magic-m15-ttk-frames.mse-style	2024-01-28	template-bug
 magic-m15-unfinity-full-art-basics.mse-style	2026-09-06	supported
 magic-m15-unstable-basics.mse-style	2024-05-26	supported
 magic-m15-vanguard.mse-style	2026-02-28	supported
 magic-m15-youtube.mse-style	2024-09-01	supported
 magic-m15classic-hires.mse-style	2024-05-27	supported
-magic-m15classic-nyx.mse-style	2024-05-27	unsupported
-magic-m15classic-walker.mse-style	2024-05-27	unsupported
+magic-m15classic-nyx.mse-style	2024-05-27	template-bug
+magic-m15classic-walker.mse-style	2024-05-27	template-bug
 magic-megaman.mse-style	2024-05-30	supported
 magic-monarch-emblem.mse-style	2026-07-14	supported
 magic-monarch-emblem-with-name.mse-style	2026-07-14	supported

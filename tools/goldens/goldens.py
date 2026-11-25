@@ -17,8 +17,9 @@ Android device or emulator (#44, see native.py); their runs and reports get a `-
 
 The Layout dump is the gate: `check` exits 1 if any card's dump differs from its golden (or a
 golden card no longer renders). The pixel comparison (SSIM) is advisory and only goes into the
-report. Both modes write <goldens>/report-<mode>.md and styles.tsv, the per-Style pass/fail list
-that Unsupported style status is read from.
+report. Both modes write <goldens>/report-<mode>.md and styles.tsv, the per-Style list that
+Style support status is read from: pass, template-bug (its only render errors are Template bugs
+recorded in template_bugs.tsv, which the reference desktop editor has too: #38) or fail.
 """
 
 from __future__ import annotations
@@ -45,6 +46,7 @@ FIXTURE_GOLDENS = FIXTURE / "goldens"
 def golden_dir(images: Path, gs: "GoldenSet") -> Path:
     """Where a Set's Golden images are: the fixture's in the repository, the others under images/."""
     return FIXTURE_GOLDENS / gs.name if gs.corpus == "fixture" else images / gs.corpus / gs.name
+TEMPLATE_BUGS = Path(__file__).resolve().parent / "template_bugs.tsv"
 SSIM_WARN = 0.98  # below this a card's pixels are flagged (advisory only)
 try:  # the pixel comparison needs numpy and Pillow; without them only the Layout dumps are compared
     import numpy  # noqa: F401
@@ -80,6 +82,55 @@ class SetResult:
     @property
     def dump_ok(self) -> bool:
         return not self.dump_diffs and not self.missing
+
+
+def template_bugs(path: Path = TEMPLATE_BUGS) -> dict[tuple[str, str], list[str]]:
+    """The recorded Template bugs: (style, version) -> the error substrings it may show"""
+    bugs: dict[tuple[str, str], list[str]] = {}
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if line.strip() and not line.startswith("#"):
+            style, version, _case, error = line.split("\t")[:4]
+            bugs.setdefault((style, version), []).append(error)
+    return bugs
+
+
+def style_version(data: Path, style: str) -> str:
+    style_file = data / f"{style}.mse-style" / "style"
+    if style_file.exists():
+        for line in style_file.read_text(encoding="utf-8-sig", errors="replace").splitlines():
+            if line.startswith("version:"):
+                return line.split(":", 1)[1].strip()
+    return ""
+
+
+def classify(r: "SetResult", mode: str, bugs: dict[tuple[str, str], list[str]], data: Path | None) -> str:
+    """A Set's verdict: pass, template-bug (every render error is a recorded Template bug of its
+    Style's version, and its Layout dumps match) or fail"""
+    if mode == "check" and not r.dump_ok:
+        return "fail"
+    if r.render_status in ("ok", "warning"):
+        return "pass"
+    if r.render_status != "error" or data is None:
+        return "fail"
+    known = bugs.get((r.gs.style, style_version(data, r.gs.style)), [])
+    errors = [l for l in r.render_output.splitlines() if "ERROR" in l]
+    if errors and known and all(any(k in l for k in known) for l in errors):
+        return "template-bug"
+    return "fail"
+
+
+RANK = {"pass": 0, "template-bug": 1, "fail": 2}
+
+
+def style_verdicts(results: list["SetResult"], mode: str, data: Path | None) -> dict[str, str]:
+    """Per Style, the worst verdict of the Sets using it"""
+    bugs = template_bugs()
+    status: dict[str, str] = {}
+    for r in results:
+        v = classify(r, mode, bugs, data)
+        if RANK[v] >= RANK[status.get(r.gs.style, "pass")]:
+            status[r.gs.style] = v
+    return status
 
 
 def set_style(set_path: Path) -> str:
@@ -193,50 +244,34 @@ def compare(res: SetResult, golden_dir: Path, run_dir: Path) -> None:
             res.ssim[card] = ssim(golden_dir / f"{card}.png", run_dir / f"{card}.png")
 
 
-def write_styles(path: Path, results: list[SetResult], mode: str) -> None:
-    """Per-Style status: a Style passes only if every Set using it rendered (and, in check, matched)."""
-    status: dict[str, str] = {}
-    for r in results:
-        ok = r.render_status in ("ok", "warning") and (mode == "capture" or r.dump_ok)
-        if not ok or r.gs.style not in status:
-            if status.get(r.gs.style) != "fail":
-                status[r.gs.style] = "pass" if ok else "fail"
+def write_styles(path: Path, results: list[SetResult], mode: str, data: Path | None) -> None:
+    """Per-Style status: pass only if every Set using it rendered (and, in check, matched);
+    template-bug if its only render errors are recorded Template bugs."""
+    status = style_verdicts(results, mode, data)
     path.write_text("style\tstatus\n" + "".join(f"{s}\t{v}\n" for s, v in sorted(status.items())), encoding="utf-8")
 
 
-def style_status(results: list[SetResult]) -> dict[str, str]:
-    """A Style passes only if every Set using it rendered and its Layout dumps match."""
-    status: dict[str, str] = {}
-    for r in results:
-        ok = r.render_status in ("ok", "warning") and r.dump_ok
-        status[r.gs.style] = "pass" if ok and status.get(r.gs.style, "pass") == "pass" else "fail"
-    return status
+STATUS_WORD = {"pass": "supported", "template-bug": "template-bug", "fail": "unsupported"}
 
 
 def write_status(path: Path, results: list[SetResult], data: Path) -> None:
     """The app's Style support status (#72, ADR 0010): each Style the Android run tested, with the
-    version tested; a Style that failed the Layout dump gate (or didn't render) is unsupported.
-    The app treats Styles not listed, or of another version, as untested."""
-    lines = []
-    for style, st in sorted(style_status([r for r in results if r.gs.corpus != "fixture"]).items()):
-        version = ""
-        style_file = data / f"{style}.mse-style" / "style"
-        if style_file.exists():
-            for line in style_file.read_text(encoding="utf-8-sig", errors="replace").splitlines():
-                if line.startswith("version:"):
-                    version = line.split(":", 1)[1].strip()
-                    break
-        lines.append(f"{style}.mse-style\t{version}\t{'supported' if st == 'pass' else 'unsupported'}\n")
+    version tested; a Style that failed the Layout dump gate (or didn't render) is unsupported,
+    unless its only render errors are recorded Template bugs (#38). The app treats Styles not
+    listed, or of another version, as untested."""
+    verdicts = style_verdicts([r for r in results if r.gs.corpus != "fixture"], "check", data)
+    lines = [f"{style}.mse-style\t{style_version(data, style)}\t{STATUS_WORD[v]}\n" for style, v in sorted(verdicts.items())]
     path.write_text(
         "# Style support for this app version: an Android golden run (tools/goldens/goldens.py --android\n"
-        "# --status-out, ADR 0010). package, version tested, supported/unsupported. Styles not listed\n"
-        "# (or of another version) are untested.\n" + "".join(lines),
+        "# --status-out, ADR 0010). package, version tested, supported/template-bug/unsupported. Styles\n"
+        "# not listed (or of another version) are untested.\n" + "".join(lines),
         encoding="utf-8",
     )
-    print(f"status: {path} ({sum(1 for l in lines if l.endswith('unsupported\n'))} unsupported of {len(lines)})")
+    counts = {w: sum(1 for l in lines if l.endswith(f"\t{w}\n")) for w in ("template-bug", "unsupported")}
+    print(f"status: {path} ({counts['unsupported']} unsupported, {counts['template-bug']} template bugs, of {len(lines)})")
 
 
-def write_report(path: Path, results: list[SetResult], mode: str) -> None:
+def write_report(path: Path, results: list[SetResult], mode: str, data: Path | None = None) -> None:
     rendered = sum(len(r.cards) for r in results)
     errors = [r for r in results if r.render_status not in ("ok", "warning")]
     out = [f"# Goldens {mode}", "", f"{len(results)} Sets, {rendered} cards rendered, {len(errors)} Sets failed to render.", ""]
@@ -258,10 +293,14 @@ def write_report(path: Path, results: list[SetResult], mode: str) -> None:
             out += [f"| {r.gs.key} | {c} | {v:.4f} |" for r, c, v in sorted(flagged, key=lambda x: x[2])]
             out.append("")
     if errors:
-        out += ["## Render failures", "", "| Set | Style | Status | First messages |", "|---|---|---|---|"]
+        bugs = template_bugs()
+        out += ["## Render failures", "",
+                "Template bug: every error is recorded in tools/goldens/template_bugs.tsv for the Style's version.", "",
+                "| Set | Style | Status | Template bug | First messages |", "|---|---|---|---|---|"]
         for r in errors:
             msgs = [l.strip() for l in r.render_output.splitlines() if "ERROR" in l][:2]
-            out.append(f"| {r.gs.key} | {r.gs.style} | {r.render_status} | {' / '.join(msgs).replace('|', '/')[:200]} |")
+            bug = "yes" if data is not None and classify(r, "capture", bugs, data) == "template-bug" else "no"
+            out.append(f"| {r.gs.key} | {r.gs.style} | {r.render_status} | {bug} | {' / '.join(msgs).replace('|', '/')[:200]} |")
     path.write_text("\n".join(out) + "\n", encoding="utf-8")
 
 
@@ -355,8 +394,9 @@ def render_native(args, sets: list[GoldenSet], run_root: Path, images: Path) -> 
 
 def finish(args, results: list[SetResult], imported: str) -> int:
     suffix = ("-fixture" if args.fixture_only else "") + imported
-    write_report(args.goldens / f"report-{args.mode}{suffix}.md", results, args.mode)
-    write_styles(args.goldens / f"styles{suffix}.tsv", results, args.mode)
+    data = None if args.fixture_only else (args.templates or args.pack / "data")
+    write_report(args.goldens / f"report-{args.mode}{suffix}.md", results, args.mode, data)
+    write_styles(args.goldens / f"styles{suffix}.tsv", results, args.mode, data)
     print(f"report: {args.goldens / f'report-{args.mode}{suffix}.md'}")
     if args.mode == "check":
         bad = [r for r in results if not r.dump_ok]

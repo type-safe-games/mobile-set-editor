@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Generate the Tier 1 golden fixture Sets: one Set per `magic` Style, one Card each (ADR 0010).
+"""Generate the Tier 1 golden fixture Sets: one Set per `magic` Style, two Cards each (ADR 0010).
 
 For every templates/Full-Magic-Pack/data/magic-*.mse-style this writes
-<out>/sets/<style>.mse-set/set: a one-card Set whose every field the Style draws holds standard
-filler text. It then loads and renders each Set through `magicseteditor --cli` and writes
+<out>/sets/<style>.mse-set/set: a Set whose Cards fill every field the Style draws with standard
+filler text, once two-color (card 0) and once one-color (card 1), so that one color combination
+alone doesn't decide a Style's support (#38). It then loads and renders each Set through `magicseteditor --cli` and writes
 <out>/report.md: the Styles that fail to load or render (these seed Unsupported style status)
 and those that render with warnings.
 
@@ -47,6 +48,9 @@ FILLER = {
     "additional credit": "Test credit",
 }
 LOYALTY_COSTS = ["+1", "−2", "−7", "+2", "0", "−3"]
+# The cases each Set has, in card order: the casting cost each Card gets. Card 0 stays the
+# two-color card the Golden images were first captured with.
+CASES = ["3WU", "3W"]
 
 # Fields the Style draws that are composed by scripts from editable source fields.
 COMPOSITES = {
@@ -125,15 +129,17 @@ def set_file(stylesheet: str, values: dict[str, str]) -> str:
         "game: magic",
         f"stylesheet: {stylesheet}",
         # No `set info`: a key the game doesn't declare there hangs MSE 2.6's reader.
-        "card:",
-        "\trarity: rare",
     ]
-    for key, value in values.items():
-        if "\n" in value:
-            lines.append(f"\t{key}:")
-            lines += [f"\t\t{part}" for part in value.split("\n")]
-        else:
-            lines.append(f"\t{key}: {value}")
+    for cost in CASES:
+        lines += ["card:", "\trarity: rare"]
+        for key, value in values.items():
+            if FACE.match(key).group(1) == "casting cost":
+                value = cost
+            if "\n" in value:
+                lines.append(f"\t{key}:")
+                lines += [f"\t\t{part}" for part in value.split("\n")]
+            else:
+                lines.append(f"\t{key}: {value}")
     return "\n".join(lines) + "\n"
 
 
@@ -177,9 +183,10 @@ def main() -> int:
 
     def check(item: tuple[str, Path]):
         style, set_path = item
-        commands = (
-            f"write_image_file(set.cards[0], file: {mse_string(str(check_dir / (style + '.png')))})\n"
-            f"write_layout_file(set.cards[0], file: {mse_string(str(check_dir / (style + '.json')))})\n"
+        commands = "".join(
+            f"write_image_file(set.cards[{i}], file: {mse_string(str(check_dir / f'{style}-{i}.png'))})\n"
+            f"write_layout_file(set.cards[{i}], file: {mse_string(str(check_dir / f'{style}-{i}.json'))})\n"
+            for i in range(len(CASES))
         )
         return style, run_cli(args.mse, set_path, commands, env, args.timeout)
 

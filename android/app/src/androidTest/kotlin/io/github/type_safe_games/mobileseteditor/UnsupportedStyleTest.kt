@@ -49,6 +49,14 @@ class UnsupportedStyleTest {
     }
 
     @Test
+    fun aTemplateBugIsFlaggedSoftly() {
+        val styles = runBlocking { Core.listTemplates().templates.filter { it.game == "fixture.mse-game" && it.type == "style" } }
+        compose.setContent { StylePicker(styles, onPick = {}, support = StyleSupport.parse("fixture-alternate.mse-style\t\ttemplate-bug\n")) }
+        compose.onNodeWithTag("template-bug-fixture-alternate.mse-style", useUnmergedTree = true).assertExists()
+        assertTrue(compose.onAllNodesWithTag("unsupported-fixture-alternate.mse-style", useUnmergedTree = true).fetchSemanticsNodes().isEmpty())
+    }
+
+    @Test
     fun styleNotInTheStatusIsUntested() {
         val styles = runBlocking { Core.listTemplates().templates.filter { it.game == "fixture.mse-game" && it.type == "style" } }
         compose.setContent { StylePicker(styles, onPick = {}, support = StyleSupport.parse("")) }

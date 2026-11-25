@@ -77,3 +77,7 @@ _Avoid_: Layout snapshot
 A Style that fails its Golden image check in this version of the app; it still installs, but is flagged in the style picker.
 _Avoid_: Broken style, disabled style
 
+**Template bug**:
+An error in a Template's own scripts or images that the reference desktop editor shows too; recorded with its upstream report, and not counted against the Style's support.
+_Avoid_: Upstream bug, pack bug
+
