@@ -103,6 +103,42 @@ class CardEditorTest {
         compose.onNodeWithTag("redo").assertIsDisplayed()
     }
 
+    /** Where the edited field's caret is (its selection's end) */
+    private fun caret(): Int = compose.onNodeWithTag("field-text").fetchSemanticsNode()
+        .config[androidx.compose.ui.semantics.SemanticsProperties.TextSelectionRange].end
+
+    @Test
+    fun aTapInTheRulesOnTheCardMovesTheCaretBackToAnEarlierWord() {
+        val model = SetViewModel(TestFixture.app.applicationContext as Application)
+        compose.setContent { CardEditorScreen(model, onBack = {}) }
+        model.open(Uri.fromFile(TestFixture.zip("caret.mse-set", TestFixture.assetFiles("sets/fixture-cards.mse-set"))))
+        compose.waitUntil(30_000) { model.state.value.card != null }
+        val card = model.state.value.card!!
+        val uid = card.uid
+        val rules = card.regions.first { it.field == "rules" }
+        compose.waitUntil(30_000) { compose.onAllNodesWithTag("card-$uid").fetchSemanticsNodes().isNotEmpty() }
+        // performTouchInput measures from the node's visible top, which a scrolled Card has cut off
+        fun tap(fx: Double, fy: Double) {
+            val node = compose.onNodeWithTag("card-$uid").fetchSemanticsNode()
+            val hidden = node.boundsInRoot.top - node.positionInRoot.y
+            compose.onNodeWithTag("card-$uid").performTouchInput {
+                val scale = width.toFloat() / card.bitmap.width
+                click(Offset(((rules.x + rules.width * fx) * scale).toFloat(), ((rules.y + rules.height * fy) * scale).toFloat() - hidden))
+            }
+        }
+        // open the rules on the Card, and put the caret at the end, as after typing
+        tap(0.5, 0.5)
+        waitForTag("field-text")
+        val text = compose.onNodeWithTag("field-text").fetchSemanticsNode()
+            .config[androidx.compose.ui.semantics.SemanticsProperties.EditableText].text
+        compose.onNodeWithTag("field-text").performTextInputSelection(TextRange(text.length))
+        compose.waitUntil(5_000) { caret() == text.length }
+        // a tap at the start of the rules' first line moves the caret to its first word
+        compose.waitForIdle()
+        tap(0.02, 0.04)
+        compose.waitUntil(10_000) { caret() < 10 }
+    }
+
     @Test
     fun arrowsMoveBetweenCardsAndADragOverAFieldDoesNotOpenIt() {
         val model = SetViewModel(TestFixture.app.applicationContext as Application)

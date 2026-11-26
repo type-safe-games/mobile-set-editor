@@ -35,6 +35,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -352,6 +353,12 @@ private fun CardPage(
     val highlight = MaterialTheme.colorScheme.primary
     val stroke = with(LocalDensity.current) { 3.dp.toPx() }
     val region = rendered?.regions?.firstOrNull { it.field == selected }
+    // the tap handler below lives as long as the render: it reads these as they are now, not as they
+    // were when it started (a tap in the field just opened would open it again, not move the caret: #99)
+    val currentSelected by rememberUpdatedState(selected)
+    val currentOnCard by rememberUpdatedState(onCard)
+    val currentOnTap by rememberUpdatedState(onTap)
+    val currentOnLongPress by rememberUpdatedState(onLongPress)
     // the field's carets on this render, when editing it on the Card (#83)
     var carets by remember(key) { mutableStateOf<List<Caret>>(emptyList()) }
     LaunchedEffect(rendered, selected, onCard) {
@@ -371,8 +378,10 @@ private fun CardPage(
         animationSpec = infiniteRepeatable(keyframes { durationMillis = 1000; 1f at 0; 1f at 499; 0f at 500; 0f at 999 }),
         label = "blink",
     ).value
-    // keep the field being edited in view, also when the sheet and the keyboard take space
-    LaunchedEffect(region?.field, region?.y, viewport) {
+    // keep the field being edited in view, also when the sheet and the keyboard take space. Again
+    // when the scroll range changes: the viewport shrinks before the range does, and a scroll
+    // clamped to the old range (0, with the whole Card in view) stays put (#99)
+    LaunchedEffect(region?.field, region?.y, viewport, scroll.maxValue) {
         if (region == null) return@LaunchedEffect
         val scale = key.width.toDouble() / rendered.image.width
         val (_, top, _, bottom) = HitTest.bounds(region).map { (it * scale).toInt() }
@@ -409,15 +418,16 @@ private fun CardPage(
                 })
                 .aspectRatio(image.width.toFloat() / image.height)
                 .pointerInput(rendered) {
-                    detectTapsNotSwipes(onLongPress = onLongPress, ignore = scrolling) { at ->
+                    detectTapsNotSwipes(onLongPress = { currentOnLongPress() }, ignore = scrolling) { at ->
                         // the core picks the field, as the desktop does (masks included)
                         val s = image.width / size.width.toDouble()
                         scope.launch {
                             val hit = Core.fieldAt(model.state.value.session, key.uid, at.x * s, at.y * s, image.width)
                             if (!hit.result.ok || hit.field.isEmpty()) return@launch
                             // a tap in the field being edited on the Card moves the caret there (#83)
-                            if (onCard != null && hit.field == selected && carets.isNotEmpty()) onCard.tapped = nearestCaret(carets, at.x * s, at.y * s, onCard.parts)
-                            else onTap(hit.field)
+                            val editing = currentOnCard
+                            if (editing != null && hit.field == currentSelected && carets.isNotEmpty()) editing.tapped = nearestCaret(carets, at.x * s, at.y * s, editing.parts)
+                            else currentOnTap(hit.field)
                         }
                     }
                 }
