@@ -1,0 +1,1 @@
+A new app icon: a fanned hand of cards on teal. Fixes for dialogs that could miss what they load. Template bugs are now told apart from unsupported styles.

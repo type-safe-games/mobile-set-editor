@@ -102,6 +102,52 @@ Builds:
       - third_party/skia/third_party/vello/Cargo.toml
     ndk: 29.0.14206865
 
+  - versionName: 0.1.2
+    versionCode: 1021
+    commit: v0.1.2
+    subdir: android/app
+    submodules: true
+    sudo:
+      - apt-get update
+      - apt-get install -y --no-install-recommends clang cmake ninja-build
+    gradle:
+      - yes
+    output: build/outputs/apk/release/app-arm64-v8a-release-unsigned.apk
+    scandelete:
+      - third_party/boost/json/fuzzing
+      - third_party/minizip-ng/test
+      - third_party/skia-deps/harfbuzz/src/rust
+      - third_party/skia-deps/harfbuzz/src/wasm
+      - third_party/skia-deps/harfbuzz/test
+      - third_party/skia-deps/zlib/google/test
+      - third_party/skia/platform_tools
+      - third_party/skia/resources
+      - third_party/skia/third_party/vello/Cargo.toml
+    ndk: 29.0.14206865
+
+  - versionName: 0.1.2
+    versionCode: 1022
+    commit: v0.1.2
+    subdir: android/app
+    submodules: true
+    sudo:
+      - apt-get update
+      - apt-get install -y --no-install-recommends clang cmake ninja-build
+    gradle:
+      - yes
+    output: build/outputs/apk/release/app-x86_64-release-unsigned.apk
+    scandelete:
+      - third_party/boost/json/fuzzing
+      - third_party/minizip-ng/test
+      - third_party/skia-deps/harfbuzz/src/rust
+      - third_party/skia-deps/harfbuzz/src/wasm
+      - third_party/skia-deps/harfbuzz/test
+      - third_party/skia-deps/zlib/google/test
+      - third_party/skia/platform_tools
+      - third_party/skia/resources
+      - third_party/skia/third_party/vello/Cargo.toml
+    ndk: 29.0.14206865
+
 AutoUpdateMode: Version
 UpdateCheckMode: Tags
 VercodeOperation:
@@ -109,5 +155,5 @@ VercodeOperation:
   - '%c * 10 + 2'
 UpdateCheckData: android/app/build.gradle.kts|val baseVersionCode = (\d+)|.|val appVersion
   = "([^"]+)"
-CurrentVersion: 0.1.1
-CurrentVersionCode: 1012
+CurrentVersion: 0.1.2
+CurrentVersionCode: 1022

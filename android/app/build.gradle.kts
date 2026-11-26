@@ -15,10 +15,10 @@ val abis = listOf("arm64-v8a", "x86_64")
 // per ABI, for F-Droid's per-ABI builds: (major * 10000 + minor * 100 + patch) * 10 + the ABI's
 // digit (arm64-v8a 1, x86_64 2), so 0.1.0 is 1001 on arm64-v8a and 1002 on x86_64; an APK with
 // every ABI (debug builds) has digit 0.
-val appVersion = "0.1.1"
+val appVersion = "0.1.2"
 // appVersion's versionCode before the ABI digit, written out so that F-Droid's update check can read
 // it (tools/fdroid/README.md); the build stops if it doesn't match appVersion.
-val baseVersionCode = 101
+val baseVersionCode = 102
 val abiDigits = mapOf("arm64-v8a" to 1, "x86_64" to 2)
 /** A release build: one APK per ABI (splits); otherwise one APK with every ABI */
 val releaseBuild = gradle.startParameter.taskNames.any { it.contains("Release", ignoreCase = true) }
