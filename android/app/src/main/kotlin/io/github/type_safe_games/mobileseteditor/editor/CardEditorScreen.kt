@@ -64,6 +64,7 @@ import io.github.type_safe_games.mobileseteditor.SetViewModel
 import io.github.type_safe_games.mobileseteditor.core.Core
 import io.github.type_safe_games.mobileseteditor.core.FieldInfo
 import io.github.type_safe_games.mobileseteditor.core.TargetKind
+import io.github.type_safe_games.mobileseteditor.core.SymbolMenuItem
 import io.github.type_safe_games.mobileseteditor.core.SymbolMenuResult
 import io.github.type_safe_games.mobileseteditor.core.TextResult
 import io.github.type_safe_games.mobileseteditor.render.RenderKey
@@ -539,7 +540,14 @@ private fun TextEditor(model: SetViewModel, session: Long, target: EditTarget, m
     // the field's symbol font, if any: a symbol bar, and typing in symbols (#64)
     var symbols by remember(target) { mutableStateOf<SymbolMenuResult?>(null) }
     var symbolMode by remember(target) { mutableStateOf(false) }
-    LaunchedEffect(target) { symbols = Core.symbolMenu(session, target.kind, target.uid, target.field) }
+    // Magic's symbols in the order a field most likely needs them (a cost: mana first; #82)
+    var symbolItems by remember(target) { mutableStateOf<List<SymbolMenuItem>>(emptyList()) }
+    LaunchedEffect(target) {
+        val menu = Core.symbolMenu(session, target.kind, target.uid, target.field)
+        val game = Core.sessionInfo(session).game
+        symbolItems = SymbolOrder.forField(game, menu.items, castingCost = menu.alwaysSymbol)
+        symbols = menu
+    }
     /** Insert a symbol's code at the caret (over the selection), as a symbol */
     fun insertSymbol(code: String) = scope.launch {
         holder.mutex.withLock {
@@ -666,7 +674,7 @@ private fun TextEditor(model: SetViewModel, session: Long, target: EditTarget, m
     }
     symbols?.takeIf { it.hasSymbols && showSymbols }?.let { menu ->
         SymbolBar(
-            menu, session, target.uid, target.field, target.kind,
+            menu, symbolItems, session, target.uid, target.field, target.kind,
             symbolMode = symbolMode,
             onSymbolMode = { symbolMode = it; focus.requestFocus() },
             onInsert = { insertSymbol(it) },

@@ -50,6 +50,8 @@ import io.github.type_safe_games.mobileseteditor.core.TargetKind
 @Composable
 fun SymbolBar(
     menu: SymbolMenuResult,
+    /** the menu's items as the bar lists them (reordered for Magic: [SymbolOrder]) */
+    items: List<SymbolMenuItem>,
     session: Long,
     uid: String,
     field: String,
@@ -76,7 +78,7 @@ fun SymbolBar(
             )
         }
         LazyRow(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
-            items(menu.items) { item ->
+            items(items) { item ->
                 when (item.type) {
                     SymbolMenuItem.Type.Line -> VerticalDivider(Modifier.height(28.dp).padding(horizontal = 2.dp))
                     SymbolMenuItem.Type.Submenu -> Submenu(item, session, uid, field, kind, pick)
